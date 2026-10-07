@@ -9,6 +9,7 @@ function newMenuSelection(scenarioId, goalId, size = 'small') {
   if (!MAP_THEMES.includes(scenarioId)) throw new BuildError('map', `Unknown map "${scenarioId}"`);
   if (!MAP_SIZES.includes(size)) throw new BuildError('size', `Unknown map size "${size}"`);
   if (!OBJECTIVES[goalId]) throw new BuildError('goal', `Unknown win condition "${goalId}"`);
+  if (!goalAllowsSize(goalId, size)) throw new BuildError('size-goal', `${OBJECTIVES[goalId].name} needs a large map; the small maps are for LAST MECH STANDING`);
   return { map: scenarioId, goal: goalId, size };
 }
 
@@ -33,8 +34,8 @@ function selectButtons(sel) {
     const o = OBJECTIVES[id];
     out.push({ id: 'goal:' + id, x: 16 + i * 250, y: 366, w: 242, h: 160, label: o.name, sub: o.blurb, state: !o.ready ? 'disabled' : sel.goal === id ? 'selected' : 'normal', tip: o.ready ? o.blurb : o.name + ' is not playable yet', action: { type: 'goal', id } });
   });
-  MAP_SIZES.forEach((size, i) => out.push({ id: 'size:' + size, x: 760 + i * 124, y: 12, w: 120, h: 40, label: size.toUpperCase(), sub: size === 'small' ? '19 x 12' : '31 x 20', state: sel.size === size ? 'selected' : 'normal',
-    tip: size === 'small' ? 'The small map (19 x 12) fits on the screen: quick battles' : 'The large map (31 x 20) is about 2.5 times the area and scrolls: room to manoeuvre, and the goals take longer', action: { type: 'size', size } }));
+  MAP_SIZES.forEach((size, i) => out.push({ id: 'size:' + size, x: 760 + i * 124, y: 12, w: 120, h: 40, label: size.toUpperCase(), sub: size === 'small' ? '19 x 12' : '31 x 20', state: !goalAllowsSize(sel.goal, size) ? 'disabled' : sel.size === size ? 'selected' : 'normal',
+    tip: !goalAllowsSize(sel.goal, size) ? `The small maps are only for LAST MECH STANDING: ${OBJECTIVES[sel.goal].name} needs the room of a large map` : size === 'small' ? 'The small map (19 x 12) fits on the screen: quick battles (last mech standing only)' : 'The large map (31 x 20) is about 2.5 times the area and scrolls: room to manoeuvre, and the goals take longer', action: { type: 'size', size } }));
   out.push({ id: 'back', x: 16, y: 620, w: 140, h: 44, label: 'BACK', sub: '', state: 'normal', tip: 'Back to the title screen', action: { type: 'back' } });
   out.push({ id: 'continue', x: 818, y: 616, w: 190, h: 52, label: 'CONTINUE', sub: '', state: 'normal', tip: 'Build your squad for this map and goal (ENTER)', action: { type: 'continue' } });
   return out;
@@ -49,7 +50,12 @@ function selectPress(sel, button) {
   if (button.state === 'disabled') return button.tip;
   const a = button.action;
   if (a.type === 'map') sel.map = newMenuSelection(a.id, sel.goal, sel.size).map;
-  else if (a.type === 'goal') sel.goal = newMenuSelection(sel.map, a.id, sel.size).goal;
+  else if (a.type === 'goal') { // a goal that needs a large map takes the selection to LARGE, and says so
+    const size = goalAllowsSize(a.id, sel.size) ? sel.size : 'large';
+    const moved = size !== sel.size;
+    sel.goal = newMenuSelection(sel.map, a.id, size).goal; sel.size = size;
+    return moved ? `${OBJECTIVES[a.id].name} needs room, so the map is now LARGE.` : '';
+  }
   else if (a.type === 'size') sel.size = newMenuSelection(sel.map, sel.goal, a.size).size;
   else throw new BuildError('action', `selectPress cannot apply a ${a.type} button`);
   return '';

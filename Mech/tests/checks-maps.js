@@ -141,7 +141,7 @@ check('menu: every win condition can be chosen, and one that is not ready would 
   const sel = newMenuSelection('basin', 'annihilation');
   for (const id of OBJECTIVE_IDS) {
     eq(OBJECTIVES[id].ready, true, id + ' is playable');
-    eq(selectPress(sel, selectButtons(sel).find(x => x.id === 'goal:' + id)), '');
+    selectPress(sel, selectButtons(sel).find(x => x.id === 'goal:' + id));
     eq(sel.goal, id);
   }
   OBJECTIVES.annihilation.ready = false; // pretend one is unfinished
@@ -172,4 +172,27 @@ check('menu: unknown maps and win conditions are typed errors, and the bay names
   const change = bayButtons(bay).find(b => b.id === 'change');
   eq([change.label, change.sub], ['DEAD CITY', 'LAST MECH STANDING']);
   eq(bayButtons(newBay(BAY_SQUAD, 'normal')).find(b => b.id === 'change').label, 'THE BASIN', 'the default map is the basin');
+});
+
+check('menu: the small maps are only for last mech standing: other goals need a large map, the menu says so and moves you there', () => {
+  eq(OBJECTIVES.annihilation.sizes, ['small', 'large']);
+  for (const goal of ['flag', 'hill', 'exit']) eq(OBJECTIVES[goal].sizes, ['large'], goal);
+  throwsKind(BuildError, 'size-goal', () => newMenuSelection('basin', 'flag', 'small'));
+  newMenuSelection('basin', 'annihilation', 'small'); // fine
+  newMenuSelection('basin', 'flag', 'large');         // fine
+  const sel = newMenuSelection('urban', 'annihilation', 'small');
+  eq(selectButtons(sel).find(b => b.id === 'size:small').state, 'selected', 'small is on offer for a straight fight');
+  const note = selectPress(sel, selectButtons(sel).find(b => b.id === 'goal:hill'));
+  assert(note.includes('needs room') && note.includes('LARGE'), note);
+  eq([sel.goal, sel.size], ['hill', 'large'], 'choosing the hill took the selection to the large map');
+  const small = selectButtons(sel).find(b => b.id === 'size:small');
+  eq(small.state, 'disabled');
+  assert(small.tip.includes('only for LAST MECH STANDING'), small.tip);
+  const before = JSON.stringify(sel);
+  assert(selectPress(sel, small).includes('LAST MECH STANDING'), 'a disabled SMALL says why');
+  eq(JSON.stringify(sel), before, 'and changes nothing');
+  selectPress(sel, selectButtons(sel).find(b => b.id === 'goal:annihilation'));
+  eq(sel.size, 'large', 'going back to a straight fight leaves the size as it is');
+  selectPress(sel, selectButtons(sel).find(b => b.id === 'size:small'));
+  eq(sel.size, 'small', 'and small is available again');
 });

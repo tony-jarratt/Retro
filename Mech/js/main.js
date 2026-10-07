@@ -1106,6 +1106,11 @@ function applyTestHooks() {
     game.scenarioId = theme; if (large) game.mapSize = 'large';
   }
   if (q.get('size')) { scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, q.get('size')); game.mapSize = q.get('size'); }
+  if (game.goal && !goalAllowsSize(game.goal, game.mapSize || 'small')) { // the small maps are for last mech standing only
+    if (q.get('size') === 'small' || (q.get('map') || '').endsWith('-small')) throw new BuildError('size-goal', `${OBJECTIVES[game.goal].name} needs a large map; the small maps are for LAST MECH STANDING`);
+    console.warn(`${OBJECTIVES[game.goal].name} needs a large map, so the address's map is used at the large size.`);
+    game.mapSize = 'large';
+  }
   game.wantIntro = q.has('intro');
   game.wantBay = !!q.get('code'); // a squad code in the address means a reload: straight to the bay
   if (q.get('goal')) { if (!OBJECTIVES[q.get('goal')]) throw new BuildError('goal', `Unknown win condition "${q.get('goal')}" (they are ${OBJECTIVE_IDS.join(', ')})`); game.goal = q.get('goal'); }

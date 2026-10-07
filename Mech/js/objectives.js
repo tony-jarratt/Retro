@@ -14,23 +14,26 @@ const HILL_TARGET = 4;
 
 const OBJECTIVES = {
   annihilation: {
-    id: 'annihilation', name: 'LAST MECH STANDING', ready: true, roundLimit: null,
+    id: 'annihilation', name: 'LAST MECH STANDING', ready: true, roundLimit: null, sizes: ['small', 'large'],
     blurb: 'Destroy every enemy mech.',
   },
   flag: {
-    id: 'flag', name: 'CAPTURE THE FLAG', ready: true, roundLimit: 20,
+    id: 'flag', name: 'CAPTURE THE FLAG', ready: true, roundLimit: 20, sizes: ['large'],
     blurb: 'Grab the flag from the middle of the map and carry it back to your base. A carrier cannot run, and a destroyed carrier drops the flag.',
   },
   hill: {
-    id: 'hill', name: 'KING OF THE HILL', ready: true, roundLimit: 15,
+    id: 'hill', name: 'KING OF THE HILL', ready: true, roundLimit: 15, sizes: ['large'],
     blurb: `Hold the hill in the middle. Each round the side with more mechs on it scores a point; first to ${HILL_TARGET} wins.`,
   },
   exit: {
-    id: 'exit', name: 'GET TO THE EXIT', ready: true, roundLimit: 15,
+    id: 'exit', name: 'GET TO THE EXIT', ready: true, roundLimit: 15, sizes: ['large'],
     blurb: 'Get your whole squad into your exit hexes before the enemy gets theirs into theirs. The slowest mech sets the pace.',
   },
 };
 const OBJECTIVE_IDS = Object.keys(OBJECTIVES);
+// Which map sizes a goal can be played on (`sizes` above): the small maps are only big enough for a straight fight; the flag, the hill and the exit
+// need room, so they are large-map goals. The menu and the address enforce it; the rules and the tests can still run any goal on any map.
+function goalAllowsSize(goalId, size) { return OBJECTIVES[goalId].sizes.includes(size); }
 const DEFAULT_OBJECTIVE_ID = 'annihilation';
 
 // ---------- setting up ----------

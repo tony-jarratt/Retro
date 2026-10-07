@@ -136,6 +136,7 @@ function goalReport(fightsPerSquad) {
     const ends = {}, perMap = {};
     let rounds = 0, fights = 0, wins = 0;
     for (const id of SCENARIO_IDS) {
+      if (!goalAllowsSize(goal, SCENARIOS[id].size)) continue; // the game does not offer this goal on this size
       perMap[id] = { rounds: 0, fights: 0 };
       for (const q of SUGGESTED_SQUADS) {
         for (let i = 0; i < fightsPerSquad; i++) {
@@ -151,7 +152,7 @@ function goalReport(fightsPerSquad) {
         }
       }
     }
-    lines.push(`  ${OBJECTIVES[goal].name}: average ${(rounds / fights).toFixed(1)} rounds (${SCENARIO_IDS.map(id => `${id} ${(perMap[id].rounds / perMap[id].fights).toFixed(1)}`).join(', ')}), you win ${Math.round(100 * wins / fights)}% of ${fights}; ended by: ${Object.entries(ends).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k.trim()} ${v}`).join('; ')}`);
+    lines.push(`  ${OBJECTIVES[goal].name}: average ${(rounds / fights).toFixed(1)} rounds (${Object.keys(perMap).map(id => `${id} ${(perMap[id].rounds / perMap[id].fights).toFixed(1)}`).join(', ')}), you win ${Math.round(100 * wins / fights)}% of ${fights}; ended by: ${Object.entries(ends).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k.trim()} ${v}`).join('; ')}`);
   }
   return lines;
 }
