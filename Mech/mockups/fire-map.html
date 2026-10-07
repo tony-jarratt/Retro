@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup B - stay on the map</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #050b1e; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  canvas { width: min(100vw, calc(100vh * 1024 / 688)); height: auto; aspect-ratio: 1024 / 688; display: block; user-select: none; }
+</style>
+</head>
+<body>
+<canvas id="game" width="1024" height="688"></canvas>
+<script src="common.js"></script>
+<script>
+'use strict';
+// MOCKUP B: the fire sequence played on the overhead hex map, with a camera push-in. Throwaway.
+const cv = document.getElementById('game');
+const g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+
+// ---- hex map (flat-top hexes, odd columns shifted down) ----
+const HR = 34, COLS = 13, ROWS = 9, OX = 70, OY = 80;
+const MAP = [
+  '..T.....H....',
+  '.TT...HH.H.T.',
+  '..T..HHH...TT',
+  '....HH.....T.',
+  '~~...R...T...',
+  '.~~~.......R.',
+  '..R~~..TT....',
+  '...T~~..TT...',
+  '....T.~~.....',
+];
+const hexCenter = (c, r) => [OX + HR * 1.5 * c, OY + HR * Math.sqrt(3) * (r + 0.5 * (c & 1))];
+function hexPath(b, x, y, rad) {
+  b.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 3 * i;
+    b[i ? 'lineTo' : 'moveTo'](x + rad * Math.cos(a), y + rad * Math.sin(a));
+  }
+  b.closePath();
+}
+function hexDist(c1, r1, c2, r2) {
+  const cube = (c, r) => { const z = r - (c - (c & 1)) / 2; return [c, -c - z, z]; };
+  const a = cube(c1, r1), b = cube(c2, r2);
+  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+}
+const hash = (c, r, k) => { const v = Math.sin(c * 12.9898 + r * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
+
+const mapCv = makeCanvas(W, H, b => {
+  b.fillStyle = '#101a2c'; b.fillRect(0, 0, W, H);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const t = MAP[r][c], [x, y] = hexCenter(c, r);
+    hexPath(b, x, y, HR);
+    b.fillStyle = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62' }[t];
+    b.fill();
+    if (t === '.') for (let i = 0; i < 4; i++) rect(b, '#76865a', x + (hash(c, r, i) - 0.5) * 40, y + (hash(c, r, i + 9) - 0.5) * 36, 3, 2);
+    if (t === 'T') for (let i = 0; i < 4; i++) {
+      const tx = x + (hash(c, r, i) - 0.5) * 36, ty = y + (hash(c, r, i + 5) - 0.5) * 32;
+      b.fillStyle = '#245030'; b.beginPath(); b.arc(tx, ty, 7, 0, Math.PI * 2); b.fill();
+      b.fillStyle = '#3f7a45'; b.beginPath(); b.arc(tx - 2, ty - 2, 3, 0, Math.PI * 2); b.fill();
+    }
+    if (t === 'H') { b.strokeStyle = '#a88b5c'; b.lineWidth = 1.5; hexPath(b, x, y, HR * 0.66); b.stroke(); hexPath(b, x, y, HR * 0.33); b.stroke(); }
+    if (t === '~') { b.strokeStyle = '#5b95c8'; b.lineWidth = 1.5; for (const dy of [-8, 4, 14]) { b.beginPath(); b.moveTo(x - 14, y + dy); b.quadraticCurveTo(x - 7, y + dy - 4, x, y + dy); b.quadraticCurveTo(x + 7, y + dy + 4, x + 14, y + dy); b.stroke(); } }
+    if (t === 'R') for (let i = 0; i < 5; i++) rect(b, '#8a867c', x + (hash(c, r, i) - 0.5) * 38, y + (hash(c, r, i + 3) - 0.5) * 32, 6, 5);
+    hexPath(b, x, y, HR); b.strokeStyle = 'rgba(0,0,0,0.35)'; b.lineWidth = 1; b.stroke();
+  }
+});
+
+// ---- top-down placeholder mechs: 32x32 sprites facing up ----
+function topMech(c) {
+  return makeCanvas(32, 32, s => {
+    rect(s, '#1b2028', 9, 18, 5, 11); rect(s, '#1b2028', 18, 18, 5, 11);
+    rect(s, c.lo, 10, 18, 3, 10); rect(s, c.lo, 19, 18, 3, 10);
+    rect(s, '#1b2028', 8, 7, 16, 13); rect(s, c.body, 9, 8, 14, 11); rect(s, c.hi, 9, 8, 14, 2);
+    rect(s, c.lo, 12, 16, 8, 3);
+    rect(s, c.accent, 9, 13, 2, 4); rect(s, c.accent, 21, 13, 2, 4);
+    for (const x of [3, 23]) { rect(s, '#1b2028', x, 6, 6, 16); rect(s, c.body, x + 1, 7, 4, 14); rect(s, c.hi, x + 1, 7, 1, 14); }
+    rect(s, '#111', 4, 1, 2, 6); rect(s, '#111', 7, 1, 2, 6);        // left arm laser barrels
+    rect(s, '#111', 24, 0, 3, 7);                                    // right arm autocannon
+    rect(s, '#1b2028', 18, 4, 5, 6);                                 // missile pod
+    rect(s, c.accent, 19, 5, 1, 2); rect(s, c.accent, 21, 5, 1, 2); rect(s, c.accent, 19, 8, 1, 1); rect(s, c.accent, 21, 8, 1, 1);
+    rect(s, '#1b2028', 13, 10, 6, 6); rect(s, '#ffb347', 14, 11, 4, 2);
+  });
+}
+const spriteP = topMech({ body: '#6d7f95', hi: '#9fb2c8', lo: '#3d4958', accent: '#e2572b' });
+const spriteE = topMech({ body: '#6f7f5c', hi: '#a2b58a', lo: '#3f4a36', accent: '#e6d34a' });
+const MS = 1.8;                                                      // sprite pixels to screen pixels
+
+const ME = { c: 1, r: 6 }, FOE = { c: 9, r: 2 };
+[ME, FOE].forEach(m => { [m.x, m.y] = hexCenter(m.c, m.r); });
+ME.a = Math.atan2(FOE.y - ME.y, FOE.x - ME.x);
+FOE.a = ME.a + Math.PI;
+const RANGE = hexDist(ME.c, ME.r, FOE.c, FOE.r);
+const BAND = RANGE > 6 ? 'LONG' : RANGE > 3 ? 'MEDIUM' : 'SHORT';
+const TO_HIT = 4 + (RANGE > 6 ? 4 : RANGE > 3 ? 2 : 0) + 1 + (MAP[FOE.r][FOE.c] === 'T' ? 1 : 0);
+const CHANCE = Math.round(100 * [...Array(36).keys()].filter(i => (i / 6 | 0) + (i % 6) + 2 >= TO_HIT).length / 36);
+
+// A point on a mech: fwd/lat in sprite pixels from its centre (lat > 0 is its right-hand side).
+function onMech(m, fwd, lat) {
+  const fx = Math.cos(m.a), fy = Math.sin(m.a);
+  return [m.x + (fx * fwd - fy * lat) * MS, m.y + (fy * fwd + fx * lat) * MS];
+}
+function muzzle(s) {
+  if (s.w.id === 'laser') return onMech(ME, 15, s.i ? -8 : -11);
+  if (s.w.id === 'ac') return onMech(ME, 16, 10.5);
+  return onMech(ME, 12, 5 + (s.i % 3));
+}
+
+function drawMech(m, sprite, now, alsoFlash) {
+  const shake = alsoFlash && now < hitShakeUntil ? 2 : 0;
+  g.save();
+  g.translate(m.x + rand(-shake, shake), m.y + rand(-shake, shake));
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  g.beginPath(); g.ellipse(4, 6, 24, 20, 0, 0, Math.PI * 2); g.fill();
+  g.rotate(m.a + Math.PI / 2);
+  g.drawImage(sprite, -16 * MS, -16 * MS, 32 * MS, 32 * MS);
+  if (alsoFlash && Object.values(S.flashUntil).some(t => now < t)) {
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.55;
+    g.drawImage(sprite, -16 * MS, -16 * MS, 32 * MS, 32 * MS);
+  }
+  g.restore();
+}
+
+function drawMarkers(now) {
+  // firing arc in front of the shooter
+  g.fillStyle = 'rgba(79,179,217,0.10)';
+  g.beginPath(); g.moveTo(ME.x, ME.y); g.arc(ME.x, ME.y, HR * 9, ME.a - Math.PI / 3, ME.a + Math.PI / 3); g.closePath(); g.fill();
+  hexPath(g, ME.x, ME.y, HR - 1); g.strokeStyle = '#4fb3d9'; g.lineWidth = 3; g.stroke();
+  hexPath(g, FOE.x, FOE.y, HR - 1); g.strokeStyle = '#ff5a4a'; g.lineWidth = 3; g.stroke();
+  // range line with the to-hit number
+  g.setLineDash([8, 8]); g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(ME.x, ME.y); g.lineTo(FOE.x, FOE.y); g.stroke(); g.setLineDash([]);
+  const mx = (ME.x + FOE.x) / 2, my = (ME.y + FOE.y) / 2;
+  g.font = FONT; g.textAlign = 'center';
+  g.fillStyle = 'rgba(5,11,30,0.8)'; g.fillRect(mx - 84, my - 28, 168, 22);
+  g.fillStyle = '#fff'; g.fillText(`RANGE ${RANGE} ${BAND}  ${TO_HIT}+ (${CHANCE}%)`, mx, my - 12);
+  g.textAlign = 'left';
+}
+
+let hitShakeUntil = 0;
+const hooks = {
+  onStart(s) {
+    s.from = muzzle(s);
+    s.to = [FOE.x + rand(-10, 10), FOE.y + rand(-10, 10)];
+    s.ctrl = [(s.from[0] + s.to[0]) / 2 + rand(-30, 30), (s.from[1] + s.to[1]) / 2 - 90 - s.i * 8];
+    flashAt(s.from[0], s.from[1], s.w.id === 'lrm' ? 7 : 11);
+    S.shake += s.w.id === 'ac' ? 2 : 1;
+  },
+  onImpact(s, now) {
+    boom(s.to[0], s.to[1], s.w.id === 'lrm' ? 0.9 : s.w.id === 'ac' ? 0.5 : 0.7, now);
+    if (s.w.id !== 'lrm') addFloat(s.to[0] + rand(-12, 12), s.to[1] - 14, `${s.loc} -${s.w.dmg}`, now);
+    hitShakeUntil = now + 0.12;
+    S.shake += 1.5;
+  },
+};
+
+function drawProjectiles(now) {
+  for (const s of S.shots) {
+    if (!s.started) continue;
+    const p = (now - s.t0) / s.w.dur;
+    if (p >= 1) continue;
+    const [fx, fy] = s.from, [tx, ty] = s.to;
+    if (s.w.id === 'laser') {
+      g.lineCap = 'round';
+      for (const [col, w] of [['rgba(255,60,40,0.35)', 14], ['#ff7a5a', 5], ['#fff', 2]]) {
+        g.strokeStyle = col; g.lineWidth = w;
+        g.beginPath(); g.moveTo(fx, fy); g.lineTo(tx, ty); g.stroke();
+      }
+      if (Math.random() < 0.8) spark(tx, ty, 2, 120);
+    } else if (s.w.id === 'ac') {
+      const q = Math.max(0, p - 0.3);
+      g.lineCap = 'round';
+      for (const [col, w] of [['#ffd24a', 4], ['#fff', 1.5]]) {
+        g.strokeStyle = col; g.lineWidth = w;
+        g.beginPath(); g.moveTo(lerp(fx, tx, q), lerp(fy, ty, q)); g.lineTo(lerp(fx, tx, p), lerp(fy, ty, p)); g.stroke();
+      }
+    } else {
+      const [cx, cy] = s.ctrl, u = 1 - p;
+      const x = u * u * fx + 2 * u * p * cx + p * p * tx, y = u * u * fy + 2 * u * p * cy + p * p * ty;
+      g.fillStyle = 'rgba(0,0,0,0.3)';                              // ground shadow, so the arc reads as height
+      g.beginPath(); g.ellipse(lerp(fx, tx, p), lerp(fy, ty, p) + 4, 4, 2.5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff'; g.fillRect(x - 3, y - 3, 6, 6);
+      g.fillStyle = '#ff9f1c'; g.fillRect(x - 2, y - 2, 4, 4);
+      puff(x, y);
+    }
+  }
+}
+
+function drawHud(now) {
+  panel(g, 16, 16, 300, 112);
+  g.font = FONT; g.fillStyle = '#ffd24a'; g.textAlign = 'left';
+  g.fillText('MOCKUP B: STAY ON THE MAP', 28, 38);
+  g.fillStyle = '#d8e4f2';
+  g.fillText('LASER x2   AC x5   MSL x6', 28, 60);
+  drawHeat(g, 28, 92, 276);
+  panel(g, 800, 16, 208, 380);
+  drawDoll(g, 836, 52, 2.4);
+  drawLog(g, 814, 232);
+  if (!seqActive() && S.lastDmg > 0) {
+    g.font = 'bold 20px ui-monospace, Menlo, monospace'; g.fillStyle = '#ffd24a'; g.textAlign = 'center';
+    g.fillText(`VOLLEY COMPLETE: ${S.lastDmg} DAMAGE`, 512, H - 44);
+    g.textAlign = 'left';
+  }
+  g.font = FONT; g.fillStyle = '#9fb2c8';
+  g.fillText('SPACE / CLICK = FIRE     R = REPAIR TARGET', 16, H - 16);
+}
+
+let zoom = 1, last = performance.now() / 1000;
+function frame(t) {
+  const now = t / 1000, dt = Math.min(0.05, now - last);
+  last = now;
+  stepShots(now, hooks);
+  stepWorld(dt);
+  // push in while the volley plays, ease back out afterwards
+  zoom += ((seqActive() ? 1.35 : 1) - zoom) * Math.min(1, dt * 4);
+  const k = Math.min(1, Math.max(0, (zoom - 1) / 0.35));
+  const fx = lerp(W / 2, (ME.x + FOE.x) / 2, k), fy = lerp(H / 2, (ME.y + FOE.y) / 2, k);
+  if (Object.values(S.armour).some(a => a <= 0) && Math.random() < 0.15) puff(FOE.x + rand(-14, 14), FOE.y + rand(-14, 14));
+
+  g.save();
+  g.translate(W / 2 + rand(-S.shake, S.shake), H / 2 + rand(-S.shake, S.shake));
+  g.scale(zoom, zoom);
+  g.translate(-fx, -fy);
+  g.drawImage(mapCv, 0, 0);
+  drawMarkers(now);
+  drawMech(FOE, spriteE, now, true);
+  drawMech(ME, spriteP, now, false);
+  drawProjectiles(now);
+  drawParts(g);
+  drawRings(g, now);
+  drawFloats(g, now);
+  g.restore();
+  drawHud(now);
+  requestAnimationFrame(frame);
+}
+
+bindControls(() => startSequence(performance.now() / 1000));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

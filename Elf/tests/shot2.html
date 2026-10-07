@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#000}</style>
+<canvas id="game" width="1024" height="688"></canvas>
+<script src="../js/levels.js"></script><script src="../js/audio.js"></script><script src="../js/music.js"></script><script src="../js/player.js"></script>
+<script src="../js/enemies.js"></script><script src="../js/obstacles.js"></script><script src="../js/render.js"></script><script src="../js/main.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+startLevel(Number(q.get('lv'))); setMode('play'); G.enemies = [];
+for (let i = 0; i < Number(q.get('n') || 300); i++) step();
+</script>

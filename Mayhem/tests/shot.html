@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#000}</style>
+<canvas id="game" width="1024" height="688"></canvas>
+<script src="../js/rng.js"></script><script src="../js/data.js"></script><script src="../js/rules.js"></script><script src="../js/ai.js"></script>
+<script src="../js/sprites.js"></script><script src="../js/audio.js"></script><script src="../js/music.js"></script>
+<script src="../js/render.js"></script><script src="../js/ui.js"></script><script src="../js/main.js"></script>
+<script>
+// Builds a screen for screenshots: shot.html?norun&scene=title|setup|play|book|handoff|over&n=3
+const q = new URLSearchParams(location.search);
+const scene = q.get('scene') || 'title';
+const N = Number(q.get('n') || 4);
+const sample = (n) => Array.from({ length: n }, (_, i) => ({ name: ['Pip Pocketwhistle', 'Zoe', 'Wanda Wobblesby', 'Gus Gigglesnort', 'Tilly Twirlwhisk', 'Percy Puddlefoot'][i], color: ROBE_COLORS[i].hex, hat: HATS[i % 4], familiar: FAMILIARS[i % 4], human: i < 2 }));
+app.tick = 90;
+if (scene === 'title') app.mode = 'title';
+else if (scene === 'help') { app.mode = 'help'; app.help = { page: Number(q.get('page') || 0) }; }
+else if (scene === 'setup') { app.mode = 'setup'; app.setup = defaultSetup(); app.setup.humans = 2; app.setup.row = 2; app.setup.names[0] = 'Zoe'; }
+else {
+  const g = createGame(sample(N), Number(q.get('seed') || 21));
+  for (let r = 0; r < Number(q.get('rounds') || 3) && !g.over; r++) aiPlayRound(g);
+  g.events.length = 0;
+  app.game = g; app.mode = 'play'; app.current = 0; app.phaseLabel = 'Move and fight';
+  app.status = g.wizards[0].name + ': pick a pet or your pupil (the glowing squares).'; app.hint = 'Click or Enter to pick - Tab: next pet - Space or End turn: finish';
+  const w = g.wizards[0];
+  if (scene === 'play') {
+    const mine = g.units.filter((u) => u.owner === 0);
+    const sel = mine.find((u) => reachableCells(g, u).size) || mine[0];
+    app.selected = sel.id; app.showEndTurn = true;
+    for (const c of reachableCells(g, sel).values()) app.highlight.set(c.x + ',' + c.y, 'move');
+    for (const t of attackTargets(g, sel)) app.highlight.set(t.x + ',' + t.y, 'attack');
+    app.hoverCell = { x: sel.x, y: sel.y }; if (!q.has('clean')) showBanner(g.wizards[0].name + '\'s move', w.color, '', 999);
+    app.showCursor = true; app.cursor = { x: sel.x, y: sel.y };
+    if (q.has('terrain')) { for (const [x,y] of [[6,3],[7,3],[6,4],[10,7],[10,8]]) addTerrain(g, { kind:'ink', x, y, owner:1, ttl: 3 }); addTerrain(g, { kind:'door', x:3, y:6, owner:1, ttl:5, pair:1 }); addTerrain(g, { kind:'door', x:11, y:3, owner:1, ttl:5, pair:1 }); addTerrain(g, { kind:'door', x:2, y:2, owner:1, ttl:1, pair:2 }); addTerrain(g, { kind:'door', x:12, y:7, owner:1, ttl:1, pair:2 }); }
+    if (!q.has('clean')) { spawnConfetti(500, 300); spawnFloater(480, 280, 'SPLAT!', '#ffe066', 26); }
+  } else if (scene === 'book') {
+    w.hand = (q.has('board') ? ['ink','passage','blob','shield','wand','wings','pie','glitter','tickle','guineaPig','frog','cat','mummy','pony'] : SPELLS.slice(0, 14).map((sp) => sp.id)).map((id, i) => ({ spell: id, used: i === 2 && !q.has('board') }));
+    const cards = w.hand.map((item) => ({ item, avail: item.used ? { ok: false, reason: 'Used' } : spellAvailable(g, w, item.spell) }));
+    app.overlay = { kind: 'spellbook', wizard: w, cards, index: Number(q.get('i') || 7) };
+  } else if (scene === 'handoff') app.overlay = { kind: 'handoff', wizard: g.wizards[1], line: 'Choose your spell for this round.' };
+  else if (scene === 'over') { g.over = true; g.result = { winners: [1], reason: 'lastStanding' }; app.overlay = { kind: 'gameOver' }; spawnConfetti(300, 200, 40); spawnConfetti(600, 200, 40); }
+}
+for (let i = 0; i < 30; i++) step();
+render();
+</script>

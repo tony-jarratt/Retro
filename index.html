@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retro Arcade</title>
+<meta name="description" content="A little arcade of retro-style browser games.">
+<style>
+  :root { --ink: #e8efff; --dim: #9fb0d8; --gold: #f2c94c; --edge: #26336e; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    color: var(--ink);
+    font-family: "Courier New", Courier, monospace;
+    background: radial-gradient(ellipse at 50% 0%, #1b2a6a 0%, #0a1030 45%, #04060f 100%) fixed;
+  }
+  /* a faint starfield and CRT scanlines, both behind/over everything without catching clicks */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.55;
+    background-image:
+      radial-gradient(1.5px 1.5px at 8% 12%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 22% 38%, #cfe0ff, transparent 60%),
+      radial-gradient(1.5px 1.5px at 35% 8%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 47% 52%, #cfe0ff, transparent 60%),
+      radial-gradient(1.5px 1.5px at 61% 22%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 74% 64%, #cfe0ff, transparent 60%),
+      radial-gradient(1.5px 1.5px at 86% 14%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 93% 46%, #cfe0ff, transparent 60%),
+      radial-gradient(1px 1px at 15% 78%, #cfe0ff, transparent 60%),
+      radial-gradient(1.5px 1.5px at 55% 88%, #fff, transparent 60%),
+      radial-gradient(1px 1px at 80% 90%, #cfe0ff, transparent 60%);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.16) 2px 3px);
+  }
+
+  main { position: relative; max-width: 980px; margin: 0 auto; padding: 36px 20px 28px; }
+  header { text-align: center; margin-bottom: 30px; }
+  h1 {
+    margin: 0; font-size: clamp(34px, 9vw, 76px); letter-spacing: 0.08em; line-height: 1.05; text-transform: uppercase;
+    background: linear-gradient(to bottom, #fff3a8 0%, var(--gold) 45%, #e8504f 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 0 #000) drop-shadow(0 0 18px rgba(242, 201, 76, 0.35));
+  }
+  .select { margin: 14px 0 0; color: var(--dim); letter-spacing: 0.3em; font-size: clamp(13px, 3.4vw, 17px); }
+  .cursor { color: var(--gold); animation: blink 1s steps(2, start) infinite; }
+  .touch-note { display: none; margin: 14px auto 0; max-width: 420px; padding: 8px 12px; border: 2px dashed #5a3a3a; color: #ffb0b0; font-size: 14px; }
+  @media (pointer: coarse) { .touch-note { display: block; } }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 28px; }
+  .card {
+    display: block; position: relative; padding: 12px; color: inherit; text-decoration: none; outline: none;
+    background: rgba(10, 16, 48, 0.88); border: 3px solid var(--edge); border-radius: 6px;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  }
+  .card:hover, .card:focus {
+    border-color: var(--accent); transform: translateY(-4px);
+    box-shadow: 0 0 0 2px #000, 0 0 26px var(--accent);
+  }
+  .shot { aspect-ratio: 3 / 2; overflow: hidden; background: #000; border: 2px solid #000; }
+  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .tag { background: var(--accent); color: #000; font-weight: bold; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; padding: 2px 8px; }
+  .num { color: var(--dim); font-size: 13px; }
+  .title { margin: 8px 0 6px; font-size: clamp(20px, 5vw, 26px); letter-spacing: 0.04em; text-transform: uppercase; }
+  .blurb { margin: 0; color: var(--dim); font-size: 15px; line-height: 1.45; min-height: 4.4em; }
+  .meta { margin: 10px 0 0; color: #7384b4; font-size: 12px; letter-spacing: 0.12em; }
+  .play { margin: 12px 0 0; color: var(--accent); font-weight: bold; font-size: 15px; letter-spacing: 0.24em; }
+  .card:focus .play::before, .card:hover .play::before { content: "\25B6\00a0"; animation: blink 0.8s steps(2, start) infinite; }
+
+  footer { margin-top: 34px; text-align: center; color: #6677a8; font-size: 13px; letter-spacing: 0.14em; line-height: 1.8; }
+  .error { padding: 16px; border: 3px solid #e63946; background: rgba(60, 0, 0, 0.6); color: #ffd0d0; }
+  noscript { display: block; text-align: center; }
+  noscript a { color: var(--gold); }
+
+  @keyframes blink { to { visibility: hidden; } }
+  @media (prefers-reduced-motion: reduce) {
+    .cursor, .card:focus .play::before, .card:hover .play::before { animation: none; }
+    .card { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Retro Arcade</h1>
+    <p class="select">SELECT YOUR GAME<span class="cursor">_</span></p>
+    <p class="touch-note">These games need a keyboard, so they will not play on a phone or tablet yet.</p>
+  </header>
+  <div class="grid" id="games"></div>
+  <noscript>
+    <p>Turn on JavaScript to play. Games: <a href="P1/index.html">P1 Racer</a>, <a href="Elf/index.html">Always Time for a Bow</a>, <a href="Mayhem/index.html">Mayhem Academy</a>.</p>
+  </noscript>
+  <footer>
+    <div>&larr; &rarr; CHOOSE &nbsp;&middot;&nbsp; ENTER PLAY &nbsp;&middot;&nbsp; OR CLICK A GAME</div>
+    <div>PLAIN JAVASCRIPT &nbsp;&middot;&nbsp; NO INSTALL &nbsp;&middot;&nbsp; USE THE BACK BUTTON TO RETURN HERE</div>
+  </footer>
+</main>
+<script src="games.js"></script>
+<script src="menu.js"></script>
+</body>
+</html>

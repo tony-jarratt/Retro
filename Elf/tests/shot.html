@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#000}</style>
+<canvas id="game" width="1024" height="688"></canvas>
+<script src="../js/levels.js"></script><script src="../js/audio.js"></script><script src="../js/music.js"></script><script src="../js/player.js"></script>
+<script src="../js/enemies.js"></script><script src="../js/obstacles.js"></script><script src="../js/render.js"></script><script src="../js/main.js"></script>
+<script>
+const lvn = Number(new URLSearchParams(location.search).get('lv'));
+if (lvn >= 0) { startLevel(lvn); setMode('play'); G.items[0].taken = true; G.player.inv.g = true; G.player.inv.wrapped = true; G.delivered = 1; for (let i=0;i<30;i++) step(); }
+</script>

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup A - behind the shooter</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #050b1e; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  canvas { width: min(100vw, calc(100vh * 1024 / 688)); height: auto; aspect-ratio: 1024 / 688; display: block; user-select: none; }
+</style>
+</head>
+<body>
+<canvas id="game" width="1024" height="688"></canvas>
+<script src="common.js"></script>
+<script>
+'use strict';
+// MOCKUP A: fire sequence seen from behind and above the shooter (pseudo-3D). Throwaway.
+const cv = document.getElementById('game');
+const g = cv.getContext('2d');
+g.imageSmoothingEnabled = false;
+
+// ---- placeholder pixel-art mechs, drawn with rects into 64x64 sprites ----
+const P = { body: '#6d7f95', hi: '#9fb2c8', lo: '#3d4958', dark: '#1e2530', accent: '#e2572b' };
+const E = { body: '#6f7f5c', hi: '#a2b58a', lo: '#3f4a36', dark: '#1e2418', accent: '#e6d34a' };
+
+function legsAndPelvis(s, c) {
+  for (const x of [17, 36]) {
+    rect(s, c.lo, x, 38, 11, 20); rect(s, c.body, x + 1, 38, 9, 19); rect(s, c.hi, x + 1, 38, 2, 19);
+    rect(s, c.dark, x, 46, 11, 3);                                   // knee
+    rect(s, c.dark, x - 3, 58, 17, 5); rect(s, c.lo, x - 2, 58, 15, 3); // foot
+  }
+  rect(s, c.dark, 21, 34, 22, 6); rect(s, c.lo, 22, 35, 20, 4);
+}
+function torsoAndArms(s, c) {
+  rect(s, c.dark, 15, 13, 34, 23); rect(s, c.body, 16, 14, 32, 21);
+  rect(s, c.hi, 16, 14, 32, 2); rect(s, c.lo, 16, 33, 32, 2);
+  rect(s, c.accent, 16, 22, 3, 6); rect(s, c.accent, 45, 22, 3, 6);
+  for (const x of [3, 49]) {
+    rect(s, c.dark, x, 14, 12, 26); rect(s, c.body, x + 1, 15, 10, 24);
+    rect(s, c.hi, x + 1, 15, 2, 24); rect(s, c.lo, x + 1, 36, 10, 3);
+  }
+}
+const rear = makeCanvas(64, 64, s => {
+  legsAndPelvis(s, P); torsoAndArms(s, P);
+  rect(s, P.dark, 25, 18, 14, 13);                                   // engine vent
+  for (let y = 19; y < 30; y += 3) rect(s, P.lo, 26, y, 12, 1);
+  rect(s, P.accent, 30, 30, 4, 2);
+  rect(s, P.dark, 5, 38, 3, 6); rect(s, P.dark, 9, 38, 3, 6);        // left arm laser barrels (seen from behind)
+  rect(s, P.dark, 52, 38, 6, 8);                                     // right arm autocannon
+  rect(s, P.dark, 48, 3, 14, 11);                                    // missile pod on the right shoulder
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) rect(s, P.lo, 50 + i * 4, 5 + j * 4, 3, 3);
+  rect(s, P.dark, 26, 5, 12, 9); rect(s, P.body, 27, 6, 10, 7); rect(s, P.hi, 27, 6, 10, 1);
+  rect(s, P.dark, 36, 1, 1, 5);                                      // antenna
+});
+const front = makeCanvas(64, 64, s => {
+  legsAndPelvis(s, E); torsoAndArms(s, E);
+  rect(s, E.dark, 27, 20, 10, 8); rect(s, E.lo, 28, 21, 8, 6);       // chest plate
+  rect(s, E.dark, 5, 38, 6, 6); rect(s, '#000', 7, 40, 2, 2);        // right arm gun (viewer's left)
+  rect(s, E.dark, 53, 38, 6, 6); rect(s, '#000', 55, 40, 2, 2);
+  rect(s, E.dark, 25, 4, 14, 10); rect(s, E.body, 26, 5, 12, 8);
+  rect(s, '#ffb347', 28, 8, 8, 3);                                   // visor
+});
+const tmp = makeCanvas(64, 64);
+
+// ---- scene layout (screen pixels) ----
+const HORIZON = 240;
+const SH = { S: 7, left: 106, top: 252 };                            // the shooter, big in the foreground
+const TG = { S: 2.6, x: 700, feetY: 350 };                           // the target, small in the distance
+TG.left = TG.x - 32 * TG.S;
+TG.top = TG.feetY - 64 * TG.S;
+const shooterPt = (x, y) => [SH.left + x * SH.S, SH.top + y * SH.S];
+const targetPt = loc => {
+  const [x, y, w, h] = LOCS[loc].r;
+  return [TG.left + (x + w / 2) * TG.S, TG.top + (y + h / 2) * TG.S];
+};
+function muzzle(s) {
+  if (s.w.id === 'laser') return shooterPt(s.i ? 10.5 : 6.5, 41);
+  if (s.w.id === 'ac') return shooterPt(55, 46);
+  return shooterPt(51 + (s.i % 3) * 4, 6 + ((s.i / 3) | 0) * 4);
+}
+
+const bg = makeCanvas(W, H, b => {
+  const sky = b.createLinearGradient(0, 0, 0, HORIZON);
+  sky.addColorStop(0, '#0b1636'); sky.addColorStop(0.7, '#5b2a52'); sky.addColorStop(1, '#f08a3c');
+  b.fillStyle = sky; b.fillRect(0, 0, W, HORIZON);
+  b.globalAlpha = 0.85; b.fillStyle = '#ffd27a';
+  b.beginPath(); b.arc(790, 205, 46, 0, Math.PI * 2); b.fill(); b.globalAlpha = 1;
+  b.fillStyle = '#2a1c34'; b.beginPath(); b.moveTo(0, HORIZON);
+  for (let x = 0; x <= W; x += 32) b.lineTo(x, HORIZON - 20 - Math.abs(Math.sin(x * 0.013)) * 50 - ((x * 7) % 23));
+  b.lineTo(W, HORIZON); b.fill();
+  const ground = b.createLinearGradient(0, HORIZON, 0, H);
+  ground.addColorStop(0, '#7a4a30'); ground.addColorStop(1, '#2a1912');
+  b.fillStyle = ground; b.fillRect(0, HORIZON, W, H - HORIZON);
+  b.strokeStyle = 'rgba(255,190,110,0.18)'; b.lineWidth = 1;
+  for (let i = -24; i <= 24; i++) { b.beginPath(); b.moveTo(512, HORIZON); b.lineTo(512 + i * 90, H); b.stroke(); }
+  for (let k = 1; k <= 14; k++) {
+    const y = HORIZON + (H - HORIZON) * Math.pow(k / 14, 2.2);
+    b.beginPath(); b.moveTo(0, y); b.lineTo(W, y); b.stroke();
+  }
+});
+
+function shadow(x, y, rx, ry) {
+  g.fillStyle = 'rgba(0,0,0,0.35)';
+  g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fill();
+}
+
+function drawTarget(now) {
+  const t = tmp.getContext('2d');
+  t.clearRect(0, 0, 64, 64);
+  t.globalCompositeOperation = 'source-over';
+  t.drawImage(front, 0, 0);
+  t.globalCompositeOperation = 'source-atop';
+  for (const k in LOCS) {
+    if (S.armour[k] <= 0) rect(t, 'rgba(20,10,0,0.5)', ...LOCS[k].r);
+    if (now < S.flashUntil[k]) rect(t, 'rgba(255,240,200,0.85)', ...LOCS[k].r);
+  }
+  t.globalCompositeOperation = 'source-over';
+  shadow(TG.x, TG.feetY, 60, 10);
+  g.drawImage(tmp, TG.left, TG.top + Math.sin(now * 2), 64 * TG.S, 64 * TG.S);
+}
+
+function drawReticle(now) {
+  if (!seqActive()) return;
+  const age = now - S.seqStart;
+  const half = 30 * TG.S * (1 + Math.max(0, 0.6 - age) * 1.2);
+  const cx = TG.left + 32 * TG.S, cy = TG.top + 30 * TG.S, a = 14;
+  g.strokeStyle = age < 0.6 ? '#ffd24a' : '#ff5a4a'; g.lineWidth = 2;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    g.beginPath();
+    g.moveTo(cx + sx * half, cy + sy * (half - a)); g.lineTo(cx + sx * half, cy + sy * half); g.lineTo(cx + sx * (half - a), cy + sy * half);
+    g.stroke();
+  }
+  g.font = FONT; g.fillStyle = g.strokeStyle; g.textAlign = 'center';
+  g.fillText(age < 0.6 ? 'ACQUIRING...' : 'LOCK', cx, cy - half - 8);
+  g.textAlign = 'left';
+}
+
+// Projectiles are drawn BEFORE the shooter, so they appear to leave from ahead of its body.
+function drawProjectiles(now) {
+  for (const s of S.shots) {
+    if (!s.started) continue;
+    const age = now - s.t0, p = age / s.w.dur;
+    if (p >= 1) continue;
+    const [fx, fy] = s.from, [tx, ty] = s.to;
+    if (s.w.id === 'laser') {
+      g.lineCap = 'round';
+      g.strokeStyle = `rgba(255,60,40,${0.35 * (1 - p * 0.5)})`; g.lineWidth = 16;
+      g.beginPath(); g.moveTo(fx, fy); g.lineTo(tx, ty); g.stroke();
+      g.strokeStyle = '#ff7a5a'; g.lineWidth = 6;
+      g.beginPath(); g.moveTo(fx, fy); g.lineTo(tx, ty); g.stroke();
+      g.strokeStyle = '#fff'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(fx, fy); g.lineTo(tx, ty); g.stroke();
+      if (Math.random() < 0.8) spark(tx, ty, 2, 160);
+    } else if (s.w.id === 'ac') {
+      const hx = lerp(fx, tx, p), hy = lerp(fy, ty, p);
+      const q = Math.max(0, p - 0.3);
+      g.lineCap = 'round';
+      g.strokeStyle = '#ffd24a'; g.lineWidth = 4;
+      g.beginPath(); g.moveTo(lerp(fx, tx, q), lerp(fy, ty, q)); g.lineTo(hx, hy); g.stroke();
+      g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(lerp(fx, tx, q), lerp(fy, ty, q)); g.lineTo(hx, hy); g.stroke();
+    } else {
+      const [cx, cy] = s.ctrl, u = 1 - p;
+      const x = u * u * fx + 2 * u * p * cx + p * p * tx;
+      const y = u * u * fy + 2 * u * p * cy + p * p * ty;
+      g.fillStyle = '#fff'; g.fillRect(x - 3, y - 3, 6, 6);
+      g.fillStyle = '#ff9f1c'; g.fillRect(x - 2, y - 2, 4, 4);
+      puff(x, y);
+    }
+  }
+}
+
+const hooks = {
+  onStart(s) {
+    s.from = muzzle(s);
+    const [tx, ty] = targetPt(s.loc);
+    s.to = [tx + rand(-6, 6), ty + rand(-6, 6)];
+    s.ctrl = [(s.from[0] + s.to[0]) / 2 + rand(-60, 60), Math.min(s.from[1], s.to[1]) - 170 - s.i * 14];
+    flashAt(s.from[0] + 10, s.from[1] - 6, s.w.id === 'lrm' ? 10 : 16);
+    S.shake += s.w.id === 'ac' ? 5 : s.w.id === 'lrm' ? 2 : 3;
+  },
+  onImpact(s, now) {
+    const size = s.w.id === 'lrm' ? 0.9 : s.w.id === 'ac' ? 0.5 : 0.7;
+    boom(s.to[0], s.to[1], size, now);
+    if (s.w.id !== 'lrm') addFloat(s.to[0], s.to[1] - 12, `${s.loc} -${s.w.dmg}`, now);
+    S.shake += 2;
+  },
+};
+
+function drawHud(now) {
+  panel(g, 16, 16, 300, 112);
+  g.font = FONT; g.fillStyle = '#ffd24a'; g.textAlign = 'left';
+  g.fillText('MOCKUP A: BEHIND THE SHOOTER', 28, 38);
+  g.fillStyle = '#d8e4f2';
+  g.fillText('LASER x2   AC x5   MSL x6', 28, 60);
+  drawHeat(g, 28, 92, 276);
+  panel(g, 800, 16, 208, 380);
+  drawDoll(g, 836, 52, 2.4);
+  drawLog(g, 814, 232);
+  if (!seqActive() && S.lastDmg > 0) {
+    g.font = 'bold 20px ui-monospace, Menlo, monospace'; g.fillStyle = '#ffd24a'; g.textAlign = 'center';
+    g.fillText(`VOLLEY COMPLETE: ${S.lastDmg} DAMAGE`, 512, 60);
+    g.textAlign = 'left';
+  }
+  g.font = FONT; g.fillStyle = '#9fb2c8';
+  g.fillText('SPACE / CLICK = FIRE     R = REPAIR TARGET', 16, H - 16);
+}
+
+let last = performance.now() / 1000;
+function frame(t) {
+  const now = t / 1000, dt = Math.min(0.05, now - last);
+  last = now;
+  stepShots(now, hooks);
+  stepWorld(dt);
+  for (const k in LOCS) if (S.armour[k] <= 0 && Math.random() < 0.1) {
+    const [x, y] = targetPt(k); puff(x, y);
+  }
+
+  g.save();
+  g.translate(rand(-S.shake, S.shake), rand(-S.shake, S.shake));
+  g.drawImage(bg, 0, 0);
+  drawTarget(now);
+  drawReticle(now);
+  drawProjectiles(now);
+  shadow(330, 692, 210, 22);
+  g.drawImage(rear, SH.left, SH.top, 64 * SH.S, 64 * SH.S);
+  drawParts(g);
+  drawRings(g, now);
+  drawFloats(g, now);
+  g.restore();
+  drawHud(now);
+  requestAnimationFrame(frame);
+}
+
+bindControls(() => startSequence(performance.now() / 1000));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

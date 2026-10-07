@@ -1,0 +1,62 @@
+'use strict';
+
+// The games on the menu, in the order they appear.
+// To add a game: put its folder (with an index.html inside) next to this file, add a screenshot
+// to thumbs/, then add one entry below. Every field is required; the menu shows an error naming
+// the entry if one is missing or wrong.
+//   id       short unique name (letters and numbers)
+//   title    shown on the card
+//   folder   the game's folder, ending in "/" (the menu opens its index.html)
+//   tag      the genre label on the card (a word or two, shown in capitals)
+//   blurb    one or two sentences
+//   players  who can play, e.g. '1 PLAYER' or '1-4 PLAYERS'
+//   controls what you press, shown on the card
+//   accent   the card's highlight colour, as #rrggbb
+//   thumb    screenshot path, about 600 pixels wide
+const GAMES = [
+  {
+    id: 'p1',
+    title: 'P1 Racer',
+    folder: 'P1/',
+    tag: 'Racing',
+    blurb: 'Overhead retro racing on six circuits. Qualify, pick your tyres, make your pit stops and chase the championship.',
+    players: '1 PLAYER',
+    controls: 'ARROWS / WASD',
+    accent: '#2fd8c8',
+    thumb: 'thumbs/p1.jpg',
+  },
+  {
+    id: 'elf',
+    title: 'Always Time for a Bow',
+    folder: 'Elf/',
+    tag: 'Platformer',
+    blurb: 'A flip-screen Christmas Eve dash. Collect the wrapping kit, wrap the presents and slip past dogs, cats, children and parents.',
+    players: '1 PLAYER',
+    controls: 'ARROWS / WASD + SPACE',
+    accent: '#ff5a64',
+    thumb: 'thumbs/elf.jpg',
+  },
+  {
+    id: 'mayhem',
+    title: 'Mayhem Academy',
+    folder: 'Mayhem/',
+    tag: 'Wizard battle',
+    blurb: 'Wizard school with zero supervision. Summon feral pets, hurl custard pies and wreck each other. Last pupil standing wins. Up to four players, plus computer pupils.',
+    players: '1-4 PLAYERS + COMPUTER',
+    controls: 'MOUSE + KEYS',
+    accent: '#b57aff',
+    thumb: 'thumbs/mayhem.jpg',
+  },
+  // Atomic Castle is hidden from the menu while it's in progress. Uncomment to restore.
+  // {
+  //   id: 'atomic',
+  //   title: 'Atomic Castle',
+  //   folder: 'Atomic/',
+  //   tag: 'Puzzle adventure',
+  //   blurb: 'A 1950s rocket castle in glorious isometric. Push crates, hop gaps, dodge tin robots, and find six missing rocket parts before the saucers land.',
+  //   players: '1 PLAYER',
+  //   controls: 'ARROWS / WASD + SPACE',
+  //   accent: '#ffa23a',
+  //   thumb: 'thumbs/atomic.jpg',
+  // },
+];
