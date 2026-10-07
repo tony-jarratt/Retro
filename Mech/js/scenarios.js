@@ -1,6 +1,6 @@
 'use strict';
 
-// The maps ("scenarios"). Each is 19 columns by 12 rows (the renderer and the unit panel are laid out for that size), flat-top hexes with
+// The maps ("scenarios"). Each theme comes small (19 x 12, which fits the screen) and large (31 x 20, which scrolls; see view.js), flat-top hexes with
 // odd columns shifted down, three starting hexes a side, and the hex groups the win conditions use:
 //   centre  the hex the flag sits on and the hill is built round, chosen on dry ground (default [9, 5], the middle of the map)
 //   flag    the hex a flag sits on (capture the flag): the centre
@@ -13,6 +13,7 @@
 const SCENARIOS = {
   basin: {
     id: 'basin',
+    theme: 'basin', size: 'small',
     name: 'THE BASIN',
     blurb: 'A lake in the middle and a ridge in the north split the field into two lanes, with woods and rubble for cover.',
     // A lake in the middle and a ridge of hills in the north split the map into a northern and a southern lane, with
@@ -41,6 +42,7 @@ const SCENARIOS = {
   },
   urban: {
     id: 'urban',
+    theme: 'urban', size: 'small',
     name: 'DEAD CITY',
     blurb: 'City blocks you cannot walk through or see through. Short sight lines, plenty of cover, rockets and shells over the roofs.',
     rows: [
@@ -64,6 +66,7 @@ const SCENARIOS = {
   },
   mountains: {
     id: 'mountains',
+    theme: 'mountains', size: 'small',
     name: 'THE RANGE',
     blurb: 'Peaks nobody can cross or see over, ridges, and a stream in the middle. Narrow passes and long lanes of fire.',
     rows: [
@@ -86,6 +89,111 @@ const SCENARIOS = {
     playerFacing: 2,
     enemyFacing: 5,
   },
+  'basin-large': {
+    id: 'basin-large',
+    theme: 'basin', size: 'large',
+    name: 'THE BASIN',
+    blurb: 'A big lake and a northern ridge; the flag and hill are on the dry ground south of the lake.',
+    rows: [
+      '.....................R....T....',
+      '....TTHHHHHHHTHTHHHHH.HH.H.....',
+      '......HHH.HHHH.~HH..H..HH......',
+      '....T..HHHHHHHH~~~..HHHHHH.T...',
+      '......T...T~~~~~~~~~..T........',
+      '.......R.~~~~~~~~~~~~~T........',
+      '...T..TT.~~~~~~~~~~~~~TT.T.....',
+      '.......T.~~~~~~~~~~~~~.........',
+      '.......T.~~~~~~~~~~~~~.........',
+      '....T....~~~~~~~~~~~~~..T......',
+      '.........~~~~~~~~~~~~~..T......',
+      '........T~~~~~~~~~~~~~....TR...',
+      '......TT.T~~~~~~~~~~~.T........',
+      '......T.....~~~~~~~....TT......',
+      '.........T....~~~T...RT....R...',
+      '.......TT....H..HH.T.TT.TT.....',
+      '....R............T.......T.....',
+      '....T..RT........H.......T.....',
+      '............T...HT..TT.........',
+      '.......T.......T..T...T..T.....',
+    ],
+    centre: [15, 16],
+    playerStarts: [[1, 4], [0, 9], [1, 15]],
+    enemyStarts: [[29, 4], [30, 10], [29, 15]],
+    playerFacing: 2,
+    enemyFacing: 5,
+    bases: { player: [[0, 8], [0, 9], [0, 10], [1, 8], [1, 9]], enemy: [[30, 9], [30, 10], [30, 11], [29, 9], [29, 10]] },
+    exits: { player: [[30, 0], [29, 0], [28, 0], [30, 1], [29, 1]], enemy: [[0, 19], [1, 19], [2, 19], [0, 18], [1, 18]] },
+  },
+  'urban-large': {
+    id: 'urban-large',
+    theme: 'urban', size: 'large',
+    name: 'DEAD CITY',
+    blurb: 'A whole city of blocks you cannot cross or see through, with a plaza in the middle.',
+    rows: [
+      '..........R....................',
+      '...BBB...BBB..BBBB...BBB...B...',
+      '...BBB.R.BBB...BBB...BBB.B.B...',
+      '..RBBB...BBBR..BBB...BBB...BB..',
+      '.....R..B..R...BR.....RR.......',
+      '.........R..R.....R.....B.B....',
+      '...BBB...BBB.B.BBB...BBB...BBB.',
+      '...BBB...BBB..BBBB...BBB..BBBB.',
+      '...BBB...BBB....BB...BBB..BBB..',
+      '..........B...........B........',
+      '...B....B..........B....B......',
+      '...BBB...BBB.........BBB...B...',
+      '...BBB...BBB.....B...BBB.B.BBB.',
+      '...BBB...BBB...BBB...BBB..BBBB.',
+      '.....R..B....R.....B...R.......',
+      '..................R.......RB...',
+      '...BBB...BBB...BBB...BBB...B...',
+      '...BBB...BBB...BBB...BBB.B.BBB.',
+      '....BB...BBB...BBBB..BBB...BBB.',
+      '....................R...R..B...',
+    ],
+    centre: [15, 10],
+    playerStarts: [[1, 4], [0, 9], [1, 15]],
+    enemyStarts: [[29, 4], [30, 10], [29, 15]],
+    playerFacing: 2,
+    enemyFacing: 5,
+    bases: { player: [[0, 8], [0, 9], [0, 10], [1, 8], [1, 9]], enemy: [[30, 9], [30, 10], [30, 11], [29, 9], [29, 10]] },
+    exits: { player: [[30, 0], [29, 0], [28, 0], [30, 1], [29, 1]], enemy: [[0, 19], [1, 19], [2, 19], [0, 18], [1, 18]] },
+  },
+  'mountains-large': {
+    id: 'mountains-large',
+    theme: 'mountains', size: 'large',
+    name: 'THE RANGE',
+    blurb: 'Peaks nobody can cross or see over, hill ridges, passes and a stream.',
+    rows: [
+      '..........H..RMM..H.H..........',
+      '........MMM..HHM~H..T.....HH...',
+      '......HHM.M.H.H.~...M.H........',
+      '.....T..MMM......~MMMH.........',
+      '...H....MM.H....HHMMM...MM.....',
+      '......T.H.H.....~H.HH..HMM.....',
+      '...HH....H.MMM..~........HHH...',
+      '...H.MMT...M.M.H.H.MM..T..H....',
+      '.....MMMH...H.~.H..MMH..HMMH...',
+      '.....TMMH....~..H.HM..H..MM....',
+      '......H......~....HMM.HH.MH....',
+      '....H.HHH....H......THH....H...',
+      '...H....H..HHMMM...H.H.H.......',
+      '..MM..HMMM...MMMH...HMMM.......',
+      '..M..T.MMR.....~.H...MHM.......',
+      '...MTH.MMM.H.H..HHH..HMM...T...',
+      '.........H.R.....H....H........',
+      '............HT...~...H.........',
+      '.............HH..~...R...HH....',
+      '...HH..H..HH.HH.~H..H..RH......',
+    ],
+    centre: [15, 10],
+    playerStarts: [[1, 4], [0, 9], [1, 15]],
+    enemyStarts: [[29, 4], [30, 10], [29, 15]],
+    playerFacing: 2,
+    enemyFacing: 5,
+    bases: { player: [[0, 8], [0, 9], [0, 10], [1, 8], [1, 9]], enemy: [[30, 9], [30, 10], [30, 11], [29, 9], [29, 10]] },
+    exits: { player: [[30, 0], [29, 0], [28, 0], [30, 1], [29, 1]], enemy: [[0, 19], [1, 19], [2, 19], [0, 18], [1, 18]] },
+  },
 };
 
 // The hex groups: the flag and the hill at the centre, a base round each side's starts, and an exit in the far corner of the other side's
@@ -99,6 +207,15 @@ for (const scenario of Object.values(SCENARIOS)) {
   if (!scenario.exits) scenario.exits = { player: [[18, 0], [17, 0], [16, 0], [18, 1], [17, 1]], enemy: [[0, 11], [1, 11], [2, 11], [0, 10], [1, 10]] };
 }
 
-const SCENARIO_IDS = Object.keys(SCENARIOS);
+const SCENARIO_IDS = Object.keys(SCENARIOS);      // every map, in both sizes
+const MAP_THEMES = ['basin', 'urban', 'mountains']; // what the menu offers; each comes in a small and a large size
+const MAP_SIZES = ['small', 'large'];
+
+// The map of a theme in a size: the small one is the theme's own id, the large one has '-large' after it.
+function scenarioFor(theme, size) {
+  if (!MAP_THEMES.includes(theme)) throw new BuildError('map', `Unknown map "${theme}" (the maps are ${MAP_THEMES.join(', ')})`);
+  if (!MAP_SIZES.includes(size)) throw new BuildError('size', `Unknown map size "${size}" (small or large)`);
+  return SCENARIOS[size === 'large' ? theme + '-large' : theme];
+}
 const DEFAULT_SCENARIO_ID = 'basin';
 const SCENARIO = SCENARIOS[DEFAULT_SCENARIO_ID]; // what a battle uses when it is not told which map to play

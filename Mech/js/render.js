@@ -6,8 +6,8 @@
 const VIEW_W = 1024, VIEW_H = 688;
 const HEX_R = 26;                  // hex radius in pixels (the map is 19 by 12 hexes and has to fit beside the unit panel)
 const HEX_SCALE = HEX_R / 34;      // the art and the pixel offsets below were drawn for a radius of 34
-const MAP_AREA_W = 790;            // the map is centred in the left part of the screen; the unit panel is on the right
-const MAP_TOP = 80;               // room above the map for the header, the banner and the instruction line
+const MAP_AREA_W = VIEWPORT.w;     // the map area is the left part of the screen (the unit panel is on the right); view.js has its size
+const MAP_TOP = VIEWPORT.y;        // room above the map for the header, the banner and the instruction line
 const MECH_SCALE = 1.4;            // sprite pixels to screen pixels (the 40 pixel sprite canvas is about 56 pixels on screen)
 // Per class: how far from the centre a mech's guns sit (sideways and forward, in sprite pixels at the old size) and
 // how much to shrink the biggest sprite so it still fits its hex.
@@ -25,8 +25,12 @@ const COLOURS = {
 };
 const MECH_LINE_COLOURS = ['#4fb3d9', '#ffd24a', '#c58bff', '#7ee08a']; // one per player mech, for aim lines
 
-let mapLayout = null;              // { ox, oy } set by buildMapCanvas
-let mapCanvas = null;
+let mapLayout = null;              // layoutFor(...) of the map on screen (view.js), set by buildMapCanvas
+let mapScroll = { x: 0, y: 0 };    // how far the map's picture is scrolled in the viewport (0, 0 for a map that fits)
+let mapCanvas = null;               // the whole map, drawn once
+let miniCanvas = null;              // a small copy of it for the minimap
+
+function setMapScroll(x, y) { const s = clampScroll(mapLayout, x, y); mapScroll = { x: Math.round(s.x), y: Math.round(s.y) }; } // whole pixels, so the picture is never resampled
 
 function hexPathOn(g, x, y, radius) {
   g.beginPath();
@@ -40,13 +44,14 @@ function hexPathOn(g, x, y, radius) {
 // ---------- the projection layer ----------
 // The one place that knows how a hex becomes a point on the screen, and back.
 function hexToScreen(c, r) {
-  const [ux, uy] = hexCentre(c, r); // unit-size centre, from map.js
-  return [mapLayout.ox + ux * HEX_R, mapLayout.oy + uy * HEX_R];
+  const [px, py] = hexInPicture(mapLayout, c, r); // the hex in the map's picture, from view.js
+  return pictureToScreen(mapLayout, mapScroll, px, py);
 }
 
 // The map hex under a screen point, or null if the point is off the map. Nearest centre wins: with 100-odd
 // hexes there is no need for anything cleverer.
 function screenToHex(map, x, y) {
+  if (!inViewport(x, y)) return null; // the unit panel, the header and the help are not the map
   let best = null;
   for (let r = 0; r < map.rows; r++) {
     for (let c = 0; c < map.cols; c++) {
@@ -61,19 +66,81 @@ function screenToHex(map, x, y) {
 
 // Builds the layout and draws the terrain once into an offscreen canvas.
 function buildMapCanvas(map) {
-  const width = HEX_R * (1.5 * (map.cols - 1) + 2);
-  const height = HEX_R * Math.sqrt(3) * (map.rows + 0.5);
-  mapLayout = { ox: (MAP_AREA_W - width) / 2 + HEX_R, oy: MAP_TOP + HEX_R * Math.sqrt(3) / 2 };
-  mapCanvas = makeCanvas(VIEW_W, VIEW_H, g => {
-    g.fillStyle = COLOURS.bg; g.fillRect(0, 0, VIEW_W, VIEW_H);
+  mapLayout = layoutFor(map.cols, map.rows, HEX_R);
+  mapScroll = { x: 0, y: 0 };
+  miniCanvas = null;
+  mapCanvas = makeCanvas(Math.ceil(mapLayout.w + 2 * mapLayout.pad), Math.ceil(mapLayout.h + 2 * mapLayout.pad), g => {
+    g.fillStyle = COLOURS.bg; g.fillRect(0, 0, mapLayout.w + 2 * mapLayout.pad, mapLayout.h + 2 * mapLayout.pad);
     for (let r = 0; r < map.rows; r++) {
       for (let c = 0; c < map.cols; c++) {
-        const [x, y] = hexToScreen(c, r);
+        const [x, y] = hexInPicture(mapLayout, c, r);
         drawTerrainHex(g, hexPathOn, map.tiles[r][c], c, r, x, y, HEX_R);
       }
     }
   });
-  if (mapLayout.oy + height > VIEW_H) throw new MapError('layout', `The map does not fit the screen: ${Math.round(mapLayout.oy + height)} pixels tall`);
+}
+
+// The minimap's picture: the whole map, shrunk (built the first time it is wanted, and again after a new map is built).
+function miniPicture() {
+  const geo = miniGeometry(mapLayout);
+  if (!miniCanvas) {
+    miniCanvas = makeCanvas(geo.w, geo.h, g => {
+      g.imageSmoothingEnabled = true;
+      g.drawImage(mapCanvas, mapLayout.pad, mapLayout.pad, mapLayout.w, mapLayout.h, 0, 0, geo.w, geo.h);
+    });
+  }
+  return { geo, picture: miniCanvas };
+}
+
+// The minimap in the corner of the viewport: the terrain, the goal's markers, every living mech as a dot, and a rectangle for what is on screen.
+// Only drawn for a map bigger than the viewport (a map that fits has nothing to scroll to).
+function minimapShown(view) { return !!view.minimap && !!mapLayout && (mapLayout.maxX > 0 || mapLayout.maxY > 0); }
+
+function drawMinimap(g, state, view) {
+  if (!minimapShown(view)) return;
+  const { geo, picture } = miniPicture();
+  const at = (c, r) => { const [px, py] = hexInPicture(mapLayout, c, r); return [geo.x + (px - mapLayout.pad) * geo.scale, geo.y + (py - mapLayout.pad) * geo.scale]; };
+  g.save();
+  panel(g, SIDE_PANEL.x, geo.panelY, SIDE_PANEL.w, geo.panelH);
+  g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.textAlign = 'left'; g.fillText('MAP', SIDE_PANEL.x + 12, geo.panelY + 17);
+  g.font = '9px ' + MONO; g.textAlign = 'right'; g.fillText('DRAG THE MAP OR USE THE WHEEL  M: HIDE', SIDE_PANEL.x + SIDE_PANEL.w - 10, geo.panelY + 17, SIDE_PANEL.w - 50); g.textAlign = 'left';
+  g.drawImage(picture, geo.x, geo.y);
+  g.strokeStyle = COLOURS.panelEdge; g.lineWidth = 1; g.strokeRect(geo.x - 0.5, geo.y - 0.5, geo.w + 1, geo.h + 1);
+  const o = state.objective;
+  const dot = (c, r, colour, size) => { const [x, y] = at(c, r); g.fillStyle = colour; g.fillRect(x - size / 2, y - size / 2, size, size); };
+  if (o && o.id === 'flag') {
+    for (const [c, r] of [...o.bases.player.slice(0, 1), ...o.bases.enemy.slice(0, 1)]) dot(c, r, '#ffffff', 3);
+    if (o.flag.pos) dot(o.flag.pos[0], o.flag.pos[1], '#ffd24a', 6);
+  } else if (o && o.id === 'hill') { for (const [c, r] of o.zone) dot(c, r, '#ffd24a', 3); }
+  else if (o && o.id === 'exit') { for (const [c, r] of o.exits.player) dot(c, r, COLOURS.player, 3); for (const [c, r] of o.exits.enemy) dot(c, r, COLOURS.enemy, 3); }
+  for (const m of livingMechs(state)) {
+    const [x, y] = at(m.pos[0], m.pos[1]);
+    g.fillStyle = m.side === 'player' ? COLOURS.player : COLOURS.enemy; g.fillRect(x - 2, y - 2, 4, 4);
+    if (view.active === m.id) { g.strokeStyle = '#fff'; g.lineWidth = 1; g.strokeRect(x - 3.5, y - 3.5, 7, 7); }
+  }
+  const rect = miniViewRect(geo, mapScroll);
+  g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.strokeRect(geo.x + Math.max(0, rect.x - geo.x), geo.y + Math.max(0, rect.y - geo.y), Math.min(rect.w, geo.w), Math.min(rect.h, geo.h));
+  g.restore();
+}
+
+// Small arrows on the viewport's edge for the mechs (and a loose flag) that are off screen, in their side's colour.
+function drawEdgeArrows(g, state, view) {
+  if (mapLayout.maxX === 0 && mapLayout.maxY === 0) return;
+  const arrow = (c, r, colour) => {
+    const [sx, sy] = hexToScreen(c, r);
+    const a = edgeArrow(sx, sy);
+    if (!a) return;
+    g.save(); g.translate(a.x, a.y); g.rotate(a.angle);
+    g.fillStyle = colour; g.strokeStyle = '#000'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(10, 0); g.lineTo(-7, -8); g.lineTo(-7, 8); g.closePath(); g.stroke(); g.fill();
+    g.restore();
+  };
+  g.save();
+  g.beginPath(); g.rect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); g.clip();
+  for (const m of livingMechs(state)) arrow(m.pos[0], m.pos[1], m.side === 'player' ? COLOURS.player : COLOURS.enemy);
+  const o = state.objective;
+  if (o && o.id === 'flag' && o.flag.pos) arrow(o.flag.pos[0], o.flag.pos[1], '#ffd24a');
+  g.restore();
 }
 
 // Where a weapon's shots leave a mech, on screen: a little way out from its centre towards the front, to the
@@ -302,10 +369,9 @@ function drawCardSlot(g, mech, ask) {
 
 // The combat log shows the last combat round: its heading under the title, then both sides' fire in order (a line starting with
 // '#' is a side's heading), the latest lines if there are more than fit.
-const LOG_Y = MAP_TOP + CARD_H + 8, LOG_H = 636 - LOG_Y; // below the card, down to the help text
-const LOG_LINES = Math.floor((LOG_H - 53 - 6) / 14);
-function drawLog(g, lines, header) {
-  const x = 806, y = LOG_Y, w = 202;
+const LOG_Y = MAP_TOP + CARD_H + 8;
+function drawLog(g, lines, header, bottom) { // from under the card down to `bottom` (the help text, or the minimap's panel on a big map)
+  const x = 806, y = LOG_Y, w = 202, LOG_H = bottom - LOG_Y, LOG_LINES = Math.floor((LOG_H - 53 - 6) / 14);
   panel(g, x, y, w, LOG_H);
   g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.textAlign = 'left';
   g.fillText('COMBAT LOG', x + 12, y + 18);
@@ -314,7 +380,7 @@ function drawLog(g, lines, header) {
   g.font = FONT_SMALL;
   lines.slice(-LOG_LINES).forEach((line, i) => {
     if (line.startsWith('#')) { g.fillStyle = line.includes('YOUR') ? COLOURS.player : COLOURS.enemy; g.font = 'bold 11px ' + MONO; g.fillText(line.slice(1), x + 12, y + 53 + i * 14); g.font = FONT_SMALL; return; }
-    g.fillStyle = line.includes('DESTROYED') || line.includes('SHUT DOWN') || line.includes('EXPLODES') || line.includes('CRITICAL') ? '#ff7b6b' : line.includes('miss') || line.includes('MISS') ? COLOURS.dim : COLOURS.text;
+    g.fillStyle = line.includes('DESTROYED') || line.includes('SHUT DOWN') || line.includes('EXPLODES') || line.includes('CRITICAL') ? '#ff7b6b' : line.includes('miss') || line.includes('MISS') ? COLOURS.dim : /^P\d /.test(line) ? '#8fd0ea' : /^E\d /.test(line) ? '#ff9a8a' : COLOURS.text; // a shot's line is tinted by who fired it
     g.fillText(line, x + 12, y + 53 + i * 14, w - 22); // squeezed to fit if too long
   });
   g.globalAlpha = 1;
@@ -588,16 +654,17 @@ function drawSelect(g, view) {
   g.fillStyle = COLOURS.bg; g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.textAlign = 'left'; g.font = 'bold 22px ' + MONO; g.fillStyle = COLOURS.player; g.fillText('FREE PLAY', 16, 38);
   g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText('Choose a map, and what it takes to win. You can change both later from the mech bay.', 16, 64);
+  g.textAlign = 'right'; g.fillText('MAP SIZE', 752, 36); g.textAlign = 'left';
   for (const b of view.buttons) {
     const hovered = b.id === view.hover && b.state !== 'disabled';
-    if (b.id === 'back' || b.id === 'continue') { drawBayButton(g, b, hovered); continue; }
+    if (b.id === 'back' || b.id === 'continue' || b.id.startsWith('size:')) { drawBayButton(g, b, hovered); continue; }
     panel(g, b.x, b.y, b.w, b.h);
     if (b.state === 'selected') { g.fillStyle = 'rgba(79,179,217,0.14)'; g.fillRect(b.x, b.y, b.w, b.h); g.strokeStyle = COLOURS.player; g.lineWidth = 3; g.strokeRect(b.x + 1.5, b.y + 1.5, b.w - 3, b.h - 3); }
     else if (hovered) { g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1); }
     const off = b.state === 'disabled';
     let top = b.y + 22;
     if (b.id.startsWith('map:')) {
-      drawMapThumb(g, SCENARIOS[b.id.slice(4)], b.x + b.w / 2, b.y + 10, b.w - 16, 176);
+      drawMapThumb(g, scenarioFor(b.id.slice(4), view.size || 'small'), b.x + b.w / 2, b.y + 10, b.w - 16, 176);
       top = b.y + 208;
     }
     g.font = 'bold 14px ' + MONO; g.fillStyle = off ? '#66738a' : b.state === 'selected' ? COLOURS.player : COLOURS.text; g.fillText(b.label, b.x + 12, top);
@@ -744,11 +811,15 @@ function drawFrame(g, view) {
   const { state } = view;
   g.fillStyle = COLOURS.bg; g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.save();
+  const pad = mapLayout.pad;
+  g.beginPath(); g.rect(VIEWPORT.x - pad, VIEWPORT.y - pad, VIEWPORT.w + 2 * pad, VIEWPORT.h + 2 * pad); g.clip(); // nothing of the map spills onto the panel, the header or the help
   if (view.camera) {
     const c = view.camera;
     g.translate(VIEW_W / 2 + c.sx, VIEW_H / 2 + c.sy); g.scale(c.zoom, c.zoom); g.translate(-c.fx, -c.fy);
   }
-  g.drawImage(mapCanvas, 0, 0);
+  // the part of the map's picture in the viewport, in whole pixels (the same size at the source and the destination, so it is copied, not resampled)
+  const showW = Math.min(Math.ceil(VIEWPORT.w) + 2 * pad, mapCanvas.width - mapScroll.x), showH = Math.min(Math.ceil(VIEWPORT.h) + 2 * pad, mapCanvas.height - mapScroll.y);
+  g.drawImage(mapCanvas, mapScroll.x, mapScroll.y, showW, showH, VIEWPORT.x + mapLayout.offX - pad, VIEWPORT.y + mapLayout.offY - pad, showW, showH);
   drawObjectiveOverlay(g, state, view.clock);
 
   const active = view.active ? mechById(state, view.active) : null;
@@ -798,6 +869,8 @@ function drawFrame(g, view) {
   if (view.finder && view.finder.lines.length) drawInfoBox(g, view.finder.path.length ? view.finder.path[view.finder.path.length - 1] : mechById(state, view.finder.mechId).pos, view.finder.lines);
   if (view.weapon && view.weapon.status) drawInfoBox(g, mechById(state, view.weapon.targetId).pos, weaponCalloutLines(view.weapon));
   g.restore();
+  drawEdgeArrows(g, state, view);
+  drawMinimap(g, state, view);
 
   // header, banner, instruction, the unit panel, the log and the help
   g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.textAlign = 'left';
@@ -810,7 +883,8 @@ function drawFrame(g, view) {
   g.font = FONT; g.fillStyle = COLOURS.warn; g.fillText(view.status || '', 16, 70);
   const cardMech = view.hoverMech || active; // the mech under the cursor, else the highlighted mech (the enemy's too, in its turn)
   drawCardSlot(g, cardMech, active ? { mechId: active.id, slot: view.weapon ? view.weapon.slot : -1, heatGhost: view.heatGhost } : null);
-  drawLog(g, view.log || [], view.logHeader);
+  const mini = minimapShown(view);
+  drawLog(g, view.log || [], view.logHeader, mini ? miniGeometry(mapLayout).panelY - 8 : 636);
   drawHelp(g, view.help);
   if (view.result) drawResult(g, view.result);
 }

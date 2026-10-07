@@ -4,8 +4,8 @@
 // checks.
 
 // One whole round, both sides played by the AI, following roundPhases: the first side moves each mech, the second
-// side moves each mech, the first side fires, the second side fires (the fight stops the moment a volley leaves
-// one side with no mech), then the end of the round. Returns all the events.
+// side moves each mech, then both sides fire at once (planned on the same state, resolved together; the fight stops
+// if that leaves a side with no mech), then the end of the round. Returns all the events.
 function playRound(state, rng) {
   const events = [];
   for (const phase of roundPhases(state.first)) {
@@ -15,7 +15,7 @@ function playRound(state, rng) {
         if (finishIfOver(state)) return events; // a flag captured or an exit reached ends the battle at once
       }
     } else {
-      events.push(...resolveFirePhase(state, aiPlanFire(state, phase.side).shots, rng));
+      events.push(...resolveFirePhase(state, aiPlanCombat(state).shots, rng));
       if (finishIfOver(state)) return events;
     }
   }

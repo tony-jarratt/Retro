@@ -6,8 +6,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 J="$HERE/../js"
 WITH=true
 [ "$1" = "nobalance" ] && WITH=false
-OUT=$("$JSC" "$J/errors.js" "$J/rng.js" "$J/data.js" "$J/map.js" "$J/scenarios.js" "$J/objectives.js" "$J/rules.js" "$J/code.js" "$J/bay.js" "$J/intro.js" "$J/menu.js" "$J/ai.js" "$J/fireplan.js" "$J/volley.js" \
-  "$HERE/planner.js" "$HERE/checks.js" "$HERE/checks-fire.js" "$HERE/checks-code.js" "$HERE/checks-play.js" "$HERE/checks-bay.js" "$HERE/checks-intro.js" "$HERE/checks-maps.js" "$HERE/checks-goals.js" "$HERE/checks-forces.js" \
+OUT=$("$JSC" "$J/errors.js" "$J/rng.js" "$J/data.js" "$J/map.js" "$J/scenarios.js" "$J/objectives.js" "$J/rules.js" "$J/code.js" "$J/bay.js" "$J/intro.js" "$J/menu.js" "$J/view.js" "$J/ai.js" "$J/fireplan.js" "$J/volley.js" \
+  "$HERE/planner.js" "$HERE/checks.js" "$HERE/checks-fire.js" "$HERE/checks-code.js" "$HERE/checks-play.js" "$HERE/checks-bay.js" "$HERE/checks-intro.js" "$HERE/checks-maps.js" "$HERE/checks-goals.js" "$HERE/checks-forces.js" "$HERE/checks-scroll.js" \
   -e "runAllChecks(print, $WITH)" 2>&1)
 echo "$OUT"
 case "$OUT" in *"failures=0"*) exit 0;; *) exit 1;; esac

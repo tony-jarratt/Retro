@@ -401,13 +401,13 @@ check('move: mechs move one at a time, so a hex a mech has just taken is occupie
   eq(state.mechs[1].pos, [2, 1]);
 });
 
-check('move: roundPhases gives move, move, fire, fire, first side first, and the sides swap each round', () => {
-  eq(roundPhases('player').map(p => `${p.side} ${p.kind}`), ['player move', 'enemy move', 'player fire', 'enemy fire']);
-  eq(roundPhases('enemy').map(p => `${p.side} ${p.kind}`), ['enemy move', 'player move', 'enemy fire', 'player fire']);
+check('move: roundPhases gives move, move, then one combat step for both sides, with the same side first every round', () => {
+  eq(roundPhases('player').map(p => `${p.side} ${p.kind}`), ['player move', 'enemy move', 'both fire']);
+  eq(roundPhases('enemy').map(p => `${p.side} ${p.kind}`), ['enemy move', 'player move', 'both fire']);
   const s = makeState(openMap(8, 5), [tm('P1', 'player', S_BOLT, [1, 1]), tm('E1', 'enemy', S_BOLT, [6, 1])], 'enemy'); // armed, or it would be a stalemate
   eq([s.round, s.first], [1, 'enemy']);
   endRound(s, fakeRng([], []));
-  eq([s.round, s.first], [2, 'player']);
+  eq([s.round, s.first], [2, 'enemy'], 'the round counts on, the first mover stays the same');
   endRound(s, fakeRng([], []));
   eq([s.round, s.first], [3, 'enemy']);
   throwsKind(RulesError, 'first', () => makeState(openMap(8, 5), [tm('P1', 'player', S_DUMMY, [1, 1])], 'nobody'));

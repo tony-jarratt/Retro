@@ -4,10 +4,10 @@
 // The state is a plain object. The action functions (moveMech, resolveFirePhase, endRound) change it in place
 // and return a list of events for the UI and the tests to read.
 //
-// A round goes: the first side moves each of its mechs, then the second side moves each of its mechs, then the
-// first side fires, then the second side fires (see roundPhases). Everything is sequential, so a mech destroyed by
-// the first side's volley cannot fire back in the second side's, and a target that is in range when you choose it
-// is still in range when you fire. Anything impossible throws a typed error (see errors.js); nothing falls back
+// A round goes: the first side moves each of its mechs, then the second side moves each of its mechs (the same side is first every round), then BOTH sides
+// fire at once (see roundPhases): every shot is judged on the state at the start of the fire step, so a mech destroyed in
+// it still fires, nobody has a first strike, and a target that is in range when you choose it is still in range when you
+// fire (nothing moves in between). Anything impossible throws a typed error (see errors.js); nothing falls back
 // to a default silently.
 
 // ---------- lookups ----------
@@ -229,11 +229,10 @@ function finishIfOver(state) {
   return state.over;
 }
 
-// The four steps of a round, in order: the first side moves, the second side moves, the first side fires,
-// the second side fires.
+// The three steps of a round, in order: the first side moves, the second side moves, then both sides fire at once (side 'both').
+// The same side is first every round (chosen by the seed at the start), so the sides alternate strictly: A, B, A, B, with the combat shared.
 function roundPhases(first) {
-  const second = otherSide(first);
-  return [{ kind: 'move', side: first }, { kind: 'move', side: second }, { kind: 'fire', side: first }, { kind: 'fire', side: second }];
+  return [{ kind: 'move', side: first }, { kind: 'move', side: otherSide(first) }, { kind: 'fire', side: 'both' }];
 }
 
 // Could this mech ever do damage with a weapon again, ignoring shutdown (which passes)? It needs a weapon that does damage (smoke
@@ -721,8 +720,7 @@ function endRound(state, rng) {
   if (finishIfOver(state)) {
     events.push({ type: 'over', winner: state.winner });
   } else {
-    state.round += 1;
-    state.first = otherSide(state.first); // the sides swap who goes first
+    state.round += 1; // (the same side moves first every round, so the moves go A, B, A, B and the combat step is shared)
   }
   return events;
 }

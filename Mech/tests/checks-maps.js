@@ -4,27 +4,29 @@
 
 function allHexGroups(s) { return { flag: [s.flag], zone: s.zone, 'player base': s.bases.player, 'enemy base': s.bases.enemy, 'player exit': s.exits.player, 'enemy exit': s.exits.enemy }; }
 
-check('maps: every map is 19 x 12, uses known terrain and has three starts a side on clear ground', () => {
-  assert(SCENARIO_IDS.length >= 3, 'basin, urban and mountains');
+check('maps: every map is 19 x 12 (small) or 31 x 20 (large), uses known terrain and has three starts a side on clear ground', () => {
+  eq(SCENARIO_IDS.length, 6, 'three themes in two sizes');
   for (const id of SCENARIO_IDS) {
     const s = SCENARIOS[id];
     eq(s.id, id);
     const map = makeMap(s.name, s.rows);
-    eq([map.cols, map.rows], [19, 12], id);
+    eq([map.cols, map.rows], s.size === 'large' ? [31, 20] : [19, 12], id);
+    eq(s.id.endsWith('-large'), s.size === 'large', id + ': the id says the size');
+    eq(scenarioFor(s.theme, s.size), s, id + ': scenarioFor finds it');
     eq([s.playerStarts.length, s.enemyStarts.length], [3, 3], id);
     for (const [c, r] of [...s.playerStarts, ...s.enemyStarts]) eq(map.tiles[r][c], '.', `${id}: start ${c},${r} is clear ground`);
     assert(s.name && s.blurb, id + ' has a name and a blurb');
   }
 });
 
-check('maps: every start can reach every enemy start, and the sides start at least 11 hexes apart', () => {
+check('maps: every start can reach every enemy start, and the sides start far apart (11 hexes on a small map, 22 on a large one)', () => {
   for (const id of SCENARIO_IDS) {
     const s = SCENARIOS[id], map = makeMap(s.name, s.rows);
     for (const from of s.playerStarts) {
       const reach = reachableHexes(map, from, 999, new Set());
       for (const to of s.enemyStarts) {
         assert(reach.has(hexKey(to[0], to[1])), `${id}: ${hexKey(...from)} cannot reach ${hexKey(...to)}`);
-        assert(hexDist(from[0], from[1], to[0], to[1]) >= 11, `${id}: starts ${hexKey(...from)} and ${hexKey(...to)} are too close`);
+        assert(hexDist(from[0], from[1], to[0], to[1]) >= (s.size === 'large' ? 22 : 11), `${id}: starts ${hexKey(...from)} and ${hexKey(...to)} are too close`);
       }
     }
   }
@@ -78,6 +80,12 @@ check('terrain: a move plan through a building is refused with a typed error nam
   moveMech(s, { mechId: 'P1', mode: 'walk', path: [[1, 3]] }); // a clear hex is fine
 });
 
+check('maps: scenarioFor refuses an unknown theme or size with a typed error', () => {
+  throwsKind(BuildError, 'map', () => scenarioFor('moon', 'small'));
+  throwsKind(BuildError, 'size', () => scenarioFor('basin', 'huge'));
+  eq(scenarioFor('basin', 'small'), SCENARIO);
+});
+
 check('maps: a battle can be played on any map, with the squad on its starts and the map name in the state', () => {
   for (const id of SCENARIO_IDS) {
     const s = SCENARIOS[id];
@@ -112,7 +120,13 @@ check('menu: the title has FREE PLAY and STORY side by side, and the focus marks
 check('menu: the select screen has a card for every map and win condition, and choosing one acts at once', () => {
   const sel = newMenuSelection('basin', 'annihilation');
   let buttons = selectButtons(sel);
-  eq(buttons.filter(b => b.id.startsWith('map:')).map(b => b.id), SCENARIO_IDS.map(id => 'map:' + id));
+  eq(buttons.filter(b => b.id.startsWith('map:')).map(b => b.id), MAP_THEMES.map(id => 'map:' + id));
+  eq(buttons.filter(b => b.id.startsWith('size:')).map(b => [b.id, b.state]), [['size:small', 'selected'], ['size:large', 'normal']]);
+  selectPress(sel, buttons.find(b => b.id === 'size:large'));
+  eq(sel.size, 'large');
+  eq(selectButtons(sel).find(b => b.id === 'size:large').state, 'selected');
+  eq(selectButtons(sel).find(b => b.id === 'map:basin').sub, scenarioFor('basin', 'large').blurb, 'the cards show the chosen size');
+  sel.size = 'small';
   eq(buttons.filter(b => b.id.startsWith('goal:')).map(b => b.id), OBJECTIVE_IDS.map(id => 'goal:' + id));
   eq(buttons.find(b => b.id === 'map:basin').state, 'selected');
   selectPress(sel, buttons.find(b => b.id === 'map:urban'));
@@ -152,6 +166,7 @@ check('menu: the cards sit on the screen and none overlap', () => {
 check('menu: unknown maps and win conditions are typed errors, and the bay names its map and goal', () => {
   throwsKind(BuildError, 'map', () => newMenuSelection('moon', 'annihilation'));
   throwsKind(BuildError, 'goal', () => newMenuSelection('basin', 'tag'));
+  throwsKind(BuildError, 'size', () => newMenuSelection('basin', 'annihilation', 'huge'));
   const bay = newBay(BAY_SQUAD, 'normal');
   bay.scenarioId = 'urban'; bay.goal = 'annihilation';
   const change = bayButtons(bay).find(b => b.id === 'change');

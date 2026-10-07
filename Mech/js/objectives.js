@@ -10,7 +10,7 @@
 // Every goal but annihilation has a round limit; at the limit the battle is decided on points (hill), then armour left, else a draw.
 // The goal's own rules run from three hooks the rules call: objectiveAfterMove, objectiveSync (a carrier destroyed) and objectiveAfterRound.
 
-const HILL_TARGET = 3;
+const HILL_TARGET = 4;
 
 const OBJECTIVES = {
   annihilation: {

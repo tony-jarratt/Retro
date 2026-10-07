@@ -275,3 +275,32 @@ check('view: every map builds, fits the screen and draws every terrain, and the 
   bay.scenarioId = 'mountains';
   drawBay(g, { bay, report: bayReport(bay), buttons: bayButtons(bay), hover: 'change', status: '', statusBad: false });
 });
+
+check('view: on a map bigger than the screen every visible hex converts to the screen and back at several scrolls, and the frame draws', () => {
+  const big = makeMap('big', Array.from({ length: 20 }, (_, r) => (r === 9 ? '.'.repeat(15) + 'T' + '.'.repeat(15) : '.'.repeat(31))));
+  buildMapCanvas(big);
+  eq([mapLayout.maxX > 300, mapLayout.maxY > 300], [true, true]);
+  const state = makeState(big, [tm('P1', 'player', S_DUMMY, [4, 4], { model: 'pool' }), tm('E1', 'enemy', S_DUMMY, [25, 15], { model: 'pool' })]);
+  const c = document.createElement('canvas'); c.width = VIEW_W; c.height = VIEW_H;
+  for (const [x, y] of [[0, 0], [200, 100], [mapLayout.maxX, mapLayout.maxY], [12345, -50]]) {
+    setMapScroll(x, y);
+    let visible = 0;
+    for (let r = 0; r < big.rows; r++) for (let col = 0; col < big.cols; col++) {
+      const [sx, sy] = hexToScreen(col, r);
+      if (inViewport(sx, sy)) { visible += 1; eq(screenToHex(big, sx, sy), [col, r], `${col},${r} at scroll ${x},${y}`); }
+      else eq(screenToHex(big, sx, sy), null, `${col},${r} is off screen at scroll ${x},${y}`);
+    }
+    assert(visible > 100 && visible < 400, `${visible} hexes visible at scroll ${x},${y}`);
+    drawFrame(c.getContext('2d'), viewFor(state, 'P1'));
+  }
+  eq(mapScroll, { x: mapLayout.maxX, y: 0 }, 'the last scroll was clamped (12345, -50)');
+  const screenPoint = hexToScreen(4, 4);
+  setMapScroll(0, 0);
+  const at0 = hexToScreen(4, 4);
+  setMapScroll(100, 40);
+  const at100 = hexToScreen(4, 4);
+  assert(Math.abs((at0[0] - at100[0]) - 100) < 1e-6 && Math.abs((at0[1] - at100[1]) - 40) < 1e-6, 'scrolling moves every hex by the scroll');
+  assert(screenPoint && true);
+  buildMapCanvas(makeMap(SCENARIO.name, SCENARIO.rows)); // leave the default map in place for the checks after this one
+  eq(mapScroll, { x: 0, y: 0 });
+});

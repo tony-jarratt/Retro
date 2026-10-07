@@ -22,9 +22,9 @@ function aiRound(s, rng, hooks) {
         if (finishIfOver(s)) return;
       }
     } else {
-      const r = aiPlanFire(s, phase.side);
-      if (hooks && hooks.fire) hooks.fire(s, phase.side, r);
-      resolveFirePhase(s, r.shots, rng);
+      const plans = ['player', 'enemy'].map(side => ({ side, r: aiPlanFire(s, side) })); // both sides plan on the same state, then fire at once
+      for (const { side, r } of plans) if (hooks && hooks.fire) hooks.fire(s, side, r);
+      resolveFirePhase(s, plans.flatMap(x => x.r.shots), rng);
       if (finishIfOver(s)) return;
     }
   }
@@ -277,7 +277,7 @@ function fightEvents(seed, model) {
         for (const mech of livingMechs(s, phase.side)) moveMech(s, aiMoveFor(s, mech.id).plan);
       } else {
         const before = cloneState(s);
-        const fire = resolveFirePhase(s, aiPlanFire(s, phase.side).shots, rng);
+        const fire = resolveFirePhase(s, aiPlanCombat(s).shots, rng);
         volleys.push({ before, fire, after: cloneState(s) });
         if (finishIfOver(s)) break;
       }

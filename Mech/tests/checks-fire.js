@@ -1023,3 +1023,41 @@ check('howitzer: the shell and its splash, on mechs of both sides beside the tar
   const ke = resolveFirePhase(k, [{ mechId: 'P1', weaponSlot: 0, targetId: 'E1' }], fakeRng([20, 1], []));
   eq(ke.filter(e => e.type === 'killed').map(e => e.mechId), ['E2']);
 });
+
+// ======================================================================
+// combat: both sides fire at once
+// ======================================================================
+check('combat: both sides fire in one resolution, a mech destroyed in it still shoots, and mutual destruction is a draw', () => {
+  const s = pair(S_BOLT, [2, 2], S_BOLT, [4, 2], null, { attacker: { model: 'pool' }, target: { model: 'pool' } });
+  s.mechs[0].hp = 3; s.mechs[1].hp = 3; // one Bolt hit (6) kills either
+  const events = resolveFirePhase(s, [{ mechId: 'P1', weaponSlot: 0, targetId: 'E1' }, { mechId: 'E1', weaponSlot: 0, targetId: 'P1' }], fakeRng([20, 20], []));
+  eq(events.filter(e => e.type === 'shot').map(e => [e.mechId, e.hit]), [['E1', true], ['P1', true]].sort((a, b) => (a[0] < b[0] ? -1 : 1)), 'both fired and both hit, whoever died first');
+  eq(s.mechs.map(m => m.alive), [false, false], 'both are destroyed');
+  assert(finishIfOver(s));
+  eq([s.winner, s.reason], ['draw', 'Every mech on both sides was destroyed']);
+});
+
+check('combat: the order of the two sides\' shots in the list does not change what happens', () => {
+  const build = () => {
+    const s = makeState(openMap(14, 9), [tm('P1', 'player', jackal([2, 4, 0]), [2, 4], { model: 'pool' }), tm('P2', 'player', jackal([2, 0, 0]), [2, 6], { model: 'pool' }),
+      tm('E1', 'enemy', jackal([2, 4, 0]), [5, 4], { model: 'pool' }), tm('E2', 'enemy', jackal([2, 0, 0]), [5, 6], { model: 'pool' })]);
+    return s;
+  };
+  const player = [{ mechId: 'P1', weaponSlot: 0, targetId: 'E1' }, { mechId: 'P2', weaponSlot: 0, targetId: 'E2' }];
+  const enemy = [{ mechId: 'E1', weaponSlot: 1, targetId: 'P1' }, { mechId: 'E2', weaponSlot: 0, targetId: 'P2' }];
+  const a = build(), b = build();
+  const ea = resolveFirePhase(a, [...player, ...enemy], new Rng(9)), eb = resolveFirePhase(b, [...enemy, ...player], new Rng(9));
+  eq(JSON.stringify(a), JSON.stringify(b), 'the same state');
+  eq(JSON.stringify(ea), JSON.stringify(eb), 'the same events in the same order');
+});
+
+check('combat: aiPlanCombat plans both sides on the same state before anything resolves, the player\'s shots first', () => {
+  const s = pair(S_BOLT, [2, 2], S_BOLT, [5, 2], null, { attacker: { model: 'pool' }, target: { model: 'pool' } });
+  const plan = aiPlanCombat(s);
+  eq(plan.shots.map(x => x.mechId), ['P1', 'E1']);
+  const before = JSON.stringify(s);
+  aiPlanCombat(s);
+  eq(JSON.stringify(s), before, 'planning changes nothing');
+  const events = resolveFirePhase(s, plan.shots, new Rng(3));
+  eq(events.filter(e => e.type === 'shot').length, 2);
+});

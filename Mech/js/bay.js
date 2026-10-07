@@ -203,8 +203,8 @@ function bayButtons(bay) {
     });
   }
 
-  const scenario = SCENARIOS[bay.scenarioId || DEFAULT_SCENARIO_ID], objective = OBJECTIVES[bay.goal || DEFAULT_OBJECTIVE_ID];
-  add('change', 612, 12, 188, 36, scenario.name, 'normal', `The map is ${scenario.name} and the goal is ${objective.name}. Click to change them`, { type: 'change' }, objective.name);
+  const scenario = scenarioFor(bay.scenarioId || DEFAULT_SCENARIO_ID, bay.mapSize || 'small'), objective = OBJECTIVES[bay.goal || DEFAULT_OBJECTIVE_ID];
+  add('change', 612, 12, 188, 36, scenario.name + (scenario.size === 'large' ? ' (LARGE)' : ''), 'normal', `The map is ${scenario.name} (${scenario.size}) and the goal is ${objective.name}. Click to change them`, { type: 'change' }, objective.name);
   SUGGESTED_SQUADS.forEach((q, k) => add(`suggest:${k}`, 100 + k * 134, 52, 128, 28, q.name, 'normal', q.blurb, { type: 'suggest', index: k }));
   const force = enemyForceOf(bay.difficulty, bay.enemyIndex || 0);
   add('enemy', 644, 52, 364, 28, `ENEMY: ${force.name}  ${squadCost(force.mechs)} cr`, 'normal',

@@ -197,6 +197,13 @@ function aiSmokeTarget(state, mech, slot) {
   return { targetId: null, reason: 'none' };
 }
 
+// Both sides' fire for the combat step, planned on the same state before anything resolves (so neither plan sees the other's results).
+// Returns { shots, notes } with the player's shots first.
+function aiPlanCombat(state) {
+  const p = aiPlanFire(state, 'player'), e = aiPlanFire(state, 'enemy');
+  return { shots: [...p.shots, ...e.shots], notes: [...p.notes, ...e.notes] };
+}
+
 // Plans a whole side's fire. Returns { shots: [{ mechId, weaponSlot, targetId }...], notes: [...] }.
 function aiPlanFire(state, side) {
   const shots = [], notes = [];
