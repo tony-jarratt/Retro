@@ -21,6 +21,7 @@ function validateGames(games) {
     if (seen.has(g.id)) throw new MenuError(`${where}: id "${g.id}" is used twice`);
     seen.add(g.id);
     if (!g.folder.endsWith('/')) throw new MenuError(`${where}: folder "${g.folder}" must end with "/"`);
+    if ('inspiredBy' in g && (typeof g.inspiredBy !== 'string' || g.inspiredBy.trim() === '')) throw new MenuError(`${where}: inspiredBy must be text`);
     if (!/^#[0-9a-f]{6}$/i.test(g.accent)) throw new MenuError(`${where}: accent "${g.accent}" must look like #2fd8c8`);
   });
 }
@@ -53,6 +54,7 @@ function buildCard(game, number) {
     el('h2', 'title', game.title),
     el('p', 'blurb', game.blurb),
     el('p', 'meta', `${game.players} · ${game.controls}`),
+    ...(game.inspiredBy ? [el('p', 'credit', `INSPIRED BY ${game.inspiredBy.toUpperCase()}`)] : []),
     el('p', 'play', 'PRESS START'),
   );
   return card;

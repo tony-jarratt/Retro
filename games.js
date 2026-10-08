@@ -13,6 +13,7 @@
 //   controls what you press, shown on the card
 //   accent   the card's highlight colour, as #rrggbb
 //   thumb    screenshot path, about 600 pixels wide
+//   inspiredBy (optional) the game that inspired it, shown on the card as a credit
 const GAMES = [
   {
     id: 'p1',
@@ -24,6 +25,7 @@ const GAMES = [
     controls: 'ARROWS / WASD',
     accent: '#2fd8c8',
     thumb: 'thumbs/p1.jpg',
+    inspiredBy: 'Micro Machines',
   },
   {
     id: 'elf',
@@ -35,6 +37,7 @@ const GAMES = [
     controls: 'ARROWS / WASD + SPACE',
     accent: '#ff5a64',
     thumb: 'thumbs/elf.jpg',
+    inspiredBy: 'Chuckie Egg',
   },
   {
     id: 'mayhem',
@@ -46,7 +49,21 @@ const GAMES = [
     controls: 'MOUSE + KEYS',
     accent: '#b57aff',
     thumb: 'thumbs/mayhem.jpg',
+    inspiredBy: 'Chaos',
   },
+  // Cocoa Cascade is hidden from the menu while it's in development. Uncomment to restore.
+  // {
+  //   id: 'cocoa',
+  //   title: 'Cocoa Cascade',
+  //   folder: 'Cocoa/',
+  //   tag: 'Puzzle',
+  //   blurb: 'A runaway chocolate factory. Place a few helpers, then pour: deflect, pipe, set and melt the flow until the vat fills.',
+  //   players: '1 PLAYER',
+  //   controls: 'MOUSE + KEYS',
+  //   accent: '#c8814a',
+  //   thumb: 'thumbs/cocoa.jpg',
+  //   inspiredBy: 'Lemmings',
+  // },
   // Atomic Castle is hidden from the menu while it's in progress. Uncomment to restore.
   // {
   //   id: 'atomic',
@@ -58,5 +75,6 @@ const GAMES = [
   //   controls: 'ARROWS / WASD + SPACE',
   //   accent: '#ffa23a',
   //   thumb: 'thumbs/atomic.jpg',
+  //   inspiredBy: 'Knight Lore',
   // },
 ];

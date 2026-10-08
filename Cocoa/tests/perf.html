@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>running</title></head>
+<body><canvas id="game" width="960" height="600"></canvas>
+<script src="../js/game.js"></script><script src="../js/levels.js"></script><script src="../js/sprites.js"></script><script src="../js/main.js"></script>
+<script>
+// How long one frame takes (the pour, the particles and the drawing) at 1x speed, in the busiest part of a level.
+startLevel(3);
+const g = ui.game;
+g.place(planHelper({ type: 'solid', x: 52.5, y: 60 }));
+g.start();
+for (let i = 0; i < 300; i++) g.tick();
+const t0 = performance.now(), N = 60;
+for (let i = 0; i < N; i++) { ctx.setTransform(RES, 0, 0, RES, 0, 0); g.tick(); ambientJuice(g, 1 / 30); updateParticles(1 / 30); drawPlay(performance.now()); }
+const per = (performance.now() - t0) / N;
+document.title = 'DONE ms-per-frame=' + per.toFixed(1);
+</script></body></html>

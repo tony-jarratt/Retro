@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#26343c}canvas{display:block;image-rendering:pixelated}</style></head>
+<body><canvas id="c" width="1080" height="560"></canvas>
+<script src="../js/sprites.js"></script>
+<script>
+// A contact sheet of every sprite at 4x, for looking at the art close up.
+const c = document.getElementById('c').getContext('2d');
+c.imageSmoothingEnabled = false;
+let x = 10, y = 10;
+const put = (s, label) => {
+  if (x + s.width * 4 > 1070) { x = 10; y += 130; }
+  c.drawImage(s, x, y, s.width * 4, s.height * 4);
+  c.fillStyle = '#9ab0bc'; c.font = '10px monospace'; c.fillText(label, x, y + s.height * 4 + 10);
+  x += s.width * 4 + 8;
+};
+for (const k of ['heat', 'solid', 'deflect', 'pipe']) {
+  put(workerSprite(k, 'idle', 0, 0), k + ' idle');
+  for (let f = 0; f < 4; f++) put(workerSprite(k, 'work', f, 0), k + ' work' + f);
+}
+put(workerSprite('heat', 'cheer', 0, 0), 'cheer'); put(workerSprite('heat', 'sad', 0, 0), 'sad'); put(workerSprite('pipe', 'idle', 0, 1), 'blink');
+for (let s = 0; s < 4; s++) put(guzzleSprite(s, s % 2, 0), 'guzzle' + s);
+put(outletSprite(0), 'out0'); put(outletSprite(1), 'out1');
+put(burstSprite(0), 'b0'); put(burstSprite(2), 'b2');
+document.title = 'ready';
+</script></body></html>

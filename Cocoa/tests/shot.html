@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="game" width="960" height="600"></canvas>
+<script src="../js/game.js"></script><script src="../js/levels.js"></script><script src="../js/sprites.js"></script><script src="../js/main.js"></script>
+<script>
+// Screenshot hook: ?level=N&ticks=T plays the scripted plan for that level and stops partway through.
+const q = new URLSearchParams(location.search);
+const li = Number(q.get('level') || 1), ticks = Number(q.get('ticks') || 250);
+const PLANS = [
+  [{ type: 'deflect', x: 37, y: 60, dir: 1 }], [{ type: 'pipe', x: 30, y: 48, x2: 45, y2: 60 }],
+  [{ type: 'heat', x: 34, y: 53 }], [{ type: 'solid', x: 52.5, y: 60 }], [{ type: 'guzzle', x: 34, y: 53 }],
+  [], [], [], [{ type: 'solid', x: 52.5, y: 60 }, { type: 'pipe', x: 83, y: 62, x2: 100, y2: 76 }],
+];
+if (q.has('title')) { ui.screen = 'title'; } else {
+startLevel(li);
+PLANS[li].forEach((h) => ui.game.place(planHelper(h)));
+if (!q.has('wait')) ui.game.start();
+for (let i = 0; i < ticks; i++) ui.game.tick();
+if (q.has('end')) { while (!ui.game.result) ui.game.tick(); }
+}
+ui.hover = null;
+document.title = 'ready';
+</script></body></html>

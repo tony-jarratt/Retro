@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cocoa Cascade</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1a0f0a; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  canvas { width: min(100vw, calc(100vh * 640 / 400)); height: auto; aspect-ratio: 640 / 400; display: block; cursor: crosshair; }
+</style>
+</head>
+<body>
+<canvas id="game" width="960" height="600"></canvas>
+<script src="js/game.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

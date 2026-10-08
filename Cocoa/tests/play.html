@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style><title>running</title></head>
+<body><canvas id="game" width="960" height="600"></canvas>
+<script src="../js/game.js"></script><script src="../js/levels.js"></script><script src="../js/sprites.js"></script><script src="../js/main.js"></script>
+<script>
+// Plays the real game with synthetic mouse and keyboard events, the way a person would, and reports in the page title.
+const out = [];
+let failures = 0;
+const check = (cond, msg) => { if (!cond) failures++; out.push((cond ? 'ok ' : 'FAIL ') + msg); };
+window.addEventListener('error', (e) => { failures++; out.push('ERROR ' + e.message + ' @' + e.filename.split('/').pop() + ':' + e.lineno); });
+const cv = document.getElementById('game');
+const mouse = (type, x, y, button = 0) => {          // x, y in drawing units (640 x 400)
+  const r = cv.getBoundingClientRect();
+  cv.dispatchEvent(new MouseEvent(type, { clientX: r.left + x * r.width / 640, clientY: r.top + y * r.height / 400, button, bubbles: true }));
+};
+const click = (x, y, button = 0) => { mouse('mousemove', x, y); mouse('mousedown', x, y, button); };
+const key = (k) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+const cellXY = (px, py) => [px * SCALE * CELL + CELL / 2, py * SCALE * CELL + CELL / 2];   // plan coordinates to drawing units
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (cond, ms) => { const t0 = performance.now(); while (!cond() && performance.now() - t0 < ms) await sleep(100); return cond(); };
+
+(async () => {
+  try {
+    await sleep(300);
+    check(ui.screen === 'title', 'opens on the title screen');
+    click(100, 125);                                       // the first plaque
+    check(ui.screen === 'play' && ui.levelIndex === 0, 'clicking the first plaque starts level 1');
+    check(ui.tool === 'deflect', 'the deflector is selected');
+    click(...cellXY(37, 60));
+    check(ui.game.helpers.length === 1 && ui.game.left('deflect') === 0, 'a click places the deflector');
+    click(...cellXY(90, 20));
+    check(ui.game.helpers.length === 1, 'a second click with none left places nothing');
+    check(ui.message.length > 0, 'and says why');
+    click(...cellXY(37, 60), 2);                           // right-click removes
+    check(ui.game.helpers.length === 0, 'right-click removes the helper');
+    click(...cellXY(37, 60));
+    click(...cellXY(37, 60));                              // click on it picks it up
+    check(ui.game.helpers.length === 0, 'clicking a placed helper picks it up');
+    click(...cellXY(37, 60));
+    check(ui.game.helpers.length === 1, 'and a click puts it down again');
+    click(440 + 50, 360 + 20);                             // POUR NOW
+    check(ui.game.running, 'the POUR NOW button starts the pour');
+    const done = await until(() => ui.game.result, 60000);
+    check(done && ui.game.result === 'won', 'the level is won through the real game loop: ' + ui.game.reason);
+    check(ui.game.stars >= 1, 'it earns stars (' + ui.game.stars + ')');
+    check(ui.best[ui.game.level.name] >= 1, 'the stars are saved');
+    key(' ');
+    check(ui.levelIndex === 1 && ui.screen === 'play', 'space goes to the next level');
+    key('Escape');
+    check(ui.screen === 'title', 'escape returns to the title screen');
+    key('4');
+    check(ui.screen === 'play' && ui.levelIndex === 3, 'a number key starts that level');
+    check(ui.tool === 'solid', 'level 4 starts with the solidifier selected');
+    click(...cellXY(52.5, 60));
+    check(ui.game.helpers.length === 1, 'the solidifier is placed in the hole');
+    key(' ');
+    check(ui.game.running, 'space starts the pour');
+    await until(() => ui.game.result, 60000);
+    check(ui.game.result === 'won', 'level 4 is won by hand: ' + ui.game.reason);
+    key(' ');                                              // next level
+    key('Escape');
+    key('9');
+    check(ui.readySecs > 0 && !ui.game.running, 'a new level waits in a countdown before the pour');
+    key('3'); click(...cellXY(52.5, 60));                  // the basin plug
+    key('2'); click(...cellXY(83, 62)); click(...cellXY(100, 76));
+    check(ui.game.helpers.length === 2, 'a pipe takes two clicks (level 9 has two helpers placed)');
+    click(540 + 25, 360 + 20);                             // the speed button
+    check(ui.speed === 3, 'the speed button works');
+    click(440 + 50, 360 + 20);                             // POUR NOW
+    check(ui.game.running, 'POUR NOW starts the pour');
+    await until(() => ui.game.warning, 60000);
+    check(ui.game.warning && /LEAK/.test(ui.game.warning.text), 'a warning appears before the second leak');
+    await until(() => ui.game.time >= 12 * 30, 60000);
+    click(...cellXY(52.5, 60), 2);                         // pick the solidifier up (right-click)
+    check(ui.game.helpers.length === 1 && ui.game.cool.solid > 0, 'a crew member picked up live rests');
+    click(...cellXY(64.33, 60));
+    check(ui.game.helpers.length === 1 && ui.message.length > 0, 'and cannot be placed again straight away');
+    await until(() => ui.game.time >= 17 * 30, 60000);
+    key('3'); click(...cellXY(64.33, 60));
+    check(ui.game.helpers.length === 2, 'after the rest it plugs the second leak');
+    await until(() => ui.game.result, 90000);
+    check(ui.game.result === 'won', 'level 9 is won live: ' + ui.game.reason);
+    key(' ');
+    check(ui.screen === 'title', 'after winning the last level, space returns to the menu');
+  } catch (e) {
+    failures++; out.push('EXCEPTION ' + e.stack);
+  }
+  document.title = 'DONE failures=' + failures + ' | ' + out.join(' | ');
+})();
+</script></body></html>
