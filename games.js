@@ -51,6 +51,17 @@ const GAMES = [
     thumb: 'thumbs/mayhem.jpg',
     inspiredBy: 'Chaos',
   },
+  {
+    id: 'mech',
+    title: 'Hexfire',
+    folder: 'Mech/',
+    tag: 'Mech tactics',
+    blurb: 'Hex-grid mech battles. Build a squad of up to three, pick a map and a win condition, then outmanoeuvre the enemy force turn by turn.',
+    players: '1 PLAYER',
+    controls: 'MOUSE + ARROWS / WASD',
+    accent: '#4aa8ff',
+    thumb: 'thumbs/mech.jpg',
+  },
   // Cocoa Cascade is hidden from the menu while it's in development. Uncomment to restore.
   // {
   //   id: 'cocoa',
