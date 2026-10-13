@@ -104,6 +104,43 @@ try {
     }
   });
   out.push(`grid game won: ${grid.over === 'win'}; free game won: ${game.over === 'win' || app.pendingEnd?.mode === 'win' || app.mode === 'win'}`);
+  // ---- lives: robots, steam and pits each cost one; none left and the game is lost ----
+  {
+    const check = (cond, msg) => { if (cond) out.push('ok: ' + msg); else failures.push('FAIL: ' + msg); };
+    startGame();
+    const g = app.game;
+    g.time = 99999;
+    const put = (roomId, x, y, face = 'E') => {
+      g.hero.room = ROOM_INDEX[roomId]; g.hero.x = x; g.hero.y = y; g.hero.face = face; g.hero.entry = { x, y }; placeHero(g);
+    };
+    const settle = () => { tick(3 * FPS); processEvents(g); };
+    check(g.lives === LIVES, `lives: a new game starts with ${LIVES}`);
+    put('cafeteria', 5, 3); jump('E'); processEvents(g);
+    check(g.lives === LIVES - 1, `lives: jumping into the cafeteria's double pit costs a life (lives ${g.lives})`);
+    check(g.time > 99990, 'lives: dying costs no time');
+    settle();
+    check(app.free.x === 5.5 && app.free.y === 3.5 && !app.free.air, 'lives: you come back at the doorway you came in by');
+    put('reactor', 5, 3);
+    const vent = cur(g).vents.find((v) => v.x === 5 && v.y === 3);
+    while (ventState(vent, g.elapsed) !== 'on') g.elapsed += 0.05;
+    tick(1); processEvents(g);
+    check(g.lives === LIVES - 2, `lives: standing on a steam vent when it blows costs a life (lives ${g.lives})`);
+    settle();
+    put('repair', 0, 3);
+    const robot = cur(g).robots[0];
+    app.free.x = robot.x + 0.5; app.free.y = robot.y + 0.5; robot.px = robot.x; robot.py = robot.y; robot.t = 0;
+    tick(1); processEvents(g);
+    check(g.lives === LIVES - 3, `lives: touching a robot costs a life (lives ${g.lives})`);
+    settle();
+    app.free.z += 2; app.free.air = true; app.free.vz = 0;
+    robot.t = 0; app.free.x = robot.x + 0.5; app.free.y = robot.y + 0.5;
+    tick(1);
+    check(g.lives === LIVES - 3, 'lives: a robot cannot touch you while you are in the air above it');
+    put('airlock', 0, 3); settle(); // somewhere safe, or you land on the robot
+    for (let k = 0; k < 2; k++) { put('cafeteria', 5, 3); jump('E'); processEvents(g); settle(); }
+    check(g.lives === 0 && g.over === 'lose' && g.loseCause === 'lives', `lives: losing the last life loses the game (lives ${g.lives}, over ${g.over})`);
+    check(app.mode === 'lose', `lives: then the game shows the losing screen (mode ${app.mode})`);
+  }
 } catch (err) {
   failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
 }

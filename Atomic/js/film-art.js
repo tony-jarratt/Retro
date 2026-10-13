@@ -101,6 +101,7 @@ const PART_ART = {
   battery: ['...###...', '.#######.', '.#xxxxx#.', '.#xx#xx#.', '.#x###x#.', '.#xx#xx#.', '.#xxxxx#.', '.#######.', '.........'],
 };
 
+const LIFE_ART = ['...#...', '..###..', '.#xxx#.', '#x###x#', '#x#x#x#', '#x###x#', '.#xxx#.', '..###..'];
 const SAUCER_ART = ['.....#####.....', '...##xxxxx##...', '.#############.', '#x#x#x#x#x#x#x#', '.#############.', '...#.......#...'];
 
 function compileSprite(name, rows) {
@@ -133,5 +134,6 @@ const SPR = {
   robot: ROBOT_FRAMES.map((rows, i) => compileSprite(`robot${i}`, rows)),
   part: Object.fromEntries(Object.entries(PART_ART).map(([id, rows]) => [id, compileSprite(id, rows)])),
   saucer: compileSprite('saucer', SAUCER_ART),
+  life: compileSprite('life', LIFE_ART),
 };
 for (const p of PARTS) if (!SPR.part[p.id]) throw new Error(`no Filmation picture for rocket part "${p.id}"`);

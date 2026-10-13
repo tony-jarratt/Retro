@@ -124,7 +124,7 @@ function smooth2x(src) {
   return out;
 }
 function smoothSprite(spr) { spr.fineImg = smooth2x(spr.img); spr.fineFlip = smooth2x(spr.flip); return spr; }
-[...SPR.heroFront, ...SPR.heroBack, ...SPR.robot, ...Object.values(SPR.part), SPR.saucer].forEach(smoothSprite);
+[...SPR.heroFront, ...SPR.heroBack, ...SPR.robot, ...Object.values(SPR.part), SPR.saucer, SPR.life].forEach(smoothSprite);
 
 function blit(spr, cx, footY, flip = false) { g.drawImage(flip ? spr.fineFlip : spr.fineImg, fine(cx - spr.w / 2), fine(footY - spr.h + 1), spr.w, spr.h); }
 function picture(c, x, y, w = c.width, h = c.height) { g.drawImage(smooth2x(c), fine(x), fine(y), w, h); }
@@ -434,7 +434,7 @@ function drawRobot(room, o, r, t) {
 
 function drawHero(game, o) {
   const f = app.free, room = cur(game);
-  if (game.invuln > 0 && Math.floor(app.tick / 4) % 2) return;
+  if (app.dying > 0 || (game.invuln > 0 && Math.floor(app.tick / 4) % 2)) return;
   const ground = standLevel(game, room, f.x, f.y);
   if (f.air && ground > NOTHING && f.z - ground > 0.2) { const [gx, gy] = P(o, f.x, f.y, ground * LV); dot(gx - 2, gy); dot(gx, gy + 1); dot(gx + 2, gy); }
   const [sx, sy] = P(o, f.x, f.y, f.z * LV);
@@ -479,7 +479,7 @@ function drawPanel(game, t) {
   const f = 1 - Math.max(0, game.time) / TIME_LIMIT;
   blit(SPR.saucer, Math.round(48 - f * 34), Math.round(172 + f * 4));
   if (low && app.tick % 20 < 10) { const bx = Math.round(48 - f * 34); line([bx - 2, 175 + f * 4], [bx - 5, 185]); line([bx + 2, 175 + f * 4], [bx + 5, 185]); }
-  text('TIME', 74, 165);
+  for (let i = 0; i < game.lives; i++) blit(SPR.life, 71 + i * 10, 172); // lives left, above the clock
   const clock = formatTime(game.time);
   text(clock, Math.round(91 - (clock.length * 10 - 1) / 2), 175, 2, 10);
   text('CARRY', 137, 165);
@@ -523,10 +523,10 @@ function drawTitle(t) {
   blit(SPR.saucer, Math.round(128 + Math.sin(t * 0.7) * 90), 52 + Math.round(Math.sin(t * 2) * 3));
   line([20, 134], [236, 134]);
   centred("THE PROFESSOR'S ROCKET IS MISSING SIX", 138);
-  centred('PARTS. FIND THEM BEFORE THE FLYING', 146);
-  centred('SAUCERS LAND.', 154);
+  centred('PARTS. FIND THEM BEFORE THE SAUCERS', 146);
+  centred('LAND. ROBOTS, STEAM AND PITS ARE DEADLY.', 154);
   centred('PRESS SPACE TO START', 169);
-  centred('ARROWS WALK  SPACE HOP  R RESET ROOM', 182);
+  centred('ARROWS WALK  SPACE JUMP  R RESET ROOM', 182);
   paint(0, 22, 32, 2, 'green');
   if (app.best) { paint(24, 0, 8, 1, 'green'); text(`BEST ${formatTime(app.best)}`, 194, 1); }
 }
@@ -543,7 +543,7 @@ function drawEnd(game, kind, t) {
     if (app.newBest) centred('A NEW BEST TIME!', 175);
   } else {
     paint(0, 1, 32, 3, 'red'); paint(0, 4, 32, 15, 'green'); paint(0, 19, 32, 5, 'white');
-    centred('THE SAUCERS HAVE LANDED', 10, 1);
+    centred(game.loseCause === 'lives' ? 'OUT OF LIVES' : 'THE SAUCERS HAVE LANDED', 10, game.loseCause === 'lives' ? 2 : 1);
     for (let i = 0; i < 3; i++) blit(SPR.saucer, 70 + i * 58, 60 + Math.round(Math.sin(t * 2 + i) * 4) + i * 6);
     line([30, 140], [226, 140]);
     for (const x of [100, 140]) edges([[x, 120], [x + 16, 120], [x + 16, 140], [x, 140]]);
@@ -554,6 +554,11 @@ function drawEnd(game, kind, t) {
 
 // ---- the game ----
 const BEST_KEY = 'atomic-castle-best';
+const DEATH_LINES = {
+  robot: ['Remember, children: robots are only dangerous when they are in the same room as you.', 'Tin robots do not say sorry. It is not in their programming.', 'The Professor would have called that "a learning experience".'],
+  vent: ['Steam: nature\'s way of saying "not now".', 'Lightly poached. Please try again.', 'The vents are on a timer. You, it seems, are not.'],
+  pit: ['The pit was deeper than it looked. Pits usually are.', 'Down you go. Mind the gap next time.', 'Gravity: still working, the Professor will be pleased to hear.'],
+};
 function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (err) { console.warn('Could not read the saved best time:', err); return 0; } }
 function saveBest(s) { try { localStorage.setItem(BEST_KEY, String(Math.round(s))); } catch (err) { console.warn('Could not save the best time:', err); } }
 
@@ -566,6 +571,7 @@ const app = {
 
 function startGame() {
   app.game = createGame();
+  app.game.lives = LIVES; app.game.deaths = 0; app.dying = 0;
   app.mode = 'play'; app.held = []; app.free.jumpQueued = 0; app.rocketWait = 0; app.slide = null; app.sparks = [];
   app.pendingEnd = null; app.newBest = false; app.caption = null; app.loading = 50;
   snapHero(app.game);
@@ -604,6 +610,15 @@ function processEvents(game) {
         const r = cur(game).rocket;
         sparkle(game, r.x, r.y, 30, 14);
         say(e.total === PARTS.length ? 'That is the last one. Stand well back.' : `${e.total} of ${PARTS.length} parts fitted. ${PARTS.length - e.total} to go.`, 300);
+        break;
+      }
+      case 'die': {
+        Sound.play('hit'); flashBorder('red', 30);
+        const f = app.free, lines = DEATH_LINES[e.cause];
+        if (!lines) throw new Error(`processEvents: no lines for dying by "${e.cause}"`);
+        sparkle(game, f.x - 0.5, f.y - 0.5, f.z * LV + 12, 16);
+        const said = lines[(game.deaths - 1) % lines.length];
+        say(e.lives <= 0 ? said : `${said} ${e.lives === 1 ? 'Last life!' : `${e.lives} lives left.`}`, 300);
         break;
       }
       case 'hit': Sound.play('hit'); flashBorder('red', 30); snapHero(game); say(HIT_LINES[game.hits % HIT_LINES.length] + ` (-${HIT_PENALTY}s)`, 260); break;
@@ -665,7 +680,8 @@ function stepGame(dt) {
     freeUpdate(game, dt); processEvents(game);
     return;
   }
-  if (!game.over) { stepFree(game, dt); processEvents(game); }
+  if (app.dying > 0) { app.dying -= dt; if (app.dying <= 0 && !game.over) respawn(game); }
+  else if (!game.over) { stepFree(game, dt); processEvents(game); }
   const before = game.time;
   freeUpdate(game, dt);
   processEvents(game);

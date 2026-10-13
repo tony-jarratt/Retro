@@ -13,6 +13,8 @@ const GRAVITY = 40;         // levels a second, every second
 const PUSH_TIME = 0.14;     // seconds of leaning on a crate before it moves
 const NUDGE = 2.5;          // tiles a second that you are slid sideways to line up with a gap, a crate or a doorway
 const SOLID = 99, NOTHING = -99;
+const LIVES = 5;
+const DEATH_TIME = 1.1;     // seconds between losing a life and coming back at the doorway
 
 // The height of the top of a square for walking: walls, shut doors and the rocket are solid, a pit has no floor.
 function tileTop(game, room, x, y) {
@@ -133,11 +135,22 @@ function stepFree(game, dt) {
   else f.z = ground;
   if (f.air && ground === NOTHING && f.z < room.h[Math.floor(f.y)][Math.floor(f.x)] - 1.2) { // down a pit
     syncSquare(game);
-    if (game.invuln > 0) placeHeroAtEntry(game); else hitHero(game, 'pit');
+    if (game.invuln > 0) placeHeroAtEntry(game); else die(game, 'pit');
     return;
   }
   syncSquare(game, landed);
 }
+
+// Robots, steam and pits cost a life (not time, as in the colour version). You come back at the doorway you came in
+// by, with the room left as it is; with no lives left the game is lost.
+function die(game, cause) {
+  if (game.over || app.dying > 0 || game.invuln > 0) return;
+  game.lives--; game.deaths++;
+  emit(game, { t: 'die', cause, lives: game.lives });
+  app.dying = DEATH_TIME; app.held = [];
+  if (game.lives <= 0) { game.over = 'lose'; game.loseCause = 'lives'; emit(game, { t: 'lose' }); }
+}
+function respawn(game) { placeHeroAtEntry(game); game.invuln = INVULN; }
 
 function placeHeroAtEntry(game) { game.hero.x = game.hero.entry.x; game.hero.y = game.hero.entry.y; placeHero(game); }
 
@@ -155,11 +168,11 @@ function freeUpdate(game, dt) {
     r.t += dt;
     while (r.t >= ROBOT_STEP) { r.t -= ROBOT_STEP; stepRobot(game, room, r); }
   }
-  if (game.invuln > 0) return;
+  if (game.invuln > 0 || app.dying > 0) return;
   for (const r of room.robots) {
     const v = robotView(r);
-    if (Math.hypot(v.x + 0.5 - f.x, v.y + 0.5 - f.y) < 0.6 && f.z < room.h[r.y][r.x] + 0.9) { hitHero(game, 'robot'); return; }
+    if (Math.hypot(v.x + 0.5 - f.x, v.y + 0.5 - f.y) < 0.6 && f.z < room.h[r.y][r.x] + 0.9) { die(game, 'robot'); return; }
   }
   const vent = ventAt(room, game.hero.x, game.hero.y);
-  if (!f.air && vent && room.crates[vent.y][vent.x] === 0 && ventState(vent, game.elapsed) === 'on') hitHero(game, 'vent');
+  if (!f.air && vent && room.crates[vent.y][vent.x] === 0 && ventState(vent, game.elapsed) === 'on') die(game, 'vent');
 }
