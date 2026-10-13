@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="game" width="960" height="600"></canvas>
+<script>window.NO_LOOP = true; window.onerror = (m, src, l) => { document.title = `ERROR ${m} ${src}:${l}`; window.FAILED = true; };</script>
+<script src="../js/sim.js"></script><script src="../js/audio.js"></script><script src="../js/art.js"></script><script src="../js/main.js"></script>
+<script>
+// Screenshot hook. ?title=1 shows the title; otherwise a built clinic after ?secs=S of play.
+// &mx=X&my=Y puts the mouse there (art pixels), &tool=ID picks a toolbar tool.
+const q = new URLSearchParams(location.search);
+let t = 1000;
+const draw = () => { frame(t); };
+window.requestAnimationFrame = () => {};
+if (q.has('title')) { ui.screen = 'title'; frame(t); } else {
+  newGame();
+  const g = ui.game = new Clinic({ seed: 3, money: 6000 });
+  if (q.has('stone')) { g.build('consult', 0, 2); }
+  else if (q.has('nodoc')) { g.build('consult', 0, 1); }
+  else if (!q.has('bare')) {
+    g.build('consult', 0, 1); g.build('coffin', 0, 2); g.build('lounge', 0, 3); g.build('rewinder', 1, 1); g.build('consult', 1, 2);
+    g.hire('doctor'); g.hire('nurse'); g.hire('nurse'); g.hire('doctor');
+  }
+  const secs = Number(q.get('secs') || 60);
+  for (let i = 0; i < secs / TICK; i++) g.tick();
+  g.events.length = 0;
+  if (q.has('end')) { g.result = 'won'; }
+  if (q.has('mx')) ui.mouse = { x: Number(q.get('mx')), y: Number(q.get('my')) };
+  if (q.has('tool')) ui.tool = TOOLS.find((x) => x.id === q.get('tool'));
+  for (let k = 0; k < 30; k++) { t += 33; frame(t); }
+}
+if (!window.FAILED) document.title = 'ready';
+</script></body></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block;width:960px;height:600px}</style></head>
+<body><canvas id="game" width="960" height="600"></canvas>
+<script>window.onerror = (m, src, l) => { document.title = `ERROR ${m} ${src}:${l}`; window.FAILED = true; };</script>
+<script src="../js/sim.js"></script><script src="../js/audio.js"></script><script src="../js/art.js"></script><script src="../js/main.js"></script>
+<script>
+// Clicks through the game with real mouse events and checks what happened. Result goes in the title.
+const fails = [];
+const check = (name, ok) => { if (!ok) fails.push(name); };
+const click = (x, y, button = 0) => {
+  const r = canvas.getBoundingClientRect(), o = { clientX: r.left + x * r.width / W, clientY: r.top + y * r.height / H, button, bubbles: true };
+  canvas.dispatchEvent(new MouseEvent('mousemove', o));
+  canvas.dispatchEvent(new MouseEvent('mousedown', o));
+};
+const tool = (id) => { const i = TOOLS.findIndex((t) => t.id === id), r = toolRect(i); click(r.x + r.w / 2, r.y + r.h / 2); };
+const slotCentre = (f, s) => [slotLeft(s) + SLOT_W / 2, roomTop(f) + 10];
+setTimeout(() => {
+  click(240, 150);
+  check('a click on the title starts a game', ui.screen === 'play' && ui.game);
+  const g = ui.game, start = g.money;
+  tool('consult');
+  check('a room button picks that tool', ui.tool && ui.tool.id === 'consult');
+  click(...slotCentre(0, 1));
+  check('clicking an empty room builds there', g.roomAt(0, 1) && g.roomAt(0, 1).type === 'consult' && g.money === start - 400);
+  click(...slotCentre(0, 1));
+  check('clicking a built room does not build again', g.rooms.length === 2);
+  click(...slotCentre(0, 0));
+  check('reception cannot be built over', g.roomAt(0, 0).type === 'reception');
+  tool('doctor');
+  check('hire is immediate', g.staff.some((s) => s.kind === 'doctor'));
+  check('hiring keeps the room tool', ui.tool && ui.tool.id === 'consult');
+  click(10, 10, 2); canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+  check('right click drops the tool', ui.tool === null);
+  tool('coffin'); click(...slotCentre(2, 3));
+  check('can build upstairs', g.roomAt(2, 3) && g.roomAt(2, 3).type === 'coffin');
+  tool('demolish'); click(...slotCentre(2, 3));
+  check('knock down removes the room and refunds half', !g.roomAt(2, 3) && g.money === start - 400 - 200 - 800 + 400);
+  click(...slotCentre(0, 0));
+  check('reception survives knock down', g.roomAt(0, 0));
+  const b = SPEED_BTN(0); click(b.x + 4, b.y + 4);
+  check('pause button pauses', ui.speed === 0);
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' }));
+  check('key 3 is fastest', ui.speed === 4);
+  g.statues.push({ id: 9999, kind: 'mummy', sick: true, name: 'Test', x: slotLeft(0) + 14, dir: 1 });
+  ui.tool = null;
+  const m0 = g.money;
+  click(slotLeft(0) + 14, FLOOR_Y[0] - 12);
+  check('clicking a statue sells it', !g.statues.length && g.money === m0 + STATUE_PRICE);
+  ui.game.result = 'won'; click(240, 150);
+  check('a click after the end starts a new game', ui.game !== g && !ui.game.result);
+  document.title = window.FAILED ? document.title : `DONE failures=${fails.length} ${fails.join('; ')}`;
+}, 300);
+</script></body></html>

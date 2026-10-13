@@ -87,4 +87,17 @@ const GAMES = [
     thumb: 'thumbs/atomic.jpg',
     inspiredBy: 'Knight Lore',
   },
+  // St Ghoulsby's Infirmary is hidden from the menu while its gameplay is redesigned. Uncomment to restore.
+  // {
+  //   id: 'clinic',
+  //   title: 'St Ghoulsby\'s Infirmary',
+  //   folder: 'Clinic/',
+  //   tag: 'Hospital sim',
+  //   blurb: 'A hospital for the unwell undead. Build rooms, hire mad doctors and ghost nurses, and cure sunburnt vampires and unravelling mummies. Rude patients get turned to stone by Medusa on reception.',
+  //   players: '1 PLAYER',
+  //   controls: 'MOUSE, SPACE PAUSE, 1-3 SPEED',
+  //   accent: '#7ad84a',
+  //   thumb: 'thumbs/clinic.jpg',
+  //   inspiredBy: 'Theme Hospital',
+  // },
 ];
