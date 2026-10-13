@@ -86,7 +86,7 @@ function roomPath(fromIdx, toIdx) { // shortest route through the doorways, as a
     const i = queue.shift();
     if (i === toIdx) break;
     for (const dir of Object.keys(ROOMS[i].exits)) {
-      const n = ROOMS.findIndex((r) => r.col === ROOMS[i].col + { E: 1, W: -1, N: 0, S: 0 }[dir] && r.row === ROOMS[i].row + { N: -1, S: 1, E: 0, W: 0 }[dir]);
+      const n = neighbourIndex({ spec: ROOMS[i] }, dir);
       if (!prev.has(n)) { prev.set(n, i); queue.push(n); }
     }
   }

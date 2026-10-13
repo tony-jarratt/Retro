@@ -5,19 +5,23 @@
 <script src="solver.js"></script>
 <script>
 'use strict';
-// Plays the grid solver's whole winning game through the Filmation page's free movement, as a player would
-// (hold a direction, jump at the edge of a gap), one solver move at a time, and checks after every move that the
-// hero, the crates and the parts are where the grid rules put them. A move that free movement cannot reproduce is
-// listed, and the hero is put back where the grid says so the rest of the game is still tested.
-// Run with tests/run-film-check.sh. Robots and steam vents are switched off, as the solver ignores them.
+// Checks that the whole castle can be played with free movement and the moving blocks. Run with tests/run-film-check.sh.
+//  1. Routes: in every room, from every doorway, the grid solver finds a way to each other doorway, the rocket part and
+//     the rocket, and each way is played through the free movement as a player would (hold a direction, jump at the
+//     edge of a gap), checking every move against the grid rules. Robots and vents are off; lifts count as walls.
+//  2. Moving blocks: the crossings that need a lift, a slider, a crumbling bridge or timing past crushers are played
+//     by hand-written runs, with every hazard on, and must get across without losing a life.
+//  3. The map: from the start, every part can be reached, picked up and carried back to the rocket.
+//  4. Lives: each hazard costs a life, and losing the last one loses the game.
 const out = [];
 const failures = [];
-const FPS = 60, TIMEOUT = 4 * FPS;
+const FPS = 60, TIMEOUT = 6 * FPS;
 
 function tick(n = 1) { for (let i = 0; i < n; i++) stepGame(1 / FPS); }
 function centreOff(axis) { return app.free[axis] - (Math.floor(app.free[axis]) + 0.5); }
+const BACK = { E: 'W', W: 'E', N: 'S', S: 'N' };
 
-// Walk (holding dir) until the hero's middle is in the middle of square (tx, ty) along the way they are going.
+// ---- driving the hero like a player ----
 function walkToCentre(dir, tx, ty, game) {
   const axis = dir === 'E' || dir === 'W' ? 'x' : 'y';
   for (let i = 0; i < TIMEOUT; i++) {
@@ -26,7 +30,7 @@ function walkToCentre(dir, tx, ty, game) {
       const off = centreOff(axis);
       if (Math.abs(off) < 0.06) break;
       const forward = { E: 1, S: 1, W: -1, N: -1 }[dir];
-      app.held = [Math.sign(off) === forward ? { E: 'W', W: 'E', N: 'S', S: 'N' }[dir] : dir];
+      app.held = [Math.sign(off) === forward ? BACK[dir] : dir];
     } else app.held = [dir];
     tick();
   }
@@ -46,11 +50,30 @@ function jump(dir) {
   app.held = [dir]; onKeyDown(' '); tick(2); app.held = [];
   for (let i = 0; i < TIMEOUT && app.free.air; i++) tick();
 }
-function holdUntil(dir, cond) { for (let i = 0; i < TIMEOUT && !cond(); i++) { app.held = [dir]; tick(); } app.held = []; }
+function holdUntil(dir, cond, limit = TIMEOUT) { for (let i = 0; i < limit && !cond(); i++) { app.held = [dir]; tick(); } app.held = []; return cond(); }
+function waitUntil(cond, limit = TIMEOUT * 2) { app.held = []; for (let i = 0; i < limit && !cond(); i++) tick(); return cond(); }
 
+// ---- 1. routes found by the grid solver ----
+function placeAt(game, idx, entry) {
+  const spec = ROOMS[idx], room = game.rooms[idx];
+  const [x, y] = entry === 'start' ? [room.start.x, room.start.y] : exitTile(spec, entry, spec.exits[entry]);
+  game.hero.room = idx; game.hero.x = x; game.hero.y = y; game.hero.entry = { x, y };
+  game.hero.face = entry === 'start' ? 'E' : BACK[entry];
+  game.seen.add(idx); game.events.length = 0;
+}
+function freshPair(idx, entry, carry) {
+  startGame(); app.loading = 0;
+  const game = app.game;
+  game.hazards = false; game.time = 99999;
+  placeAt(game, idx, entry); game.hero.carry = carry.slice(); placeHero(game);
+  const grid = createGame();
+  grid.hazards = false;
+  placeAt(grid, idx, entry); grid.hero.carry = carry.slice();
+  for (const m of ROOMS[idx].movers || []) if (m.type === 'lift' && ROOMS[idx].height[m.y][m.x] === '.') grid.rooms[idx].wall[m.y][m.x] = true; // the solver walks round lifts
+  return { game, grid };
+}
 function sameState(a, b) {
-  const ra = cur(a), rb = b.rooms[ra.index];
-  const diffs = [];
+  const ra = cur(a), rb = b.rooms[ra.index], diffs = [];
   if (a.hero.room !== b.hero.room) diffs.push(`room ${ROOMS[b.hero.room].id} not ${ROOMS[a.hero.room].id}`);
   else {
     if (a.hero.x !== b.hero.x || a.hero.y !== b.hero.y) diffs.push(`hero at ${b.hero.x},${b.hero.y} not ${a.hero.x},${a.hero.y}`);
@@ -60,51 +83,195 @@ function sameState(a, b) {
   if (a.delivered.length !== b.delivered.length) diffs.push(`delivered ${b.delivered.length} not ${a.delivered.length}`);
   return diffs;
 }
-function resync(grid, game) {
-  grid.rooms.forEach((r, i) => {
-    const f = game.rooms[i];
-    f.crates = r.crates.map((row) => row.slice()); f.pit = r.pit.map((row) => row.slice());
-    f.parts.forEach((p, k) => { p.taken = r.parts[k].taken; });
-  });
-  Object.assign(game.hero, { room: grid.hero.room, x: grid.hero.x, y: grid.hero.y, face: grid.hero.face, carry: grid.hero.carry.slice(), entry: { ...grid.hero.entry } });
-  game.delivered = grid.delivered.slice();
-  placeHero(game);
-}
-
-try {
-  botPlay();
-  const actions = BOT_ACTIONS.slice();
-  out.push(`solver game: ${actions.length} actions`);
-  startGame();
-  const game = app.game;
-  game.hazards = false; game.time = 99999; app.loading = 0;
-  const grid = createGame();
-  grid.hazards = false;
-  actions.forEach(([name, dir], i) => {
-    const room = ROOMS[grid.hero.room].id, fromLevel = heroLevel(grid);
-    if (name === 'reset') { resetRoom(grid); resetRoom(game); grid.events.length = 0; processEvents(game); resync(grid, game); return; }
+// Play the grid solver's moves with free movement. Returns null, or what went wrong.
+function replay(grid, game, actions) {
+  for (let i = 0; i < actions.length; i++) {
+    const [name, dir] = actions[i], fromLevel = heroLevel(grid);
     const res = (name === 'walk' ? walk : hop)(grid, dir);
     grid.events.length = 0;
-    const { x: tx, y: ty } = grid.hero, toLevel = heroLevel(grid);
+    const { x: tx, y: ty } = grid.hero, toLevel = res.kind === 'room' ? 0 : heroLevel(grid);
     let how;
     if (res.kind === 'room') { how = 'walk out'; holdUntil(dir, () => game.hero.room === grid.hero.room); }
-    else if (res.kind === 'deliver') { how = 'walk into rocket'; holdUntil(dir, () => game.delivered.length === grid.delivered.length); }
+    else if (res.kind === 'deliver') { how = 'walk into the rocket'; holdUntil(dir, () => game.delivered.length === grid.delivered.length); }
     else if (res.kind === 'leap') {
       how = 'leap';
-      const [dx, dy] = DIRS[dir], gx = tx - dx, gy = ty - dy, r = cur(game);
-      if (r.pit[gy][gx]) { how = 'leap from the edge'; untilStill(dir); }
+      const [dx, dy] = DIRS[dir], r = cur(game);
+      if (r.pit[ty - dy][tx - dx]) { how = 'leap from the edge'; untilStill(dir); }
       jump(dir); walkToCentre(dir, tx, ty, game);
-    } else if (toLevel > fromLevel) { how = res.kind === 'hop' ? 'hop up' : 'step up (now a jump)'; jump(dir); walkToCentre(dir, tx, ty, game); }
+    } else if (toLevel - fromLevel > STEP_UP) { how = 'jump up'; jump(dir); walkToCentre(dir, tx, ty, game); }
     else { how = res.kind === 'hop' ? 'hop (walked)' : res.kind; walkToCentre(dir, tx, ty, game); }
     processEvents(game);
     const diffs = sameState(grid, game);
-    if (diffs.length) {
-      failures.push(`${room} move ${i} (${name} ${dir}, ${how}, from level ${fromLevel} to ${toLevel}): ${diffs.join("; ")}; free hero ${["x", "y", "z"].map((k) => app.free[k].toFixed(2)).join(",")} air ${app.free.air}`);
-      resync(grid, game);
+    if (diffs.length) return `move ${i} (${name} ${dir}, ${how}, level ${fromLevel} to ${toLevel}): ${diffs.join('; ')}; hero at ${['x', 'y', 'z'].map((k) => app.free[k].toFixed(2)).join(',')}`;
+    if (app.game.lives !== LIVES) return `move ${i}: lost a life`;
+  }
+  return null;
+}
+
+const routeEdges = new Map(); // `${room}|${entry}` -> Set of what that entry leads to: a doorway side, 'part' or 'rocket'
+const addEdge = (id, from, to) => { const k = `${id}|${from}`; if (!routeEdges.has(k)) routeEdges.set(k, new Set()); routeEdges.get(k).add(to); };
+const noRoute = [];
+
+function goalFor(idx, target, game) {
+  if (target === 'part') { const n = game.hero.carry.length; return (g) => g.hero.carry.length > n; }
+  if (target === 'rocket') return (g) => g.delivered.length > 0;
+  const to = neighbourIndex(game.rooms[idx], target);
+  return (g) => g.hero.room === to;
+}
+
+function checkRoute(idx, entry, target) {
+  const id = ROOMS[idx].id, carry = target === 'rocket' ? ['nose'] : [];
+  const { game, grid } = freshPair(idx, entry, carry);
+  const sol = solve(grid, goalFor(idx, target, grid), 200000);
+  if (!sol) { noRoute.push(`${id} ${entry}->${target}`); return null; }
+  const err = replay(grid, game, sol);
+  if (err) {
+    // The solver does not wait for moving blocks; a crossing that needs timing is covered by a hand-written run.
+    const timed = err.endsWith('lost a life') && SCRIPTS.some((x) => x.room === id && x.from === entry && x.to === target);
+    if (timed) noRoute.push(`${id} ${entry}->${target} (needs timing)`); else failures.push(`FAIL: ${id} from ${entry} to ${target}: ${err}`);
+    return null;
+  }
+  addEdge(id, entry, target);
+  return { game, grid };
+}
+
+function checkFromPart(idx, entry, exitSide) {
+  const id = ROOMS[idx].id;
+  const first = checkRoute(idx, entry, 'part');
+  if (!first) return;
+  const { game, grid } = first;
+  const sol = solve(grid, goalFor(idx, exitSide, grid), 200000);
+  if (!sol) { noRoute.push(`${id} part->${exitSide} (from ${entry})`); return; }
+  const err = replay(grid, game, sol);
+  if (err) { failures.push(`FAIL: ${id} from the part (entered ${entry}) to ${exitSide}: ${err}`); return; }
+  addEdge(id, 'part', exitSide);
+}
+
+// ---- 2. hand-written runs for the moving blocks (all hazards on) ----
+let run = null; // { game, idx }
+function enter(roomId, entry) {
+  startGame(); app.loading = 0;
+  const game = app.game, idx = ROOM_INDEX[roomId];
+  game.time = 99999;
+  placeAt(game, idx, entry); placeHero(game);
+  run = { game, idx };
+  return game;
+}
+const F = () => app.free;
+const mover = (i) => cur(run.game).movers[i];
+const mbox = (i) => mover(i).box; // a moving block's box
+const on = (i) => mbox(i) && centreIn(mbox(i), F().x, F().y) && !F().air;
+const phase = (m) => ((((run.game.elapsed + (m.offset || 0)) % m.period) + m.period) % m.period) / m.period;
+function go(dir, n = 1) { // walk n squares, to the middle of the square
+  const [dx, dy] = DIRS[dir];
+  for (let k = 0; k < n; k++) { const h = run.game.hero; walkToCentre(dir, h.x + dx, h.y + dy, run.game); }
+}
+function leave(dir, toId) { holdUntil(dir, () => ROOMS[run.game.hero.room].id === toId); }
+function stepOnto(dir, i) { holdUntil(dir, () => on(i), 2 * FPS); }
+// Move from the block (or floor) you are on onto block i, waiting until its top is level with you.
+function transfer(dir, i) {
+  for (let tries = 0; tries < 12 && !on(i); tries++) {
+    waitUntil(() => mbox(i) && Math.abs(mbox(i).top - F().z) < 0.25, 4 * FPS);
+    holdUntil(dir, () => on(i), FPS / 2);
+  }
+}
+const robotFar = (x, y, d = 3) => cur(run.game).robots.every((r) => Math.abs(r.x - x) + Math.abs(r.y - y) >= d);
+
+const SCRIPTS = [
+  { room: 'towerstairs', from: 'W', to: 'N', go: () => { go('E', 5); go('N', 2); waitUntil(() => phase(mover(0)) < 0.03); go('N', 3); leave('N', 'tlanding'); } },
+  { room: 'towerstairs', from: 'N', to: 'W', go: () => { go('S', 2); waitUntil(() => phase(mover(0)) < 0.03); go('S', 6); leave('W', 'range'); } },
+  { room: 'tlanding', from: 'S', to: 'E', go: () => { go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('N', 0); waitUntil(() => Math.abs(phase(mover(0)) - 0.55) < 0.03); go('N', 1); go('N', 2); leave('E', 'battlements'); } },
+  { room: 'tlanding', from: 'E', to: 'S', go: () => { go('W', 3); go('S', 2); waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.03); stepOnto('S', 0); waitUntil(() => phase(mover(0)) < 0.1 && phase(mover(0)) > 0.02); go('S', 1); leave('S', 'towerstairs'); } },
+  { room: 'bridge', from: 'W', to: 'E', go: () => { leave('E', 'radio'); } },
+  { room: 'bridge', from: 'E', to: 'W', go: () => { leave('W', 'battlements'); } },
+  { room: 'radio', from: 'W', to: 'part', go: () => { go('E', 4); go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 2.98); go('E', 2); } },
+  { room: 'radio', from: 'part', to: 'W', after: 'radio:W>part', go: () => { go('S', 1); go('S', 1); go('W', 7); go('N', 1); leave('W', 'bridge'); } },
+  { room: 'shaft', from: 'W', to: 'E', go: () => { go('E', 2); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 1.98 && mbox(1).top < 0.02); jump('E'); waitUntil(() => on(1) && mbox(1).top > 1.98); go('E', 1); leave('E', 'loft'); } },
+  { room: 'shaft', from: 'E', to: 'W', go: () => { go('W', 2); waitUntil(() => mbox(1).top > 1.98 && phase(mover(1)) < 0.55); stepOnto('W', 1); waitUntil(() => mbox(1).top > 1.98 && mbox(0).top < 0.02); jump('W'); waitUntil(() => on(0) && mbox(0).top < 0.02); go('W', 1); leave('W', 'clock'); } },
+  { room: 'clock', from: 'N', to: 'E', go: () => { waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.02); go('S', 2); waitUntil(() => Math.abs(phase(mover(1)) - 0.5) < 0.02); go('S', 2); leave('E', 'shaft'); } },
+  { room: 'clock', from: 'E', to: 'N', go: () => { go('W', 4); waitUntil(() => Math.abs(phase(mover(1)) - 0.5) < 0.02); go('N', 2); waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.02); go('N', 2); leave('N', 'battlements'); } },
+  { room: 'loft', from: 'W', to: 'N', go: () => { go('E', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('N', 0); jump('N'); go('E', 3); leave('N', 'radio'); } },
+  { room: 'loft', from: 'N', to: 'W', go: () => { go('S', 1); go('W', 3); waitUntil(() => phase(mover(0)) < 0.02); jump('S'); go('S', 1); leave('W', 'shaft'); } },
+  { room: 'chute', from: 'N', to: 'S', go: () => { go('S', 2); go('E', 3); waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.03); stepOnto('S', 0); waitUntil(() => phase(mover(0)) < 0.1 && phase(mover(0)) > 0.02); go('S', 1); waitUntil(() => robotFar(4, 7, 4)); leave('S', 'furnace'); } },
+  { room: 'chute', from: 'S', to: 'N', go: () => { waitUntil(() => robotFar(4, 7, 4)); go('N', 2); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('N', 0); waitUntil(() => Math.abs(phase(mover(0)) - 0.55) < 0.03); go('N', 1); go('W', 3); go('N', 2); leave('N', 'dungeon'); } },
+  { room: 'pump', from: 'N', to: 'S', go: () => { go('S', 2); transfer('S', 0); transfer('S', 1); transfer('S', 2); waitUntil(() => Math.abs(mbox(2).top) < 0.2); go('S', 1); leave('S', 'depot'); } },
+  { room: 'pump', from: 'S', to: 'N', go: () => { go('N', 2); transfer('N', 2); transfer('N', 1); transfer('N', 0); waitUntil(() => Math.abs(mbox(0).top) < 0.2); go('N', 1); leave('N', 'clanding'); } },
+  { room: 'boiler', from: 'N', to: 'part', go: () => { go('E', 3); go('S', 1); waitUntil(() => run.game.elapsed % 4 < 0.03); stepOnto('S', 0); waitUntil(() => mbox(0).top > 2.98); go('W', 1); go('N', 1); } },
+  { room: 'boiler', from: 'part', to: 'N', after: 'boiler:N>part', go: () => { go('W', 2); go('N', 2); leave('N', 'wine'); } },
+  { room: 'depot', from: 'W', to: 'part', go: () => { go('S', 1); waitUntil(() => Math.abs(phase(mover(2)) - 0.85) < 0.01); stepOnto('E', 2); waitUntil(() => mbox(2).top > 1.98); go('E', 1); } },
+  { room: 'depot', from: 'part', to: 'W', after: 'depot:W>part', go: () => { waitUntil(() => mbox(2).top > 1.98); stepOnto('W', 2); waitUntil(() => mbox(2).top < 0.02 && mover(0).gone <= 0 && mover(1).gone <= 0); go('W', 3); go('N', 1); leave('W', 'furnace'); } },
+];
+
+function runScript(s) {
+  const label = `${s.room} ${s.from}->${s.to}`;
+  if (s.after) { // start where another run ended (holding the part)
+    const [room, rest] = s.after.split(':'), [from, to] = rest.split('>');
+    const before = SCRIPTS.find((x) => x.room === room && x.from === from && x.to === to);
+    enter(before.room, before.from); before.go();
+  } else enter(s.room, s.from);
+  const startRoom = run.game.hero.room, carried = run.game.hero.carry.length;
+  s.go();
+  processEvents(run.game);
+  const g = run.game;
+  const ok = s.to === 'part' ? g.hero.carry.length > carried && g.hero.room === startRoom : ROOMS[g.hero.room].id === ROOMS[neighbourIndex(g.rooms[startRoom], s.to)].id;
+  if (!ok || g.lives !== LIVES) {
+    failures.push(`FAIL: moving blocks: ${label}: ${ok ? '' : 'did not get there'}${g.lives !== LIVES ? ` lost ${LIVES - g.lives} life` : ''}; hero in ${ROOMS[g.hero.room].id} at ${['x', 'y', 'z'].map((k) => app.free[k].toFixed(2)).join(',')}`);
+    return;
+  }
+  out.push(`ok: moving blocks: ${label}`);
+  addEdge(s.room, s.from, s.to);
+}
+
+const pause = (what) => { document.title = `PROGRESS ${what} (${failures.length} failures)`; return new Promise((r) => setTimeout(r, 0)); };
+(async () => {
+try {
+  // 1. routes
+  for (const [idx, spec] of ROOMS.entries()) {
+    await pause(`routes ${spec.id}`);
+    const t0 = performance.now();
+    const entries = Object.keys(spec.exits);
+    if (spec.objects.join('').includes('S')) entries.push('start');
+    const hasPart = spec.objects.join('').includes('$'), hasRocket = spec.objects.join('').includes('R');
+    for (const entry of entries) {
+      for (const target of Object.keys(spec.exits)) if (target !== entry) checkRoute(idx, entry, target);
+      if (hasRocket) checkRoute(idx, entry, 'rocket');
+      if (hasPart) for (const exitSide of Object.keys(spec.exits)) checkFromPart(idx, entry, exitSide);
     }
-  });
-  out.push(`grid game won: ${grid.over === 'win'}; free game won: ${game.over === 'win' || app.pendingEnd?.mode === 'win' || app.mode === 'win'}`);
-  // ---- lives: robots, steam and pits each cost one; none left and the game is lost ----
+    const secs = (performance.now() - t0) / 1000;
+    if (secs > 5) out.push(`info: ${spec.id} took ${secs.toFixed(1)} s`);
+  }
+  const routes = [...routeEdges.values()].reduce((n, s) => n + s.size, 0);
+  out.push(`routes played with free movement: ${routes}; with no grid route (need moving blocks or impossible): ${noRoute.length}`);
+
+  // 2. moving blocks
+  for (const s of SCRIPTS) { await pause(`moving blocks ${s.room} ${s.from}->${s.to}`); runScript(s); }
+
+  // 3. the map: everywhere you can get to from the start
+  const reach = new Set(), queue = ['airlock|start'];
+  const visit = (k) => { if (!reach.has(k)) { reach.add(k); queue.push(k); } };
+  reach.add(queue[0]);
+  while (queue.length) {
+    const k = queue.shift(), [id, from] = k.split('|'), idx = ROOM_INDEX[id];
+    for (const to of routeEdges.get(k) || []) {
+      if (to === 'part') { for (const ex of routeEdges.get(`${id}|part`) || []) visit(`${ROOMS[neighbourIndex({ spec: ROOMS[idx] }, ex)].id}|${OPPOSITE[ex]}`); continue; }
+      if (to === 'rocket') continue;
+      visit(`${ROOMS[neighbourIndex({ spec: ROOMS[idx] }, to)].id}|${OPPOSITE[to]}`);
+    }
+  }
+  const roomsReached = new Set([...reach].map((k) => k.split('|')[0]));
+  const missingRooms = ROOMS.filter((r) => !roomsReached.has(r.id)).map((r) => r.id);
+  if (missingRooms.length) failures.push(`FAIL: map: these rooms cannot be reached from the start: ${missingRooms.join(', ')}`);
+  else out.push(`ok: map: all ${ROOMS.length} rooms can be reached from the start`);
+  let mapOk = !missingRooms.length;
+  for (const part of PARTS) {
+    const got = [...reach].some((k) => k.startsWith(part.room + '|') && (routeEdges.get(k) || new Set()).has('part'));
+    const outAgain = (routeEdges.get(`${part.room}|part`) || new Set()).size > 0;
+    if (!got || !outAgain) { mapOk = false; failures.push(`FAIL: map: the ${part.name} in ${part.room} ${!got ? 'cannot be reached' : 'can be picked up but there is no way out with it'}`); }
+  }
+  if (![...reach].some((k) => k.startsWith('launch|') && (routeEdges.get(k) || new Set()).has('rocket'))) { mapOk = false; failures.push('FAIL: map: the rocket cannot be reached'); }
+  if (mapOk) out.push(`ok: map: all ${PARTS.length} parts can be picked up and carried away, and the rocket can be reached`);
+
+  // 4. lives
   {
     const check = (cond, msg) => { if (cond) out.push('ok: ' + msg); else failures.push('FAIL: ' + msg); };
     startGame();
@@ -137,7 +304,13 @@ try {
     tick(1);
     check(g.lives === LIVES - 3, 'lives: a robot cannot touch you while you are in the air above it');
     put('airlock', 0, 3); settle(); // somewhere safe, or you land on the robot
-    for (let k = 0; k < 2; k++) { put('cafeteria', 5, 3); jump('E'); processEvents(g); settle(); }
+    put('furnace', 0, 4); app.free.x = 2.5;
+    const crusher = cur(g).movers.find((m) => m.x === 2 && m.y === 4);
+    while (crusherDrop(g.elapsed, crusher.period, crusher.offset) > 0) g.elapsed += 0.02;
+    waitUntil(() => g.lives < LIVES - 3, 3 * FPS); processEvents(g);
+    check(g.lives === LIVES - 4, `lives: standing under a crusher when it drops costs a life (lives ${g.lives})`);
+    settle();
+    put('cafeteria', 5, 3); jump('E'); processEvents(g); settle();
     check(g.lives === 0 && g.over === 'lose' && g.loseCause === 'lives', `lives: losing the last life loses the game (lives ${g.lives}, over ${g.over})`);
     check(app.mode === 'lose', `lives: then the game shows the losing screen (mode ${app.mode})`);
   }
@@ -145,7 +318,8 @@ try {
   failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
 }
 const pre = document.createElement('pre'); pre.id = 'log';
-pre.textContent = [...out, `failures=${failures.length}`, ...failures].join('\n');
+pre.textContent = [...out, `failures=${failures.length}`, ...failures, `(no grid route: ${noRoute.join(', ')})`].join('\n');
 document.body.appendChild(pre);
-document.title = `DONE failures=${failures.length} :: ` + [...out, ...failures].join(" || ");
+document.title = `DONE failures=${failures.length} :: ` + [...out, ...failures, `no grid route: ${noRoute.join(', ')}`].join(' || ');
+})();
 </script>

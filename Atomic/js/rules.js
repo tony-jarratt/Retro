@@ -27,7 +27,7 @@ function createRoomState(spec, index) {
     const hc = spec.height[y][x], oc = spec.objects[y][x];
     if (hc === '#') room.wall[y][x] = true;
     else if ('xyz'.includes(hc)) { room.pit[y][x] = true; room.h[y][x] = { x: 0, y: 1, z: 2 }[hc]; } // the level of the floor once it is filled
-    else if ('123'.includes(hc)) room.h[y][x] = Number(hc);
+    else if (hc in LEVEL_CHARS) room.h[y][x] = LEVEL_CHARS[hc];
     if (oc === '*') room.crates[y][x] = 1;
     else if (oc === '$') { room.parts.push({ x, y, id: part.id, taken: false }); room.protectedTiles.add(`${x},${y}`); }
     else if (oc === 'R') room.rocket = { x, y };
@@ -96,6 +96,7 @@ function bump(game, why) {
 }
 
 function neighbourIndex(room, dir) {
+  if (room.spec.to && room.spec.to[dir]) return ROOM_INDEX[room.spec.to[dir]]; // a staircase to another floor
   const dc = { E: 1, W: -1, N: 0, S: 0 }[dir], dr = { N: -1, S: 1, E: 0, W: 0 }[dir];
   return ROOMS.findIndex((r) => r.col === room.spec.col + dc && r.row === room.spec.row + dr);
 }

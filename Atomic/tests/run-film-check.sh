@@ -9,7 +9,7 @@ PROFILE="$(mktemp -d)"
   --remote-debugging-port=$PORT "file://$HERE/film-check.html?norun" >/dev/null 2>&1 &
 PID=$!
 TITLE=""
-for i in $(seq 1 180); do
+for i in $(seq 1 400); do
   TITLE=$(curl -s localhost:$PORT/json | python3 -c 'import sys, json; print(" ".join(t.get("title", "") for t in json.load(sys.stdin) if t.get("title", "").startswith("DONE")))' 2>/dev/null)
   case "$TITLE" in
     *DONE*) kill $PID; rm -rf "$PROFILE" 2>/dev/null; echo "$TITLE"; case "$TITLE" in *"failures=0"*) exit 0;; *) exit 1;; esac;;
@@ -17,5 +17,5 @@ for i in $(seq 1 180); do
   sleep 1
 done
 kill $PID; rm -rf "$PROFILE" 2>/dev/null
-echo "Checks did not finish within 180 seconds. Last page title: $TITLE"
+echo "Checks did not finish within 400 seconds. Last page title: $TITLE"
 exit 1

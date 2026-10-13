@@ -2,13 +2,15 @@
 
 // Atomic Castle drawn the way Ultimate's Filmation games were (Knight Lore, Alien 8): a 256 x 192 screen in one ink
 // colour per room on black, each room boxed in by two brick back walls with arched doorways, masked sprites, a
-// coloured border, and a framed panel along the bottom. The rules are the colour version's (data.js and rules.js).
+// coloured border, and a framed panel along the bottom. The rules are in data.js and rules.js;
+// free movement and the moving blocks in film-move.js.
 // Everything is drawn in black and white first; present() then colours each 8 x 8 cell with its ink, like a Spectrum.
 
 const params = new URLSearchParams(location.search);
 const SW = 256, SH = 192;
 const HX = 10, HY = 5, LV = 10; // half a tile across, half a tile down, one level up (screen pixels)
-const WALL_H = 44;              // the back walls of a room
+const BASE_WALL_H = 44;         // the back walls of a room (taller where a doorway is high up)
+const WALL_H = BASE_WALL_H;
 const BLOCK_H = 15;             // a block of stonework inside a room (a # square)
 const CRATE_H = LV;
 const GATE_H = 22;
@@ -34,7 +36,34 @@ const ROOM_STYLE = {
   lounge: { ink: 'magenta', deco: ['window', 'porthole'] },
   greenhouse: { ink: 'green', deco: ['vine', 'vine'] },
   vault: { ink: 'yellow', deco: ['dial', 'pipes'] },
+  cellarstairs: { ink: 'cyan', deco: ['pipes', 'shelf'] },
+  towerstairs: { ink: 'cyan', deco: ['window', 'dial'] },
+  tlanding: { ink: 'white', deco: ['window', 'window'] },
+  battlements: { ink: 'cyan', deco: ['window', 'window'] },
+  bridge: { ink: 'magenta', deco: ['window', 'vine'] },
+  radio: { ink: 'yellow', deco: ['dial', 'window'] },
+  clock: { ink: 'green', deco: ['dial', 'dial'] },
+  shaft: { ink: 'yellow', deco: ['pipes', 'pipes'] },
+  loft: { ink: 'cyan', deco: ['window', 'shelf'] },
+  clanding: { ink: 'green', deco: ['pipes', 'shelf'] },
+  dungeon: { ink: 'yellow', deco: ['vine', 'pipes'] },
+  wine: { ink: 'magenta', deco: ['shelf', 'shelf'] },
+  boiler: { ink: 'cyan', deco: ['dial', 'pipes'] },
+  chute: { ink: 'red', deco: ['pipes', 'dial'] },
+  pump: { ink: 'white', deco: ['dial', 'pipes'] },
+  flooded: { ink: 'yellow', deco: ['pipes', 'shelf'] },
+  furnace: { ink: 'green', deco: ['dial', 'pipes'] },
+  depot: { ink: 'magenta', deco: ['dial', 'pipes'] },
 };
+// What the solid squares (#) in each room are dressed as; a room with several picks one per square.
+const PROPS = {
+  airlock: ['computer'], repair: ['still', 'computer'], observatory: ['computer', 'stone'], range: ['stone'], cafeteria: ['still'],
+  launch: ['computer'], control: ['computer', 'computer', 'coil'], reactor: ['stone', 'coil', 'stone'], store: ['barrel'], lounge: ['computer', 'still'],
+  greenhouse: ['stone'], vault: ['stone', 'coil'], cellarstairs: ['barrel'], towerstairs: ['coil'], tlanding: ['stone'],
+  battlements: ['stone'], radio: ['computer'], loft: ['stone'], clanding: ['barrel'], wine: ['barrel'], boiler: ['still', 'barrel'],
+  pump: ['computer', 'still'],
+};
+function propAt(room, x, y) { const kinds = PROPS[room.spec.id] || ['stone']; return kinds[(x * 7 + y * 3) % kinds.length]; }
 for (const r of ROOMS) if (!ROOM_STYLE[r.id]) throw new Error(`no Filmation style for room "${r.id}"`);
 
 // ---- the screen ----
@@ -104,6 +133,7 @@ function pattern(rows) {
 }
 const DOTS = pattern(['#...', '....', '..#.', '....']);
 const CHECK = pattern(['#.', '.#']);
+const HATCH = pattern(['#.....', '.#....', '..#...', '...#..', '....#.', '.....#']); // the darkness down a pit
 
 // Scale2x: doubles a black / white / see-through picture, rounding off its staircases instead of making them chunkier.
 function smooth2x(src) {
@@ -229,9 +259,11 @@ const EXIT_PLANES = { N: (room) => ({ fixed: 'y', at: 0 }), W: (room) => ({ fixe
 
 function drawBackWalls(o, room, style, t) {
   const W = room.W, H = room.H, k = 0.35;
+  const exitBase = (dir) => { const at = room.spec.exits[dir]; if (at === undefined) return 0; const [x, y] = exitTile(room.spec, dir, at); return room.h[y][x] * LV; };
+  const WALL_H = Math.max(BASE_WALL_H, exitBase('N') + 34, exitBase('W') + 34); // tall enough for a raised doorway
   const walls = [
-    { plane: { fixed: 'y', at: 0 }, len: W, exit: room.spec.exits.N, deco: style.deco[0] },
-    { plane: { fixed: 'x', at: 0 }, len: H, exit: room.spec.exits.W, deco: style.deco[1] },
+    { plane: { fixed: 'y', at: 0 }, len: W, exit: room.spec.exits.N, base: exitBase('N'), deco: style.deco[0] },
+    { plane: { fixed: 'x', at: 0 }, len: H, exit: room.spec.exits.W, base: exitBase('W'), deco: style.deco[1] },
   ];
   for (const w of walls) {
     const pt = (a, v) => planePt(o, w.plane, a, v);
@@ -249,7 +281,7 @@ function drawBackWalls(o, room, style, t) {
       const i = free.reduce((best, c) => (Math.abs(c - w.len * 0.4) < Math.abs(best - w.len * 0.4) ? c : best));
       drawDeco(o, w.plane, i + 0.5, w.deco, t);
     } else console.warn(`room "${room.spec.id}": no free stretch of wall for its ${w.deco}`);
-    if (w.exit !== undefined) drawArch(o, w.plane, w.exit, 0, false);
+    if (w.exit !== undefined) drawArch(o, w.plane, w.exit, w.base, false);
   }
   line(P(o, 0, 0, 0), P(o, 0, 0, WALL_H));
   // the tops of the walls, to show how thick they are, and their two cut ends
@@ -315,7 +347,7 @@ function drawFloor(o, room) {
 
 function drawPit(o, room, x, y, z) {
   const T = P(o, x, y, z), R = P(o, x + 1, y, z), B = P(o, x + 1, y + 1, z), L = P(o, x, y + 1, z);
-  fill([T, R, B, L]);
+  fill([T, R, B, L], HATCH);
   const openLeft = x === 0 || !room.pit[y][x - 1], openRight = y === 0 || !room.pit[y - 1][x];
   g.save(); path([T, R, B, L]); g.clip();
   for (const d of [3, 7, 12, 18]) {
@@ -362,16 +394,117 @@ function rocketCanvas(fitted, flame) {
   }
   px(cx, 0, true);
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) px(cx + dx, 19 + dy, true); // porthole
-  for (let i = 0; i < 6; i++) if (i < fitted) px(cx, 27 + i * 2, true);
+  for (let i = 0; i < PARTS.length; i++) if (i < fitted) px(cx, 26 + i * 2, true);
   for (let y = 46; y < 48; y++) for (let x = -3; x <= 3; x++) px(cx + x, y, Math.abs(x) === 3 || y === 47);
   if (flame) for (let y = 48; y < 50; y++) for (let x = -2; x <= 2; x++) if ((x + y + flame) % 2 === 0) px(cx + x, y, true);
   return c;
 }
 
+// ---- scenery on the solid squares ----
+function ring(cx, cy, rx, ry, n = 14) { const pts = []; for (let i = 0; i < n; i++) { const a = i * Math.PI * 2 / n; pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return pts; }
+function cylinder(cx, base, rx, ry, h, hoops = []) {
+  const top = ring(cx, base - h, rx, ry), bottom = ring(cx, base, rx, ry);
+  const front = bottom.filter((p) => p[1] >= base - 0.01);
+  fill([[cx - rx, base - h], ...front.slice().reverse().map((p) => p), [cx + rx, base - h]]);
+  fill([[cx - rx, base - h], [cx + rx, base - h], [cx + rx, base], [cx - rx, base]]);
+  fill(top); edges(top);
+  line([cx - rx, base - h], [cx - rx, base]); line([cx + rx, base - h], [cx + rx, base]);
+  polyline([[cx + rx, base], ...ring(cx, base, rx, ry, 14).filter((p, i) => i <= 7), [cx - rx, base]]);
+  for (const v of hoops) polyline(ring(cx, base - v, rx, ry, 14).filter((p, i) => i <= 7));
+  return top;
+}
+const coilTops = []; // where this frame's Tesla coils end, for the sparks between them
+
+function drawProp(o, kind, x, y, t) {
+  const [cx, base] = P(o, x + 0.5, y + 0.5, 0);
+  if (kind === 'stone') box(o, x, y, x + 1, y + 1, 0, BLOCK_H, { left: bricks(5), right: bricks(5) });
+  else if (kind === 'barrel') { cylinder(cx, base - 1, 7, 3.5, 13, [4, 9]); dot(cx, base - 14); }
+  else if (kind === 'computer') {
+    box(o, x + 0.1, y + 0.1, x + 0.9, y + 0.9, 0, 22, {
+      left: (tl, tr, br, bl) => {
+        for (const u of [0.3, 0.7]) {
+          const c = lerp(tl, tr, u), r = ring(c[0], c[1] + 6, 2.6, 2.6, 10);
+          edges(r);
+          const a = t * 5 * (u < 0.5 ? 1 : -1);
+          line([c[0], c[1] + 6], [c[0] + Math.cos(a) * 2.4, c[1] + 6 + Math.sin(a) * 2.4]);
+        }
+        const a = lerp(tl, tr, 0.15), b = lerp(tl, tr, 0.85);
+        line(down(a, 13), down(b, 13)); line(down(a, 16), down(b, 16));
+      },
+      right: (tl, tr, br, bl) => {
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+          const on = Math.sin((i * 3 + j * 7 + x * 5 + y * 11) * 12.9898 + Math.floor(t * 3) * 78.233) > 0;
+          if (on) { const p = lerp(tl, tr, 0.25 + i * 0.25); dot(p[0], p[1] + 4 + j * 3); }
+        }
+      },
+    });
+  } else if (kind === 'coil') {
+    cylinder(cx, base - 1, 6, 3, 4);
+    cylinder(cx, base - 5, 2, 1, 15, [3, 6, 9, 12]);
+    const ball = ring(cx, base - 22, 3.5, 3.5, 12);
+    fill(ball); edges(ball);
+    coilTops.push([cx, base - 22]);
+  } else if (kind === 'still') {
+    box(o, x + 0.05, y + 0.05, x + 0.95, y + 0.95, 0, 7, { left: panelled, right: panelled });
+    const [tx, ty] = P(o, x + 0.5, y + 0.5, 7);
+    const flask = ring(tx - 4, ty - 4, 3.5, 3.5, 12); fill(flask); edges(flask);
+    line([tx - 4, ty - 7.5], [tx - 4, ty - 12]);                // its neck
+    polyline([[tx - 4, ty - 12], [tx - 1, ty - 14], [tx + 3, ty - 12], [tx + 5, ty - 9], [tx + 5, ty - 6]]); // the tube
+    const small = ring(tx + 5, ty - 3, 2.5, 2.5, 10); fill(small); edges(small);
+    const b = (t * 6 + x) % 3;
+    dot(tx - 5, ty - 3 - b); dot(tx - 3, ty - 2 - ((b + 1.5) % 3));  // bubbles
+  } else throw new Error(`drawProp: unknown scenery "${kind}"`);
+}
+
+// Sparks between Tesla coils that stand near each other in the same room.
+function drawCoilSparks(t) {
+  for (let i = 0; i < coilTops.length; i++) for (let j = i + 1; j < coilTops.length; j++) {
+    const a = coilTops[i], b = coilTops[j];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 70 || (Math.floor(t * 9) + i + j) % 4 === 0) continue;
+    const pts = [a];
+    for (let k = 1; k < 6; k++) { const p = lerp(a, b, k / 6); pts.push([p[0], p[1] + Math.sin(t * 40 + k * 2.3 + i) * 3]); }
+    pts.push(b);
+    polyline(pts);
+  }
+}
+
+// ---- the moving blocks ----
+function drawMover(room, o, m, t) {
+  const b = m.box;
+  if (!b) return;
+  const i = 0.03;
+  if (m.type === 'lift') {
+    const inPit = 'xyz'.includes(room.spec.height[m.y][m.x]); // a lift rising out of a pit
+    const floor = inPit ? b.top - 2.5 : room.h[m.y][m.x];
+    g.save();
+    if (inPit) { // the part below the floor shows only through the pit's opening
+      const L = P(o, m.x, m.y + 1, 0), B = P(o, m.x + 1, m.y + 1, 0), R = P(o, m.x + 1, m.y, 0);
+      path([L, B, R, [R[0], -50], [L[0], -50]]); g.clip();
+    }
+    box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, floor * LV, (b.top - floor) * LV, { left: barred, right: barred, top: (T, R, B, L) => { line(lerp(T, R, 0.5), lerp(L, B, 0.5)); line(lerp(T, L, 0.5), lerp(R, B, 0.5)); } });
+    g.restore();
+  } else if (m.type === 'slider') {
+    const thick = b.bottom >= 0 ? b.top - b.bottom : 0.4;
+    box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, (b.top - thick) * LV, thick * LV, { left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.25), lerp(R, L, 0.25), lerp(B, T, 0.25), lerp(L, R, 0.25)]) });
+  } else if (m.type === 'crumble') {
+    const shake = m.falling > 0 ? (Math.floor(t * 30) % 2 ? 0.04 : -0.04) : 0;
+    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.4) * LV, 0.4 * LV, {
+      left: dotted, right: dotted,
+      top: (T, R, B, L) => { polyline([lerp(T, L, 0.3), lerp(T, B, 0.45), lerp(R, B, 0.6)]); line(lerp(T, B, 0.45), lerp(L, B, 0.7)); },
+    });
+  } else if (m.type === 'crusher') {
+    const top = P(o, m.x + 0.5, m.y + 0.5, b.top * LV), rod = P(o, m.x + 0.5, m.y + 0.5, (room.h[m.y][m.x] + CRUSH_HEIGHT + 4) * LV);
+    line(top, rod); line([top[0] + 1, top[1]], [rod[0] + 1, rod[1]]);
+    box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, b.bottom * LV, LV, { left: bricks(5), right: bricks(5) });
+    const L = P(o, b.x0 + i, b.y1 - i, b.bottom * LV), Bt = P(o, b.x1 - i, b.y1 - i, b.bottom * LV), R = P(o, b.x1 - i, b.y0 + i, b.bottom * LV);
+    for (const [a, c] of [[L, Bt], [Bt, R]]) for (let k = 0; k < 4; k++) polyline([lerp(a, c, k / 4), down(lerp(a, c, (k + 0.5) / 4), 3), lerp(a, c, (k + 1) / 4)]); // teeth
+  } else throw new Error(`drawMover: unknown moving block "${m.type}"`);
+}
+
 // ---- what is on each square ----
 function drawTile(game, room, o, x, y, t) {
   const h = room.h[y][x], z = h * LV;
-  if (room.wall[y][x]) { box(o, x, y, x + 1, y + 1, 0, BLOCK_H, { left: bricks(5), right: bricks(5) }); return; }
+  if (room.wall[y][x]) { drawProp(o, propAt(room, x, y), x, y, t); return; }
   if (room.pit[y][x]) { drawPit(o, room, x, y, z); return; }
   if (h > 0) box(o, x, y, x + 1, y + 1, 0, z, { left: dotted, right: dotted });
   if (room.initial.pit[y][x]) { const d = inset(o, x, y, z, 0.15); edges(d); line(d[0], d[2]); line(d[1], d[3]); } // a filled pit: the crate's lid
@@ -435,7 +568,7 @@ function drawRobot(room, o, r, t) {
 function drawHero(game, o) {
   const f = app.free, room = cur(game);
   if (app.dying > 0 || (game.invuln > 0 && Math.floor(app.tick / 4) % 2)) return;
-  const ground = standLevel(game, room, f.x, f.y);
+  const ground = standLevel(game, room, f.x, f.y, f.z);
   if (f.air && ground > NOTHING && f.z - ground > 0.2) { const [gx, gy] = P(o, f.x, f.y, ground * LV); dot(gx - 2, gy); dot(gx, gy + 1); dot(gx + 2, gy); }
   const [sx, sy] = P(o, f.x, f.y, f.z * LV);
   const face = game.hero.face, back = face === 'N' || face === 'W', flip = face === 'S' || face === 'W';
@@ -445,11 +578,13 @@ function drawHero(game, o) {
 
 function renderRoom(game, t) {
   const room = cur(game), o = originFor(room), style = ROOM_STYLE[room.spec.id];
+  coilTops.length = 0;
   drawBackWalls(o, room, style, t);
   drawFloor(o, room);
   const items = [];
   for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) items.push({ d: x + y, k: 0, fn: () => drawTile(game, room, o, x, y, t) });
   for (const r of room.robots) items.push({ d: Math.max(r.x + r.y, r.px + r.py), k: 1, fn: () => drawRobot(room, o, r, t) });
+  for (const m of room.movers) if (m.box) items.push({ d: Math.floor(m.box.x1 - 0.01) + Math.floor(m.box.y1 - 0.01), k: 1, fn: () => drawMover(room, o, m, t) });
   const f = app.free, under = tilesUnder(f.x, f.y, RADIUS);
   items.push({ d: Math.max(...under.map(([x, y]) => x + y)), k: 2, fn: () => drawHero(game, o) });
   items.sort((a, b) => a.d - b.d || a.k - b.k);
@@ -460,6 +595,7 @@ function renderRoom(game, t) {
     const [ex, ey] = exitTile(room.spec, dir, at);
     drawArch(o, EXIT_PLANES[dir](room), at, room.h[ey][ex] * LV, true);
   }
+  drawCoilSparks(t);
   for (const s of app.sparks) { dot(s.x, s.y); if (s.life > 12) { dot(s.x - 1, s.y); dot(s.x + 1, s.y); dot(s.x, s.y - 1); dot(s.x, s.y + 1); } }
 }
 
@@ -489,11 +625,10 @@ function drawPanel(game, t) {
     const id = game.hero.carry[i];
     if (id) blit(SPR.part[id], x + 8, 187);
   }
-  text('ROCKET', 202, 165);
-  PARTS.forEach((p, i) => {
-    const x = 191 + i * 11;
-    if (game.delivered.includes(p.id)) blit(SPR.part[p.id], x, 187);
-    else { dot(x - 2, 182); dot(x + 2, 182); dot(x - 2, 186); dot(x + 2, 186); }
+  PARTS.forEach((p, i) => { // the rocket's parts, fitted or still missing, in rows of five
+    const x = 196 + (i % 5) * 12, y = 176 + Math.floor(i / 5) * 12;
+    if (game.delivered.includes(p.id)) blit(SPR.part[p.id], x, y);
+    else { dot(x - 2, y - 6); dot(x + 2, y - 6); dot(x - 2, y - 2); dot(x + 2, y - 2); }
   });
 }
 
@@ -517,12 +652,12 @@ function drawTitle(t) {
   centred('ATOMIC CASTLE', 17, 2);
   for (const [sx, sy] of [[20, 50], [70, 60], [200, 48], [236, 80], [40, 110], [222, 120], [110, 44], [160, 64]]) dot(sx, sy);
   const flame = Math.floor(t * 10) % 2 + 1;
-  picture(rocketCanvas(6, flame), 92, 52, 40, 80);
+  picture(rocketCanvas(PARTS.length, flame), 92, 52, 40, 80);
   blit(SPR.heroFront[Math.floor(t * 3) % 2], 160, 131);
   blit(SPR.robot[Math.floor(t * 4) % 2], 186, 131, true);
   blit(SPR.saucer, Math.round(128 + Math.sin(t * 0.7) * 90), 52 + Math.round(Math.sin(t * 2) * 3));
   line([20, 134], [236, 134]);
-  centred("THE PROFESSOR'S ROCKET IS MISSING SIX", 138);
+  centred("THE PROFESSOR'S ROCKET IS MISSING NINE", 138);
   centred('PARTS. FIND THEM BEFORE THE SAUCERS', 146);
   centred('LAND. ROBOTS, STEAM AND PITS ARE DEADLY.', 154);
   centred('PRESS SPACE TO START', 169);
@@ -537,7 +672,7 @@ function drawEnd(game, kind, t) {
     paint(0, 1, 32, 3, 'yellow'); paint(0, 4, 32, 15, 'white'); paint(0, 19, 32, 5, 'cyan');
     centred('LIFT OFF!', 10, 2);
     const rise = Math.min(140, Math.max(0, app.endTimer - 30) * 1.2);
-    picture(rocketCanvas(6, Math.floor(t * 12) % 2 + 1), 103, 60 - rise, 50, 100);
+    picture(rocketCanvas(PARTS.length, Math.floor(t * 12) % 2 + 1), 103, 60 - rise, 50, 100);
     line([40, 161], [216, 161]);
     centred(`TIME TO SPARE ${formatTime(game.time)}`, 166);
     if (app.newBest) centred('A NEW BEST TIME!', 175);
@@ -557,6 +692,8 @@ const BEST_KEY = 'atomic-castle-best';
 const DEATH_LINES = {
   robot: ['Remember, children: robots are only dangerous when they are in the same room as you.', 'Tin robots do not say sorry. It is not in their programming.', 'The Professor would have called that "a learning experience".'],
   vent: ['Steam: nature\'s way of saying "not now".', 'Lightly poached. Please try again.', 'The vents are on a timer. You, it seems, are not.'],
+  crusher: ['Flattened. The Professor will want that back in its original shape.', 'Timing is everything. Yours was not.'],
+  squashed: ['Squashed between a moving block and a wall. Neither of them apologised.'],
   pit: ['The pit was deeper than it looked. Pits usually are.', 'Down you go. Mind the gap next time.', 'Gravity: still working, the Professor will be pleased to hear.'],
 };
 function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (err) { console.warn('Could not read the saved best time:', err); return 0; } }
@@ -571,6 +708,7 @@ const app = {
 
 function startGame() {
   app.game = createGame();
+  initMovers(app.game);
   app.game.lives = LIVES; app.game.deaths = 0; app.dying = 0;
   app.mode = 'play'; app.held = []; app.free.jumpQueued = 0; app.rocketWait = 0; app.slide = null; app.sparks = [];
   app.pendingEnd = null; app.newBest = false; app.caption = null; app.loading = 50;
@@ -626,7 +764,7 @@ function processEvents(game) {
         Sound.play('room'); snapHero(game); app.slide = null; app.sparks = []; app.reveal = PLAY_TOP;
         if (e.first) say(ROOMS[e.room].caption, 340); else app.caption = null;
         break;
-      case 'reset': Sound.play('reset'); snapHero(game); app.reveal = PLAY_TOP; say(`Room reset. That cost ${RESET_PENALTY} seconds and a little dignity.`); break;
+      case 'reset': Sound.play('reset'); resetMovers(cur(game)); snapHero(game); app.reveal = PLAY_TOP; say(`Room reset. That cost ${RESET_PENALTY} seconds and a little dignity.`); break;
       case 'win': app.pendingEnd = { mode: 'win', delay: 80 }; break;
       case 'lose': app.pendingEnd = { mode: 'lose', delay: 40 }; Sound.play('lose'); break;
       default: throw new Error(`processEvents: unknown event "${e.t}"`);
@@ -683,7 +821,8 @@ function stepGame(dt) {
     return;
   }
   if (app.dying > 0) { app.dying -= dt; if (app.dying <= 0 && !game.over) respawn(game); }
-  else if (!game.over) { stepFree(game, dt); processEvents(game); }
+  updateMovers(game, dt); processEvents(game);
+  if (app.dying <= 0 && !game.over) { stepFree(game, dt); processEvents(game); }
   const before = game.time;
   freeUpdate(game, dt);
   processEvents(game);
@@ -759,7 +898,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// Screenshot hook: filmation.html?still&scene=title|room|win|lose&room=vault&x=..&y=..&ticks=..
+// Screenshot hook: index.html?still&scene=title|room|win|lose&room=vault&x=..&y=..&ticks=..
 if (params.has('still')) {
   const scene = params.get('scene') || 'title';
   if (scene !== 'title') {
