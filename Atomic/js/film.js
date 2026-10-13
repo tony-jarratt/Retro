@@ -479,7 +479,7 @@ function drawPanel(game, t) {
   const f = 1 - Math.max(0, game.time) / TIME_LIMIT;
   blit(SPR.saucer, Math.round(48 - f * 34), Math.round(172 + f * 4));
   if (low && app.tick % 20 < 10) { const bx = Math.round(48 - f * 34); line([bx - 2, 175 + f * 4], [bx - 5, 185]); line([bx + 2, 175 + f * 4], [bx + 5, 185]); }
-  for (let i = 0; i < game.lives; i++) blit(SPR.life, 71 + i * 10, 172); // lives left, above the clock
+  for (let i = 0; i < game.lives; i++) blit(SPR.life, 71 + i * 10, 173); // lives left, above the clock
   const clock = formatTime(game.time);
   text(clock, Math.round(91 - (clock.length * 10 - 1) / 2), 175, 2, 10);
   text('CARRY', 137, 165);
@@ -526,7 +526,7 @@ function drawTitle(t) {
   centred('PARTS. FIND THEM BEFORE THE SAUCERS', 146);
   centred('LAND. ROBOTS, STEAM AND PITS ARE DEADLY.', 154);
   centred('PRESS SPACE TO START', 169);
-  centred('ARROWS WALK  SPACE JUMP  R RESET ROOM', 182);
+  centred('ARROWS WALK SPACE JUMP R RESET P PAUSE', 182);
   paint(0, 22, 32, 2, 'green');
   if (app.best) { paint(24, 0, 8, 1, 'green'); text(`BEST ${formatTime(app.best)}`, 194, 1); }
 }
@@ -656,6 +656,8 @@ function onKeyDown(key) {
     if (key === 'p' || key === 'P' || key === 'Escape') { app.mode = 'paused'; app.held = []; return true; }
   } else if (app.mode === 'paused') {
     if (['p', 'P', 'Escape', 'Enter', ' '].includes(key)) { app.mode = 'play'; return true; }
+    if (key === 'r' || key === 'R') { app.mode = 'play'; resetRoom(app.game); processEvents(app.game); return true; }
+    if (key === 'q' || key === 'Q') { Sound.play('choose'); app.mode = 'title'; app.game = null; return true; }
   } else if (app.mode === 'win' || app.mode === 'lose') {
     if (app.endTimer > 40 && (key === ' ' || key === 'Enter')) { Sound.play('choose'); app.mode = 'title'; return true; }
   }
@@ -702,10 +704,13 @@ function render() {
     drawCaption(game);
     drawPanel(game, t);
     if (app.mode === 'paused') {
-      g.fillStyle = '#000'; g.fillRect(88, 72, 80, 24);
-      edges([[88, 72], [167, 72], [167, 95], [88, 95]]);
-      centred('PAUSED', 81);
-      paint(11, 9, 10, 3, 'white');
+      g.fillStyle = '#000'; g.fillRect(40, 60, 176, 52);
+      edges([[40, 60], [215, 60], [215, 111], [40, 111]]);
+      centred('PAUSED', 66);
+      text('P  CARRY ON', 56, 80);
+      text(`R  RESET THIS ROOM (-${RESET_PENALTY}S)`, 56, 90);
+      text('Q  QUIT TO THE TITLE', 56, 100);
+      paint(5, 7, 23, 7, 'white');
     }
   }
   present();
@@ -768,6 +773,7 @@ if (params.has('still')) {
     if (params.has('carry')) game.hero.carry = params.get('carry').split(',');
     if (params.has('delivered')) game.delivered = params.get('delivered').split(',');
     snapHero(game); say(room.spec.caption, 99999);
+    if (scene === 'paused') app.mode = 'paused';
     if (scene === 'win' || scene === 'lose') { app.mode = scene; app.endTimer = Number(params.get('t') || 80); if (scene === 'win') game.delivered = PARTS.map((p) => p.id); }
   }
   for (let i = 0; i < Number(params.get('ticks') || 30); i++) stepGame(STEP_MS / 1000);
