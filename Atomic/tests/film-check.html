@@ -1,0 +1,114 @@
+<!doctype html><meta charset="utf-8"><style>body{margin:0;background:#000}</style>
+<canvas id="screen" width="1024" height="768"></canvas>
+<script src="../js/data.js"></script><script src="../js/rules.js"></script><script src="../js/audio.js"></script>
+<script src="../js/film-art.js"></script><script src="../js/film-move.js"></script><script src="../js/film.js"></script>
+<script src="solver.js"></script>
+<script>
+'use strict';
+// Plays the grid solver's whole winning game through the Filmation page's free movement, as a player would
+// (hold a direction, jump at the edge of a gap), one solver move at a time, and checks after every move that the
+// hero, the crates and the parts are where the grid rules put them. A move that free movement cannot reproduce is
+// listed, and the hero is put back where the grid says so the rest of the game is still tested.
+// Run with tests/run-film-check.sh. Robots and steam vents are switched off, as the solver ignores them.
+const out = [];
+const failures = [];
+const FPS = 60, TIMEOUT = 4 * FPS;
+
+function tick(n = 1) { for (let i = 0; i < n; i++) stepGame(1 / FPS); }
+function centreOff(axis) { return app.free[axis] - (Math.floor(app.free[axis]) + 0.5); }
+
+// Walk (holding dir) until the hero's middle is in the middle of square (tx, ty) along the way they are going.
+function walkToCentre(dir, tx, ty, game) {
+  const axis = dir === 'E' || dir === 'W' ? 'x' : 'y';
+  for (let i = 0; i < TIMEOUT; i++) {
+    const h = game.hero;
+    if (h.x === tx && h.y === ty && !app.free.air) {
+      const off = centreOff(axis);
+      if (Math.abs(off) < 0.06) break;
+      const forward = { E: 1, S: 1, W: -1, N: -1 }[dir];
+      app.held = [Math.sign(off) === forward ? { E: 'W', W: 'E', N: 'S', S: 'N' }[dir] : dir];
+    } else app.held = [dir];
+    tick();
+  }
+  app.held = [];
+}
+function untilStill(dir) { // hold dir until the hero stops moving (at the edge of a gap)
+  let last = null;
+  for (let i = 0; i < TIMEOUT; i++) {
+    app.held = [dir]; tick();
+    const pos = `${app.free.x.toFixed(3)},${app.free.y.toFixed(3)}`;
+    if (pos === last) break;
+    last = pos;
+  }
+  app.held = [];
+}
+function jump(dir) {
+  app.held = [dir]; onKeyDown(' '); tick(2); app.held = [];
+  for (let i = 0; i < TIMEOUT && app.free.air; i++) tick();
+}
+function holdUntil(dir, cond) { for (let i = 0; i < TIMEOUT && !cond(); i++) { app.held = [dir]; tick(); } app.held = []; }
+
+function sameState(a, b) {
+  const ra = cur(a), rb = b.rooms[ra.index];
+  const diffs = [];
+  if (a.hero.room !== b.hero.room) diffs.push(`room ${ROOMS[b.hero.room].id} not ${ROOMS[a.hero.room].id}`);
+  else {
+    if (a.hero.x !== b.hero.x || a.hero.y !== b.hero.y) diffs.push(`hero at ${b.hero.x},${b.hero.y} not ${a.hero.x},${a.hero.y}`);
+    if (ra.crates.join('/') !== rb.crates.join('/')) diffs.push('crates differ');
+  }
+  if (a.hero.carry.length !== b.hero.carry.length) diffs.push(`carrying ${b.hero.carry.length} not ${a.hero.carry.length}`);
+  if (a.delivered.length !== b.delivered.length) diffs.push(`delivered ${b.delivered.length} not ${a.delivered.length}`);
+  return diffs;
+}
+function resync(grid, game) {
+  grid.rooms.forEach((r, i) => {
+    const f = game.rooms[i];
+    f.crates = r.crates.map((row) => row.slice()); f.pit = r.pit.map((row) => row.slice());
+    f.parts.forEach((p, k) => { p.taken = r.parts[k].taken; });
+  });
+  Object.assign(game.hero, { room: grid.hero.room, x: grid.hero.x, y: grid.hero.y, face: grid.hero.face, carry: grid.hero.carry.slice(), entry: { ...grid.hero.entry } });
+  game.delivered = grid.delivered.slice();
+  placeHero(game);
+}
+
+try {
+  botPlay();
+  const actions = BOT_ACTIONS.slice();
+  out.push(`solver game: ${actions.length} actions`);
+  startGame();
+  const game = app.game;
+  game.hazards = false; game.time = 99999; app.loading = 0;
+  const grid = createGame();
+  grid.hazards = false;
+  actions.forEach(([name, dir], i) => {
+    const room = ROOMS[grid.hero.room].id, fromLevel = heroLevel(grid);
+    if (name === 'reset') { resetRoom(grid); resetRoom(game); grid.events.length = 0; processEvents(game); resync(grid, game); return; }
+    const res = (name === 'walk' ? walk : hop)(grid, dir);
+    grid.events.length = 0;
+    const { x: tx, y: ty } = grid.hero, toLevel = heroLevel(grid);
+    let how;
+    if (res.kind === 'room') { how = 'walk out'; holdUntil(dir, () => game.hero.room === grid.hero.room); }
+    else if (res.kind === 'deliver') { how = 'walk into rocket'; holdUntil(dir, () => game.delivered.length === grid.delivered.length); }
+    else if (res.kind === 'leap') {
+      how = 'leap';
+      const [dx, dy] = DIRS[dir], gx = tx - dx, gy = ty - dy, r = cur(game);
+      if (r.pit[gy][gx]) { how = 'leap from the edge'; untilStill(dir); }
+      jump(dir); walkToCentre(dir, tx, ty, game);
+    } else if (toLevel > fromLevel) { how = res.kind === 'hop' ? 'hop up' : 'step up (now a jump)'; jump(dir); walkToCentre(dir, tx, ty, game); }
+    else { how = res.kind === 'hop' ? 'hop (walked)' : res.kind; walkToCentre(dir, tx, ty, game); }
+    processEvents(game);
+    const diffs = sameState(grid, game);
+    if (diffs.length) {
+      failures.push(`${room} move ${i} (${name} ${dir}, ${how}, from level ${fromLevel} to ${toLevel}): ${diffs.join("; ")}; free hero ${["x", "y", "z"].map((k) => app.free[k].toFixed(2)).join(",")} air ${app.free.air}`);
+      resync(grid, game);
+    }
+  });
+  out.push(`grid game won: ${grid.over === 'win'}; free game won: ${game.over === 'win' || app.pendingEnd?.mode === 'win' || app.mode === 'win'}`);
+} catch (err) {
+  failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
+}
+const pre = document.createElement('pre'); pre.id = 'log';
+pre.textContent = [...out, `failures=${failures.length}`, ...failures].join('\n');
+document.body.appendChild(pre);
+document.title = `DONE failures=${failures.length} :: ` + [...out, ...failures].join(" || ");
+</script>

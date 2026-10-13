@@ -7,7 +7,6 @@
 
 const SPEED = 3.2;          // tiles a second
 const RADIUS = 0.28;        // half the width of the hero's footprint, in tiles
-const STAND = 0.15;         // half the width of what has to be under the hero for them to stand on it
 const STEP_UP = 0.3;        // levels you can walk up without jumping (so a crate or a ledge needs a jump)
 const JUMP_V = 11;          // levels a second, straight up, when a jump starts
 const GRAVITY = 40;         // levels a second, every second
@@ -29,10 +28,9 @@ function tilesUnder(px, py, r) {
   return out;
 }
 
+// What the middle of the hero's feet is over: you stand on a square only with your middle on it.
 function standLevel(game, room, px, py) {
-  let best = NOTHING;
-  for (const [x, y] of tilesUnder(px, py, STAND)) best = Math.max(best, tileTop(game, room, x, y));
-  return best;
+  return tileTop(game, room, Math.floor(px), Math.floor(py));
 }
 
 // Try to move the hero by (dx, dy). Returns the square that stopped them, or null if they moved.
@@ -78,12 +76,12 @@ function placeHero(game) {
   game.hero.air = 0;
 }
 
-function syncSquare(game) {
+function syncSquare(game, landed = false) {
   const f = app.free, room = cur(game), hero = game.hero;
   const x = Math.min(room.W - 1, Math.max(0, Math.floor(f.x))), y = Math.min(room.H - 1, Math.max(0, Math.floor(f.y)));
   const moved = x !== hero.x || y !== hero.y;
   hero.x = x; hero.y = y; hero.air = f.air ? 1 : 0;
-  if (moved && !f.air) collect(game);
+  if ((moved || landed) && !f.air) collect(game); // pick up what you walk or land on
 }
 
 function stepFree(game, dt) {
@@ -127,9 +125,10 @@ function stepFree(game, dt) {
 
   // up and down
   const ground = standLevel(game, room, f.x, f.y);
+  let landed = false;
   if (f.air) {
     f.vz -= GRAVITY * dt; f.z += f.vz * dt;
-    if (f.vz <= 0 && f.z <= ground) { f.z = ground; f.air = false; f.vz = 0; f.jumpDir = null; Sound.play('step'); }
+    if (f.vz <= 0 && f.z <= ground) { f.z = ground; f.air = false; f.vz = 0; f.jumpDir = null; landed = true; Sound.play('step'); }
   } else if (ground < f.z - 0.01) { f.air = true; f.vz = 0; f.jumpDir = null; } // walked off a ledge
   else f.z = ground;
   if (f.air && ground === NOTHING && f.z < room.h[Math.floor(f.y)][Math.floor(f.x)] - 1.2) { // down a pit
@@ -137,7 +136,7 @@ function stepFree(game, dt) {
     if (game.invuln > 0) placeHeroAtEntry(game); else hitHero(game, 'pit');
     return;
   }
-  syncSquare(game);
+  syncSquare(game, landed);
 }
 
 function placeHeroAtEntry(game) { game.hero.x = game.hero.entry.x; game.hero.y = game.hero.entry.y; placeHero(game); }
@@ -151,6 +150,7 @@ function freeUpdate(game, dt) {
   app.rocketWait -= dt;
   if (game.time <= 0) { endGame(game); return; }
   const room = cur(game), f = app.free;
+  if (!game.hazards) return; // the tests switch robots and vents off, as rules.js update() does
   for (const r of room.robots) {
     r.t += dt;
     while (r.t >= ROBOT_STEP) { r.t -= ROBOT_STEP; stepRobot(game, room, r); }

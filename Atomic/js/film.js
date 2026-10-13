@@ -767,4 +767,4 @@ if (params.has('still')) {
   const log = document.createElement('pre'); log.id = 'log'; log.style.display = 'none'; document.body.appendChild(log);
   log.textContent = ['hero', JSON.stringify(app.free), 'square', app.game && app.game.hero.x, app.game && app.game.hero.y, 'room', app.game && cur(app.game).spec.id, 'time', app.game && app.game.time.toFixed(1), 'carry', app.game && app.game.hero.carry.join('/')].join(' ');
   render();
-} else requestAnimationFrame(frame);
+} else if (!params.has('norun')) requestAnimationFrame(frame); // the tests load the page without starting the loop
