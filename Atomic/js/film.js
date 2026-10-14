@@ -139,7 +139,6 @@ function pattern(rows) {
 }
 const DOTS = pattern(['#...', '....', '..#.', '....']);
 const CHECK = pattern(['#.', '.#']);
-const HATCH = pattern(['#.....', '.#....', '..#...', '...#..', '....#.', '.....#']); // the darkness down a pit
 
 // Scale2x: doubles a black / white / see-through picture, rounding off its staircases instead of making them chunkier.
 function smooth2x(src) {
@@ -416,24 +415,58 @@ function drawFloor(o, room) {
   line(a, down(a, S)); line(b, down(b, S)); line(c, down(c, S));
 }
 
-// Drawn as seen: the far sides of the hole show their stonework going down into the dark.
-function drawPit(o, room, x, y, z) {
-  const [u, v] = viewTile(o, x, y);
+// The open pits, drawn as holes: black, with a white rim where the hole meets the floor. A narrow pit (one square
+// across, with no 2x2 of pit in it anywhere) stays plain black. A wider one shows its far walls dropping away, as
+// streaks running down into the dark.
+function drawPits(o, room) {
   const pitAt = (a, b) => { const [px, py] = mapTile(o, a, b); return room.pit[py][px]; };
-  const T = Pv(o, u, v, z), R = Pv(o, u + 1, v, z), B = Pv(o, u + 1, v + 1, z), L = Pv(o, u, v + 1, z);
-  fill([T, R, B, L], HATCH);
-  const openLeft = u === 0 || !pitAt(u - 1, v), openRight = v === 0 || !pitAt(u, v - 1);
-  g.save(); path([T, R, B, L]); g.clip();
-  for (const d of [3, 7, 12, 18]) {
-    if (openLeft) line(Pv(o, u, v + 1, z - d), Pv(o, u, v, z - d));
-    if (openRight) line(Pv(o, u, v, z - d), Pv(o, u + 1, v, z - d));
+  const regions = pitRegions(room);
+  const seen = [];
+  for (const region of regions) {
+    const wide = region.some(([x, y]) => [[x + 1, y], [x, y + 1], [x + 1, y + 1]].every(([a, b]) => inBounds(room, a, b) && room.pit[b][a]));
+    for (const [x, y] of region) { const [u, v] = viewTile(o, x, y); seen.push({ u, v, z: room.h[y][x] * LV, wide }); }
   }
-  if (openLeft && openRight) line(T, Pv(o, u, v, z - 30));
+  if (!seen.length) return;
+  seen.sort((a, b) => a.u + a.v - b.u - b.v);
+  g.save(); clipToPits(o, room);
+  for (const { u, v, z } of seen) fill([Pv(o, u, v, z), Pv(o, u + 1, v, z), Pv(o, u + 1, v + 1, z), Pv(o, u, v + 1, z)]);
+  // each far edge of a wide hole (one with floor beyond it) hangs a wall down into the pit; nearer walls are drawn later
+  for (const { u, v, z, wide } of seen) {
+    if (!wide) continue;
+    const T = Pv(o, u, v, z), R = Pv(o, u + 1, v, z), L = Pv(o, u, v + 1, z);
+    if (u === 0 || !pitAt(u - 1, v)) pitWall(L, T, u + v);
+    if (v === 0 || !pitAt(u, v - 1)) pitWall(T, R, u + v);
+  }
   g.restore();
-  if (openRight) line(T, R);
-  if (openLeft) line(L, T);
-  if (u + 1 >= o.VW || !pitAt(u + 1, v)) line(R, B);
-  if (v + 1 >= o.VH || !pitAt(u, v + 1)) line(B, L);
+  for (const { u, v, z } of seen) { // the rim: wherever the hole meets the floor
+    const T = Pv(o, u, v, z), R = Pv(o, u + 1, v, z), B = Pv(o, u + 1, v + 1, z), L = Pv(o, u, v + 1, z);
+    if (v === 0 || !pitAt(u, v - 1)) line(T, R);
+    if (u === 0 || !pitAt(u - 1, v)) line(L, T);
+    if (u + 1 >= o.VW || !pitAt(u + 1, v)) line(R, B);
+    if (v + 1 >= o.VH || !pitAt(u, v + 1)) line(B, L);
+  }
+}
+// The open pits grouped into holes: squares of pit that touch side by side belong to the same hole.
+function pitRegions(room) {
+  const done = room.pit.map((r) => r.map(() => false)), regions = [];
+  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) {
+    if (!room.pit[y][x] || done[y][x]) continue;
+    const region = [], todo = [[x, y]]; done[y][x] = true;
+    while (todo.length) {
+      const [a, b] = todo.pop(); region.push([a, b]);
+      for (const [c, d] of [[a + 1, b], [a - 1, b], [a, b + 1], [a, b - 1]]) {
+        if (inBounds(room, c, d) && room.pit[d][c] && !done[d][c]) { done[d][c] = true; todo.push([c, d]); }
+      }
+    }
+    regions.push(region);
+  }
+  return regions;
+}
+// One far wall of a wide pit, hanging from the rim edge a-b: black, with streaks of differing length running down it.
+function pitWall(a, b, k) {
+  fill([a, b, down(b, 40), down(a, 40)]);
+  for (const t of [0.2, 0.5, 0.8]) { const p = lerp(a, b, t), n = 8 + ((k * 7 + t * 10) % 3) * 6; line(down(p, 2), down(p, n)); }
+  line(down(a, 2), down(b, 2));
 }
 
 function inset(o, x, y, z, i) { return [P(o, x + i, y + i, z), P(o, x + 1 - i, y + i, z), P(o, x + 1 - i, y + 1 - i, z), P(o, x + i, y + 1 - i, z)]; }
@@ -544,42 +577,39 @@ function drawCoilSparks(t) {
 
 // ---- the moving blocks ----
 // The open pits as one clipping shape, so the part of a block below the floor shows only through the holes.
-function clipToPits(o, room) {
+function clipToPits(o, room) { pitOpenings(o, room); g.clip(); }
+function pitOpenings(o, room) {
   g.beginPath();
   for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) {
     if (!room.pit[y][x]) continue;
     const [u, v] = viewTile(o, x, y), z = room.h[y][x] * LV, c = [Pv(o, u, v, z), Pv(o, u + 1, v, z), Pv(o, u + 1, v + 1, z), Pv(o, u, v + 1, z)];
     g.moveTo(c[0][0], c[0][1]); for (const p of c.slice(1)) g.lineTo(p[0], p[1]); g.closePath();
   }
-  g.clip();
 }
 // A block from `bottom` to `top` (levels). Over a pit, the part below the floor is drawn as if down inside the hole:
-// clipped to the pit openings, so it never spills over the floor in front.
+// the block is drawn whole, but clipped to the pit openings plus everything above its own floor-level outline, so it
+// never spills over the floor in front and shows no seam where it passes through the floor.
 function slab(o, room, x0, y0, x1, y1, bottom, top, skin) {
   const tx = Math.floor((x0 + x1) / 2), ty = Math.floor((y0 + y1) / 2);
   const floor = inBounds(room, tx, ty) && room.pit[ty][tx] ? room.h[ty][tx] : -SOLID;
-  if (bottom < floor) {
-    g.save(); clipToPits(o, room);
-    box(o, x0, y0, x1, y1, bottom * LV, (Math.min(top, floor) - bottom) * LV, top <= floor ? skin : { left: skin.left, right: skin.right });
-    g.restore();
-  }
-  if (top > floor) { const b = Math.max(bottom, floor); box(o, x0, y0, x1, y1, b * LV, (top - b) * LV, skin); }
+  if (bottom >= floor) { box(o, x0, y0, x1, y1, bottom * LV, (top - bottom) * LV, skin); return; }
+  const [u0, v0, u1, v1] = viewBox(o, x0, y0, x1, y1), z = floor * LV;
+  const L = Pv(o, u0, v1, z), B = Pv(o, u1, v1, z), R = Pv(o, u1, v0, z);
+  g.save();
+  pitOpenings(o, room);
+  g.moveTo(L[0], L[1]); g.lineTo(L[0], -50); g.lineTo(R[0], -50); g.lineTo(R[0], R[1]); g.lineTo(B[0], B[1]); g.closePath(); // wound the same way as the openings
+  g.clip();
+  box(o, x0, y0, x1, y1, bottom * LV, (top - bottom) * LV, skin);
+  g.restore();
 }
 
 function drawMover(room, o, m, t) {
   const b = m.box;
   if (!b) return;
   const i = 0.03;
-  if (m.type === 'lift') {
-    const inPit = 'xyz'.includes(room.spec.height[m.y][m.x]); // a lift rising out of a pit
-    const floor = inPit ? b.top - 2.5 : room.h[m.y][m.x];
-    g.save();
-    if (inPit) { // the part below the floor shows only through the pit's opening
-      const [u, v] = viewTile(o, m.x, m.y), L = Pv(o, u, v + 1, 0), B = Pv(o, u + 1, v + 1, 0), R = Pv(o, u + 1, v, 0);
-      path([L, B, R, [R[0], -50], [L[0], -50]]); g.clip();
-    }
-    box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, floor * LV, (b.top - floor) * LV, { left: barred, right: barred, top: (T, R, B, L) => { line(lerp(T, R, 0.5), lerp(L, B, 0.5)); line(lerp(T, L, 0.5), lerp(R, B, 0.5)); } });
-    g.restore();
+  if (m.type === 'lift') { // a single block riding up and down; below the floor it shows only through a pit's opening
+    const bottom = room.pit[m.y][m.x] ? b.top - 1 : Math.max(b.top - 1, room.h[m.y][m.x]); // on solid floor it rises out of a slot
+    slab(o, room, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, bottom, b.top, { top: (T, R, B, L) => { line(lerp(T, R, 0.5), lerp(L, B, 0.5)); line(lerp(T, L, 0.5), lerp(R, B, 0.5)); } });
   } else if (m.type === 'slider') {
     slab(o, room, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, b.bottom, b.top, { left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.25), lerp(R, L, 0.25), lerp(B, T, 0.25), lerp(L, R, 0.25)]) });
   } else if (m.type === 'crumble') {
@@ -706,7 +736,7 @@ function renderRoom(game, t) {
   drawBackWalls(o, room, style, t);
   drawFloor(o, room);
   // the open pits first: nothing in the room is lower, so nothing should ever be painted over by one
-  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) if (room.pit[y][x]) drawPit(o, room, x, y, room.h[y][x] * LV);
+  drawPits(o, room);
   // painter's order: the far squares first, by how far down the screen they are as seen
   const depth = (x, y) => { const [u, v] = viewTile(o, x, y); return u + v; };
   const items = [];
