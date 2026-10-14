@@ -291,8 +291,8 @@ function drawLeyLines(s, game, ms) {
       for (let k = 0; k <= n; k++) { // beads of light running along the line, each with a dark rim so it shows on any ground
         if ((k + Math.floor(ms / 250)) % 3 === 0) continue;
         const bx = Math.round(x0 + ((x1 - x0) * k) / n) - 1, by = Math.round(y0 + ((y1 - y0) * k) / n) - 1;
-        fillRect(s, bx - 1, by - 1, 4, 4, C.black);
-        fillRect(s, bx, by, 2, 2, TRIBE_COLOURS[tribe].c);
+        fillRect(s, bx - 1, by, 4, 2, C.black);
+        fillRect(s, bx, by, 2, 1, TRIBE_COLOURS[tribe].c);
       }
     }
     if (!line.length) return;
