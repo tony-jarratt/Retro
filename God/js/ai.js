@@ -78,7 +78,8 @@ function aiPower(world, tribe) {
   if (world.tick < rules.grace || me.manna < rules.powerManna || world.tick - me.lastPower < rules.powerGap) return false;
   const targets = world.houses.filter((h) => h.tribe !== tribe).sort((a, b) => b.level - a.level || b.pop - a.pop);
   if (!targets.length) return false;
-  const h = targets[0], id = h.level >= 3 ? 'quake' : 'swamp';
+  const h = targets[0], id = h.level >= 3 && world.powers.has('quake') ? 'quake' : 'swamp';
+  if (!world.powers.has(id)) return false; // no powers in this land
   const r = castPower(world, tribe, id, h.u + 1, h.v + 1);
   if (!r.ok) return false; // nowhere to put it (no room for a swamp): it will think again
   me.lastPower = world.tick;

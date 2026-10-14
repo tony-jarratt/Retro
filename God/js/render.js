@@ -254,7 +254,8 @@ function drawPanel(s, game, hoverCost) {
   else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
   for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
     if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
-    outlined(s, slot.label, slot.x, slot.y, manna >= POWER[slot.id].cost ? C.gold : C.grey);
+    const colour = !game.powers.has(slot.id) ? C.earth : manna >= POWER[slot.id].cost ? C.gold : C.grey; // dark: not earned in this land
+    outlined(s, slot.label, slot.x, slot.y, colour);
   }
 }
 // Where each power's name sits in the panel (also where a click picks it).
@@ -270,14 +271,17 @@ function powerSlots() {
 // The end of a game: a card over the land.
 function drawEnd(s, game) {
   if (!game.over) return;
-  const won = game.over.winner === PLAYER, title = won ? 'VICTORY' : 'DEFEAT';
-  const lines = won ? ['THE DARK GOD IS NO MORE.', 'YOUR PEOPLE HAVE THE WORLD.'] : ['YOUR PEOPLE ARE GONE.', 'THE DARK GOD HAS THE WORLD.'];
-  const w = 230, h = 78, x = Math.round(LW / 2 - w / 2), y = 150;
+  const won = game.over.winner === PLAYER, land = game.land, next = land !== null && land + 1 < LANDS.length ? LANDS[land + 1] : null;
+  const title = won ? 'VICTORY' : 'DEFEAT';
+  const lines = !won ? ['YOUR PEOPLE ARE GONE.', 'THE DARK GOD HAS THIS LAND.']
+    : next ? ['THE DARK GOD IS DRIVEN OUT.', `ON TO ${next.name}.`]
+    : land !== null ? ['THE DARK GOD IS NO MORE.', 'THE WORLD IS YOURS.'] : ['THE DARK GOD IS NO MORE.', 'YOUR PEOPLE HAVE THE LAND.'];
+  const keys = !won ? 'R TRY AGAIN    ENTER TITLE SCREEN' : next ? 'ENTER ON TO THE NEXT LAND    R PLAY AGAIN' : 'ENTER TITLE SCREEN    R PLAY AGAIN';
+  const w = Math.max(230, textWidth(keys) + 20), h = 78, x = Math.round(LW / 2 - w / 2), y = 150;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, won ? TRIBE_COLOURS[PLAYER].c : C.red);
   fillRect(s, x, y, w, h, C.black);
   outlined(s, title, Math.round(LW / 2 - textWidth(title) / 2), y + 8, C.gold);
   lines.forEach((l, i) => outlined(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 26 + i * 11, C.snow));
-  const keys = 'ENTER TITLE SCREEN    R SAME LAND';
   outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + 62, C.grey);
 }
 
@@ -399,6 +403,8 @@ const HELP = [
   ['POWERS', '1 SWAMP, 2 QUAKE, 3 VOLCANO, 4 FLOOD: PRESS THE KEY, THEN CLICK THE LAND.'],
   ['STONES (5)', 'RAISE A LINE OF STONES. YOUR PEOPLE NEAR THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE, AND FIGHT OR '
     + 'SETTLE AT ITS END. ENEMIES OR QUAKES TOPPLE STONES.'],
+  ['THE CAMPAIGN', 'FIVE LANDS, EACH HARDER THAN THE LAST. WIN ONE TO REACH THE NEXT, AND EARN A NEW POWER AS YOU GO. '
+    + 'POWERS NOT YET EARNED ARE SHOWN DARK.'],
   ['LOOKING ABOUT', 'SWIPE, MOUSE WHEEL, ARROWS OR CLICK THE MAP BOOK. POINT AT THINGS TO INSPECT THEM. P PAUSES, M MUSIC, H HELP.'],
 ];
 function wrapText(str, maxChars) {
@@ -422,32 +428,27 @@ function drawHelp(s) {
   text(s, close, Math.round(LW / 2 - textWidth(close) / 2), y + h - 12, C.grey);
 }
 
-// Where each difficulty's name sits on the title card (also where a click picks it).
-function difficultySlots() {
-  const gap = 18, labels = DIFFICULTIES.map((d, i) => `${i + 1} ${d.name}`);
-  let x = Math.round(LW / 2 - (labels.reduce((n, l) => n + textWidth(l), 0) + gap * (labels.length - 1)) / 2);
-  return labels.map((label, i) => { const slot = { i, label, x, y: 270, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
-}
-function drawTitle(s, difficulty, ms) {
+function drawTitle(s, land, reached, ms) {
   const title = 'OLD STONES', scale = 5, tw = title.length * 6 * scale - scale, tx = Math.round(LW / 2 - tw / 2);
   bigText(s, title, tx + 3, 21, C.black, scale);
   bigText(s, title, tx + 2, 20, C.earth, scale);
   bigText(s, title, tx, 18, C.gold, scale);
   const sub = 'A GOD GAME';
   outlined(s, sub, Math.round(LW / 2 - textWidth(sub) / 2), 62, C.snow);
-  const w = 260, h = 66, x = Math.round(LW / 2 - w / 2), y = 236;
+  const L = LANDS[land], lines = [
+    { str: TITLE_LINES[0], c: C.snow }, { str: TITLE_LINES[1], c: C.snow }, { str: '', c: C.snow },
+    { str: `LAND ${land + 1} OF ${LANDS.length}: ${L.name}`, c: C.gold }, { str: L.intro, c: C.snow },
+  ];
+  if (reached > 0) lines.push({ str: `1 TO ${reached + 1}: PICK A LAND YOU HAVE REACHED`, c: C.grey });
+  const w = 330, h = 18 + lines.length * 11 + 12, x = Math.round(LW / 2 - w / 2), y = 300 - h;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
   fillRect(s, x, y, w, h, C.black);
-  TITLE_LINES.forEach((l, i) => text(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 8 + i * 11, i === TITLE_LINES.length - 1 ? C.gold : C.snow));
+  lines.forEach((l, i) => text(s, l.str, Math.round(LW / 2 - textWidth(l.str) / 2), y + 8 + i * 11, l.c));
   const help = 'H FOR HELP';
-  text(s, help, Math.round(LW / 2 - textWidth(help) / 2), y + h - 10, C.grey);
-  for (const slot of difficultySlots()) {
-    if (slot.i === difficulty) { fillRect(s, slot.x - 3, slot.y - 3, slot.w + 6, 13, C.gold); fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.black); }
-    text(s, slot.label, slot.x, slot.y, slot.i === difficulty ? C.gold : C.grey);
-  }
+  text(s, help, Math.round(LW / 2 - textWidth(help) / 2), y + h - 12, C.grey);
   if (Math.floor(ms / 500) % 2 === 0) {
     const go = 'PRESS ENTER OR CLICK TO BEGIN';
-    outlined(s, go, Math.round(LW / 2 - textWidth(go) / 2), y + h + 4 > LH - 10 ? y - 12 : y + h + 4, C.gold);
+    outlined(s, go, Math.round(LW / 2 - textWidth(go) / 2), y + h + 6, C.gold);
   }
 }
 

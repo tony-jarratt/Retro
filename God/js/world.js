@@ -9,11 +9,15 @@
 
 const DT = TICK_MS / 1000;
 
+// opts.land: a land of the campaign (an index into LANDS), which sets the map, the dark god's rules and the powers;
+// without one it is an ordinary map with every power and FAIR_RULES.
 function makeWorld(seed, opts = {}) {
-  const terrain = generateTerrain(MAP_N, seed), difficulty = opts.difficulty ?? FAIR, rules = DIFFICULTIES[difficulty];
-  if (!rules) throw new WorldError('difficulty', `there is no difficulty ${difficulty} (0 to ${DIFFICULTIES.length - 1})`);
+  const land = opts.land === undefined ? null : LANDS[opts.land];
+  if (opts.land !== undefined && !land) throw new WorldError('no-land', `there is no land ${opts.land} (0 to ${LANDS.length - 1})`);
+  const terrain = generateTerrain(MAP_N, seed, land ? { ...MAP_STYLE, ...land.map } : MAP_STYLE), rules = land ? land.rules : FAIR_RULES;
   const world = {
-    difficulty, rules,      // how hard the dark god plays (DIFFICULTIES in data.js)
+    land: opts.land ?? null, rules, // rules: how hard the dark god plays (data.js)
+    powers: new Set(land ? [...land.powers, 'stone'] : POWERS.map((p) => p.id)), // the powers both gods have here
     seed, terrain, tick: 0, rng: new Rng(seed ^ 0x5eed), over: null, // over: { winner } once a tribe is wiped out
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
     tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), bridging: false, bridgeAt: null, lastPower: 0, mines: 0, weapons: 0 })),
@@ -30,10 +34,12 @@ function makeWorld(seed, opts = {}) {
     addWalker(world, PLAYER, home.u + 0.5, home.v + 0.5, 1);
     addWalker(world, PLAYER, home.u + 0.5, home.v + 0.5, 1);
     world.cam = clampCam(terrain, { u: home.u - VIEW_N / 2, v: home.v - VIEW_N / 2 });
-    const dark = startingTile(world, MAP_N * 0.7, MAP_N * 0.68);
-    addHouse(world, RIVAL, dark.u, dark.v, START_PEOPLE);
-    addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
-    addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
+    for (const [cu, cv] of [[0.7, 0.68], [0.8, 0.58]].slice(0, land ? land.rivalHomes : 1)) {
+      const dark = startingTile(world, MAP_N * cu, MAP_N * cv);
+      addHouse(world, RIVAL, dark.u, dark.v, START_PEOPLE);
+      addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
+      addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
+    }
     for (const home of [{ u: MAP_N * 0.3, v: MAP_N * 0.32 }, { u: MAP_N * 0.7, v: MAP_N * 0.68 }]) {
       for (let i = 0; i < SHEEP_START; i++) {
         const spot = grassNear(world, Math.floor(home.u) + world.rng.int(13) - 6, Math.floor(home.v) + world.rng.int(13) - 6);
@@ -46,12 +52,12 @@ function makeWorld(seed, opts = {}) {
   return world;
 }
 
-// The flat tile nearest a point, for a tribe's first house.
+// The flat, clear tile nearest a point (and not close to another house), for a tribe's first house.
 function startingTile(world, cu, cv) {
   let best = null, bestD = Infinity;
   for (let v = 0; v < MAP_N; v++) for (let u = 0; u < MAP_N; u++) {
     const d = (u - cu) ** 2 + (v - cv) ** 2;
-    if (d < bestD && isFlat(world.terrain, u, v) && isClear(world.terrain, u, v)) { best = { u, v }; bestD = d; }
+    if (d < bestD && isFlat(world.terrain, u, v) && isClear(world.terrain, u, v) && !world.houses.some((h) => gap(h, { u, v }) < 4)) { best = { u, v }; bestD = d; }
   }
   if (!best) throw new WorldError('no-flat-land', `seed ${world.seed}: there is no flat land anywhere for a first house`);
   return best;

@@ -1,7 +1,7 @@
 # Old Stones — design notes
 
 A god game in the spirit of the 1989 original the owner loved: shape the land so your people can settle and
-grow, while a rival god does the same. Not on the arcade menu until the prototype proves fun.
+grow, while a rival god does the same.
 
 ## Decisions so far
 - **The original's core, plus a twist of our own**, chosen after play-testing the prototype. Candidates: tides,
@@ -130,6 +130,24 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
     arches with a red glow. The ley lines are beads of light in each god's colour, and each hearth shows its
     count, for example 12/20.
   - **Sounds:** a chime when a stone is raised, a horn when pilgrims set out, and a crash when a stone falls.
+- **Campaign: built** (it replaces Gentle, Fair and Cruel). There are five fixed lands, `LANDS` in data.js:
+
+  | Land | What's different | Powers |
+  |---|---|---|
+  | 1. The Green Isles | gentle, open | stones only |
+  | 2. The Pinewoods | thick forest | + swamp |
+  | 3. The Stony Shore | boulders everywhere, Fair rules | + quake |
+  | 4. The Narrow Sea | thin strait, Cruel rules | + volcano |
+  | 5. The Dark God's Home | it starts with two villages | + flood |
+
+  - **What a land sets:** its map style (`MAP_STYLE` in terrain.js: island size, strait width, forests, rock),
+    the dark god's rules, and which powers both gods have. Powers not yet earned show dark and are refused.
+  - **Seeds:** chosen from ten tried, so that a player who does nothing lasts about: never falls, 9, 7, 7 and 5
+    minutes.
+  - **Progress:** winning a land opens the next. It's remembered in localStorage (`oldstones.reached`), with a
+    warning and a fresh start if storage is blocked.
+  - **Title screen:** shows the land and what's new there; 1–5 replays a land you've reached.
+- **On the arcade menu** (games.js) as "Old Stones", credited "inspired by Populous (1989)".
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.
 

@@ -59,13 +59,30 @@ const AI_BRIDGE_STEPS = 3;       // corners it raises each time it works on the 
 const AI_POWER_MANNA = 160;      // after the grace period, with this much saved, it casts a swamp or earthquake on you...
 const AI_POWER_GAP = 40 * 20;    // ...at most every 40 s
 
-// How hard the dark god plays, chosen on the title screen. FAIR is the numbers above.
-const DIFFICULTIES = [
-  { name: 'GENTLE', grace: 5 * 60 * 20, bridgeManna: 200, powerManna: 260, powerGap: 75 * 20, rivalManna: 25 },
-  { name: 'FAIR', grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerManna: AI_POWER_MANNA, powerGap: AI_POWER_GAP, rivalManna: START_MANNA },
-  { name: 'CRUEL', grace: 2 * 60 * 20, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 },
+// How hard the dark god plays: when it starts on you, what it saves before bridging or casting, how often it casts, and
+// the manna it starts with. FAIR_RULES are the numbers above; each land in the campaign has its own.
+const FAIR_RULES = { grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerManna: AI_POWER_MANNA, powerGap: AI_POWER_GAP, rivalManna: START_MANNA };
+
+// The campaign: five lands, each harder, each a fixed map. The seeds were picked (from ten tried) so that a player
+// who does nothing lasts about: never falls, 9, 7, 7 and 5 minutes. A land sets the map (MAP_STYLE in terrain.js), the dark
+// god's rules, which powers both gods have (the stone always), and how many villages the dark god starts with.
+const MIN = 60 * 20; // ticks in a minute
+const LANDS = [
+  { name: 'THE GREEN ISLES', seed: 2024, intro: 'LEARN TO SHAPE THE LAND. YOU HAVE STONES.', powers: [], rivalHomes: 1,
+    map: { mass: 0.22, strait: 2.5, forests: 6, wood: 0.5, rock: 0.5 },
+    rules: { grace: 6 * MIN, bridgeManna: 220, powerManna: 99999, powerGap: 99 * MIN, rivalManna: 25 } },
+  { name: 'THE PINEWOODS', seed: 11, intro: 'THICK FORESTS TO CLEAR. NEW: SWAMP.', powers: ['swamp'], rivalHomes: 1,
+    map: { mass: 0.2, strait: 2, forests: 20, wood: 0.9, rock: 0.8 },
+    rules: { grace: 5 * MIN, bridgeManna: 180, powerManna: 240, powerGap: 75 * 20, rivalManna: 30 } },
+  { name: 'THE STONY SHORE', seed: 1989, intro: 'BOULDERS EVERYWHERE: DIG MINES. NEW: QUAKE.', powers: ['swamp', 'quake'], rivalHomes: 1,
+    map: { mass: 0.2, strait: 2, forests: 10, wood: 0.6, rock: 3 }, rules: FAIR_RULES },
+  { name: 'THE NARROW SEA', seed: 11, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
+    map: { mass: 0.22, strait: 1.2, forests: 12, wood: 0.75, rock: 1.2 },
+    rules: { grace: 2 * MIN, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 } },
+  { name: "THE DARK GOD'S HOME", seed: 2024, intro: 'IT HOLDS TWO VILLAGES HERE. NEW: FLOOD.', powers: ['swamp', 'quake', 'volcano', 'flood'], rivalHomes: 2,
+    map: { mass: 0.2, strait: 2, forests: 12, wood: 0.75, rock: 1.5 },
+    rules: { grace: 90 * 20, bridgeManna: 70, powerManna: 90, powerGap: 20 * 20, rivalManna: 100 } },
 ];
-const FAIR = 1;
 
 // ---- the screen ----
 const LW = 512, LH = 344;  // the low-res screen the game draws into, shown at 2x

@@ -100,9 +100,14 @@ function checkTerrain(t) {
 // ---- a new map ----
 // Two landmasses with a sea strait between them, a few tiles wide, so the tribes start apart. Each is a soft-edged lump of low ground, roughened with many
 // small hills and the odd tall one, then rounded to whole steps and pulled down until the rule holds everywhere.
-function generateTerrain(n, seed) {
+// How a map is made (a land in the campaign can change any of these; the defaults are an ordinary map):
+//   mass: each island's size, as a share of the map; strait: how wide the sea between them is;
+//   forests: how many woods; wood: how thick they are; rock: how many boulders (1 = ordinary)
+const MAP_STYLE = { mass: 0.2, strait: 2, forests: 12, wood: 0.75, rock: 1 };
+
+function generateTerrain(n, seed, style = MAP_STYLE) {
   const rng = new Rng(seed), t = makeTerrain(n);
-  const masses = [{ u: n * 0.3, v: n * 0.32, r: n * 0.2 }, { u: n * 0.7, v: n * 0.68, r: n * 0.2 }];
+  const masses = [{ u: n * 0.3, v: n * 0.32, r: n * style.mass }, { u: n * 0.7, v: n * 0.68, r: n * style.mass }];
   const hills = [];
   for (const m of masses) {
     for (let i = 0; i < 14; i++) {
@@ -120,7 +125,7 @@ function generateTerrain(n, seed) {
     }
     for (const b of hills) s += b.a * Math.exp(-((u - b.u) ** 2 + (v - b.v) ** 2) / (2 * b.r * b.r));
     const strait = (u + v - n) / Math.SQRT2; // distance from the line between the two lands
-    s -= 4 * Math.exp(-(strait * strait) / (2 * 2 * 2));
+    s -= 4 * Math.exp(-(strait * strait) / (2 * style.strait * style.strait));
     t.h[v * t.w + u] = Math.max(0, Math.min(MAX_H, Math.round(s)));
   }
   // pull every corner down to at most one above its lowest neighbour, until nothing moves
@@ -132,22 +137,22 @@ function generateTerrain(n, seed) {
       if (low < t.h[c]) { t.h[c] = low; moved = true; }
     }
   }
-  placeFeatures(t, rng);
+  placeFeatures(t, rng, style);
   checkTerrain(t);
   return t;
 }
 
 // Forests of round trees on the low ground, pines higher up, and boulders mostly on the hills. Nothing on the sea or
 // the sandy shore.
-function placeFeatures(t, rng) {
-  const forests = Array.from({ length: 12 }, () => ({ u: rng.next() * t.n, v: rng.next() * t.n, r: 2 + rng.next() * 2.5 }));
+function placeFeatures(t, rng, style) {
+  const forests = Array.from({ length: style.forests }, () => ({ u: rng.next() * t.n, v: rng.next() * t.n, r: 2 + rng.next() * 2.5 }));
   for (let v = 0; v < t.n; v++) for (let u = 0; u < t.n; u++) {
     const k = tileCorners(t, u, v), lo = Math.min(...k), hi = Math.max(...k);
     if (lo === 0) continue;
     let wood = 0.04;
-    for (const f of forests) wood += 0.75 * Math.exp(-((u - f.u) ** 2 + (v - f.v) ** 2) / (2 * f.r * f.r));
+    for (const f of forests) wood += style.wood * Math.exp(-((u - f.u) ** 2 + (v - f.v) ** 2) / (2 * f.r * f.r));
     const roll = rng.next();
-    if (roll < (hi >= 3 ? 0.06 : 0.015)) t.f[v * t.n + u] = FEATURE.rock;
+    if (roll < (hi >= 3 ? 0.06 : 0.015) * style.rock) t.f[v * t.n + u] = FEATURE.rock;
     else if (roll < wood) t.f[v * t.n + u] = hi >= 3 ? FEATURE.pine : FEATURE.tree;
   }
 }

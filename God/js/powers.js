@@ -26,6 +26,7 @@ const POWER_WORDS = { swamp: 'SPREADS A SWAMP', quake: 'SHAKES THE EARTH', volca
 function castPower(world, tribe, id, u, v) {
   const p = POWER[id];
   if (!p) throw new RulesError('no-power', `there is no power "${id}"`);
+  if (!world.powers.has(id)) return { ok: false, reason: 'locked' }; // not earned yet in this land
   if (world.tribes[tribe].manna < p.cost) return { ok: false, reason: 'no-manna' };
   const done = id === 'swamp' ? swamp(world, u, v) : id === 'quake' ? quake(world, u, v) : id === 'volcano' ? volcano(world, u, v)
     : id === 'stone' ? raiseStone(world, tribe, u, v) : flood(world);

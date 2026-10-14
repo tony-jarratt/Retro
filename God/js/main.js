@@ -1,7 +1,8 @@
 'use strict';
 
 // The browser side: the loop, the mouse and keys, and the test hooks.
-//   index.html?seed=N        that map for every game (otherwise each game is a new land)
+//   index.html?seed=N        that map in place of each land's own
+//   index.html?still&land=N  a still of land N (1 to 5) of the campaign
 //   index.html?still&scene=title  the title screen (scene=help: with the help card over it)
 //   index.html?manna=N       start with more manna (for trying things out)
 //   index.html?still&cam=u,v&mx=..&my=..&shape=u,v,dir;u,v,dir&cast=power,u,v;...&stones=u,v;...&armed=power&ticks=N
@@ -20,7 +21,8 @@ const numberParam = (name, fallback) => {
 
 const app = {
   mode: 'title',      // 'title' (a demo plays behind the title card) or 'play'
-  difficulty: FAIR,
+  reached: 0,         // the furthest land of the campaign reached (remembered in this browser)
+  land: 0,            // the land picked on the title screen, or being played
   world: null,        // the game being played, or the demo behind the title
   demoTarget: null,   // where the title's camera is drifting to
   mouse: null,        // low-res screen position, or null when off the canvas
@@ -42,9 +44,33 @@ function showTitle() {
   app.fx = [];
   app.demoTarget = null;
 }
-function startGame(seed) {
+// How far through the campaign this browser has got. Kept in localStorage, which may be missing or blocked (a private
+// window): then every visit starts at the first land, with a warning in the console.
+const PROGRESS_KEY = 'oldstones.reached';
+function loadReached() {
+  try {
+    const n = Number(localStorage.getItem(PROGRESS_KEY) || 0);
+    if (!Number.isInteger(n) || n < 0 || n >= LANDS.length) { console.warn(`Old Stones: ignoring a saved land of "${n}"`); return 0; }
+    return n;
+  } catch (err) { console.warn('Old Stones: cannot read saved progress, starting at the first land:', err); return 0; }
+}
+function saveReached(n) {
+  try { localStorage.setItem(PROGRESS_KEY, String(n)); } catch (err) { console.warn(`Old Stones: cannot save progress (land ${n + 1}):`, err); }
+}
+// When the player wins a land, the next one opens.
+function recordResult(world) {
+  if (world.recorded || !world.over || world.land === null) return;
+  world.recorded = true;
+  if (world.over.winner === PLAYER && world.land === app.reached && app.reached < LANDS.length - 1) { app.reached++; saveReached(app.reached); }
+}
+function startLand(i) {
+  app.land = i;
+  startGame(numberParam('seed', LANDS[i].seed), i);
+  say(app.world, `LAND ${i + 1}: ${LANDS[i].name}`, 80);
+}
+function startGame(seed, land) {
   app.mode = 'play';
-  app.world = makeWorld(seed, { manna: numberParam('manna', START_MANNA), difficulty: app.difficulty });
+  app.world = makeWorld(seed, { manna: numberParam('manna', START_MANNA), land });
   app.world.pointer = app.mouse;
   app.fx = [];
   app.paused = false;
@@ -97,6 +123,7 @@ function bookClick([x, y]) {
 function arm(id) {
   const w = app.world;
   if (w.armed === id) { w.armed = null; return; }
+  if (!w.powers.has(id)) { say(w, `${POWER[id].name} IS EARNED IN A LATER LAND`); Sound.play('buzz'); return; }
   if (w.tribes[PLAYER].manna < POWER[id].cost) { say(w, `${POWER[id].name} NEEDS ${POWER[id].cost} MANNA`); Sound.play('buzz'); return; }
   w.armed = id;
 }
@@ -125,11 +152,7 @@ canvas.addEventListener('mousedown', (e) => {
   e.preventDefault();
   app.mouse = toLowRes(e);
   if (app.help) { app.help = false; return; } // a click closes the help card
-  if (app.mode === 'title') { // pick a difficulty, or click anywhere else to begin
-    const [x, y] = app.mouse, slot = difficultySlots().find((d) => x >= d.x - 3 && x <= d.x + d.w + 3 && y >= d.y - 3 && y <= d.y + d.h + 3);
-    if (slot) app.difficulty = slot.i; else startGame(numberParam('seed', randomSeed()));
-    return;
-  }
+  if (app.mode === 'title') { startLand(app.land); return; } // a click begins
   // a right click lowers; on a Mac trackpad that is a two-finger click, or control-click, and shift-click lowers too
   const lower = e.button === 2 || (e.button === 0 && (e.ctrlKey || e.shiftKey));
   if (e.button === 0 && !lower && bookClick(app.mouse)) return;
@@ -174,9 +197,10 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyH') { app.help = !app.help; return; }
   if (app.help) { if (e.code === 'Escape') app.help = false; return; } // nothing else while the help card is up
   if (app.mode === 'title') {
-    const pick = DIFFICULTIES.findIndex((_, i) => e.code === `Digit${i + 1}`);
-    if (pick >= 0) app.difficulty = pick;
-    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); startGame(numberParam('seed', randomSeed())); }
+    const pick = LANDS.findIndex((_, i) => e.code === `Digit${i + 1}`);
+    if (pick >= 0 && pick <= app.reached) app.land = pick; // any land reached so far
+    else if (pick >= 0) Sound.play('buzz');
+    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); startLand(app.land); }
     return;
   }
   if (SCROLL[e.code]) { e.preventDefault(); if (!app.keys.has(e.code)) { app.keys.add(e.code); app.lastScroll = 0; } }
@@ -184,8 +208,11 @@ window.addEventListener('keydown', (e) => {
   const power = POWERS.find((p) => e.code === `Digit${p.key}`);
   if (power && !app.world.over) arm(power.id);
   if (e.code === 'Escape') app.world.armed = null;
-  if (app.world.over && e.code === 'Enter') showTitle();
-  else if (app.world.over && e.code === 'KeyR') startGame(app.world.seed); // the same land again
+  if (app.world.over && e.code === 'Enter') { // on to the next land after a win, or back to the title
+    const won = app.world.over.winner === PLAYER;
+    if (won && app.land + 1 < LANDS.length) startLand(app.land + 1);
+    else showTitle();
+  } else if (app.world.over && e.code === 'KeyR') startLand(app.land); // this land again
 });
 window.addEventListener('keyup', (e) => app.keys.delete(e.code));
 
@@ -263,7 +290,8 @@ function frame(now) {
     if (title) app.world.events.length = 0; // the demo's battles make no sound
     else { playEvents(app.world); bleat(app.world, now); }
     renderGame(screen, app.world, now, app.fx, { hud: !title });
-    if (title) drawTitle(screen, app.difficulty, now);
+    if (!title) recordResult(app.world);
+    if (title) drawTitle(screen, app.land, app.reached, now);
     if (app.paused && !title && !app.help) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
     if (app.help) drawHelp(screen);
     const tuneHint = `H HELP   M MUSIC ${app.music ? 'ON' : 'OFF'}`;
@@ -283,10 +311,10 @@ function stillTitle() {
   for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(app.world);
   app.world.cam = clampCam(app.world.terrain, { u: 14, v: 15 });
   renderGame(screen, app.world, 1000, [], { hud: false });
-  drawTitle(screen, app.difficulty, 0);
+  drawTitle(screen, app.land, app.reached, 0);
 }
 function stillGame() {
-  startGame(numberParam('seed', SEED));
+  if (params.has('land')) startLand(numberParam('land', 1) - 1); else startGame(numberParam('seed', SEED));
   const w = app.world;
   if (params.has('cam')) { const [u, v] = params.get('cam').split(',').map(Number); w.cam = clampCam(w.terrain, { u, v }); }
   for (const step of (params.get('shape') || '').split(';').filter(Boolean)) {
@@ -318,6 +346,8 @@ if (params.has('still')) {
     document.title = 'STILL READY';
   } catch (err) { fail(err); }
 } else {
+  app.reached = loadReached();
+  app.land = app.reached;
   showTitle();
   musicRandomTune();
   requestAnimationFrame(frame);
