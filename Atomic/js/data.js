@@ -196,7 +196,7 @@ const LEVEL_CHARS = { 1: 1, 2: 2, 3: 3, h: 0.5, i: 1.5, j: 2.5 };
 const ROOM_INDEX = Object.fromEntries(ROOMS.map((r, i) => [r.id, i]));
 
 // Check the room tables once at load, so a typo fails loudly here instead of during a game.
-(function checkRooms() {
+function checkRooms() {
   const fail = (room, msg) => { throw new Error(`room "${room.id}": ${msg}`); };
   ROOMS.forEach((room) => {
     const H = room.height.length, W = room.height[0].length;
@@ -258,7 +258,8 @@ const ROOM_INDEX = Object.fromEntries(ROOMS.map((r, i) => [r.id, i]));
     const n = room.objects.join('').split('$').length - 1;
     if (n !== 1) fail(room, `should hold exactly one part, has ${n}`);
   }
-})();
+}
+checkRooms();
 
 // The tile just inside the room for a doorway on a given edge.
 function exitTile(room, dir, at) {

@@ -54,6 +54,10 @@ const ROOM_STYLE = {
   flooded: { ink: 'yellow', deco: ['pipes', 'shelf'] },
   furnace: { ink: 'green', deco: ['dial', 'pipes'] },
   depot: { ink: 'magenta', deco: ['dial', 'pipes'] },
+  // the rotation trial (trial.html)
+  turntable: { ink: 'cyan', deco: ['window', 'dial'] },
+  gallery: { ink: 'yellow', deco: ['pipes', 'shelf'] },
+  plinth: { ink: 'green', deco: ['window', 'vine'] },
 };
 // What the solid squares (#) in each room are dressed as; a room with several picks one per square.
 const PROPS = {
@@ -196,21 +200,51 @@ function wrap(str, width) {
 function formatTime(s) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
 // ---- the room's projection ----
+// The camera can look at a room from any of its four corners: app.rot quarter turns. A point on the room's map (x, y)
+// is first turned into the room as seen (u, v), where u runs down-right and v down-left on screen as x and y did
+// before, and then drawn with the one Filmation projection (Pv). P does both, so most drawing never knows about turns;
+// only what depends on which side faces you (the back walls, box faces, pit sides, sprites' facing) works in (u, v).
+const TURN = ['N', 'E', 'S', 'W'];
 function originFor(room) {
-  return { ox: Math.round(SW / 2 - (room.W - room.H) * HX / 2), oy: Math.round(PLAY_BOTTOM - 6 - (room.W + room.H) * HY) };
+  const rot = app.rot, VW = rot % 2 ? room.H : room.W, VH = rot % 2 ? room.W : room.H;
+  return { ox: Math.round(SW / 2 - (VW - VH) * HX / 2), oy: Math.round(PLAY_BOTTOM - 6 - (VW + VH) * HY), rot, W: room.W, H: room.H, VW, VH };
 }
-function P(o, x, y, z = 0) { return [fine(o.ox + (x - y) * HX), fine(o.oy + (x + y) * HY - z)]; }
-// a point on a wall: plane {fixed: 'x'|'y', at}, `along` the other axis in tiles, v pixels up
-function planePt(o, plane, along, v) { return plane.fixed === 'y' ? P(o, along, plane.at, v) : P(o, plane.at, along, v); }
+function toView(o, x, y) {
+  if (o.rot === 0) return [x, y];
+  if (o.rot === 1) return [o.H - y, x];
+  if (o.rot === 2) return [o.W - x, o.H - y];
+  return [y, o.W - x];
+}
+function viewTile(o, x, y) { const [u, v] = toView(o, x + 0.5, y + 0.5); return [Math.floor(u), Math.floor(v)]; }
+// the map square seen at (u, v)
+function mapTile(o, u, v) {
+  const a = u + 0.5, b = v + 0.5;
+  const [x, y] = o.rot === 0 ? [a, b] : o.rot === 1 ? [b, o.H - a] : o.rot === 2 ? [o.W - a, o.H - b] : [o.W - b, a];
+  return [Math.floor(x), Math.floor(y)];
+}
+// a box on the map, as seen: [u0, v0, u1, v1]
+function viewBox(o, x0, y0, x1, y1) {
+  const [a0, b0] = toView(o, x0, y0), [a1, b1] = toView(o, x1, y1);
+  return [Math.min(a0, a1), Math.min(b0, b1), Math.max(a0, a1), Math.max(b0, b1)];
+}
+const viewDir = (rot, dir) => TURN[(TURN.indexOf(dir) + rot) % 4];   // a compass direction, as seen
+const mapDir = (rot, dir) => TURN[(TURN.indexOf(dir) + 4 - rot) % 4]; // a direction on screen, on the map
+function Pv(o, u, v, z = 0) { return [fine(o.ox + (u - v) * HX), fine(o.oy + (u + v) * HY - z)]; }
+function P(o, x, y, z = 0) { const [u, v] = toView(o, x, y); return Pv(o, u, v, z); }
+// a point on a wall of the room as seen: plane {fixed: 'u'|'v', at}, `along` the other axis in tiles, v pixels up
+function planePt(o, plane, along, v) { return plane.fixed === 'v' ? Pv(o, along, plane.at, v) : Pv(o, plane.at, along, v); }
 
 // A box from (x0, y0) to (x1, y1) in tiles, z pixels up, h pixels tall. skin.left/right/top dress its faces.
 // A face comes as its four corners: top left, top right, bottom right, bottom left.
+// After a quarter turn the box's other pair of sides faces you, so the skins swap over.
 function box(o, x0, y0, x1, y1, z, h, skin = {}) {
-  const T = P(o, x0, y0, z + h), R = P(o, x1, y0, z + h), B = P(o, x1, y1, z + h), L = P(o, x0, y1, z + h);
-  const Rb = P(o, x1, y0, z), Bb = P(o, x1, y1, z), Lb = P(o, x0, y1, z);
+  const [u0, v0, u1, v1] = viewBox(o, x0, y0, x1, y1), turned = o.rot % 2 === 1;
+  const left = turned ? skin.right : skin.left, right = turned ? skin.left : skin.right;
+  const T = Pv(o, u0, v0, z + h), R = Pv(o, u1, v0, z + h), B = Pv(o, u1, v1, z + h), L = Pv(o, u0, v1, z + h);
+  const Rb = Pv(o, u1, v0, z), Bb = Pv(o, u1, v1, z), Lb = Pv(o, u0, v1, z);
   fill([T, R, Rb, Bb, Lb, L]);
-  if (skin.left) skin.left(L, B, Bb, Lb);
-  if (skin.right) skin.right(B, R, Rb, Bb);
+  if (left) left(L, B, Bb, Lb);
+  if (right) right(B, R, Rb, Bb);
   if (skin.top) skin.top(T, R, B, L);
   edges([T, R, B, L]); line(L, Lb); line(B, Bb); line(R, Rb); line(Lb, Bb); line(Bb, Rb);
 }
@@ -255,15 +289,27 @@ function drawArch(o, plane, at, base, inFront) {
   for (let i = 2; i <= 10; i += 2) line(inner[i], outer[i]); // the stones of the arch
   for (const v of [7, 14]) { line(planePt(o, plane, at - 0.45, base + v), planePt(o, plane, at - 0.12, base + v)); line(planePt(o, plane, at + 1.12, base + v), planePt(o, plane, at + 1.45, base + v)); }
 }
-const EXIT_PLANES = { N: (room) => ({ fixed: 'y', at: 0 }), W: (room) => ({ fixed: 'x', at: 0 }), S: (room) => ({ fixed: 'y', at: room.H }), E: (room) => ({ fixed: 'x', at: room.W }) };
+const EXIT_PLANES = { N: (o) => ({ fixed: 'v', at: 0 }), W: (o) => ({ fixed: 'u', at: 0 }), S: (o) => ({ fixed: 'v', at: o.VH }), E: (o) => ({ fixed: 'u', at: o.VW }) };
+// The room's doorways as seen: { N: {at, base}, ... } by the side of the screen they are on.
+function viewExits(o, room) {
+  const out = {};
+  for (const [dir, at] of Object.entries(room.spec.exits)) {
+    const [x, y] = exitTile(room.spec, dir, at), [u, v] = viewTile(o, x, y), side = viewDir(o.rot, dir);
+    out[side] = { at: side === 'N' || side === 'S' ? u : v, base: room.h[y][x] * LV };
+  }
+  return out;
+}
+// what hangs on each wall of the room: style.deco gives the north and west walls, and the other two copy them
+function decoFor(style, dir) { return { N: style.deco[0], W: style.deco[1], S: style.deco[0], E: style.deco[1] }[dir]; }
 
 function drawBackWalls(o, room, style, t) {
-  const W = room.W, H = room.H, k = 0.35;
-  const exitBase = (dir) => { const at = room.spec.exits[dir]; if (at === undefined) return 0; const [x, y] = exitTile(room.spec, dir, at); return room.h[y][x] * LV; };
+  const W = o.VW, H = o.VH, k = 0.35, exits = viewExits(o, room);
+  const exitBase = (side) => (exits[side] ? exits[side].base : 0);
   const WALL_H = Math.max(BASE_WALL_H, exitBase('N') + 34, exitBase('W') + 34); // tall enough for a raised doorway
+  const at = (side) => (exits[side] ? exits[side].at : undefined);
   const walls = [
-    { plane: { fixed: 'y', at: 0 }, len: W, exit: room.spec.exits.N, base: exitBase('N'), deco: style.deco[0] },
-    { plane: { fixed: 'x', at: 0 }, len: H, exit: room.spec.exits.W, base: exitBase('W'), deco: style.deco[1] },
+    { plane: { fixed: 'v', at: 0 }, len: W, exit: at('N'), base: exitBase('N'), deco: decoFor(style, mapDir(o.rot, 'N')) },
+    { plane: { fixed: 'u', at: 0 }, len: H, exit: at('W'), base: exitBase('W'), deco: decoFor(style, mapDir(o.rot, 'W')) },
   ];
   for (const w of walls) {
     const pt = (a, v) => planePt(o, w.plane, a, v);
@@ -283,12 +329,12 @@ function drawBackWalls(o, room, style, t) {
     } else console.warn(`room "${room.spec.id}": no free stretch of wall for its ${w.deco}`);
     if (w.exit !== undefined) drawArch(o, w.plane, w.exit, w.base, false);
   }
-  line(P(o, 0, 0, 0), P(o, 0, 0, WALL_H));
+  line(Pv(o, 0, 0, 0), Pv(o, 0, 0, WALL_H));
   // the tops of the walls, to show how thick they are, and their two cut ends
-  const capN = [P(o, 0, 0, WALL_H), P(o, W, 0, WALL_H), P(o, W, -k, WALL_H), P(o, -k, -k, WALL_H)];
-  const capW = [P(o, 0, H, WALL_H), P(o, 0, 0, WALL_H), P(o, -k, -k, WALL_H), P(o, -k, H, WALL_H)];
-  const endN = [P(o, W, 0, 0), P(o, W, 0, WALL_H), P(o, W, -k, WALL_H), P(o, W, -k, 0)];
-  const endW = [P(o, 0, H, 0), P(o, 0, H, WALL_H), P(o, -k, H, WALL_H), P(o, -k, H, 0)];
+  const capN = [Pv(o, 0, 0, WALL_H), Pv(o, W, 0, WALL_H), Pv(o, W, -k, WALL_H), Pv(o, -k, -k, WALL_H)];
+  const capW = [Pv(o, 0, H, WALL_H), Pv(o, 0, 0, WALL_H), Pv(o, -k, -k, WALL_H), Pv(o, -k, H, WALL_H)];
+  const endN = [Pv(o, W, 0, 0), Pv(o, W, 0, WALL_H), Pv(o, W, -k, WALL_H), Pv(o, W, -k, 0)];
+  const endW = [Pv(o, 0, H, 0), Pv(o, 0, H, WALL_H), Pv(o, -k, H, WALL_H), Pv(o, -k, H, 0)];
   for (const f of [capN, capW]) { fill(f, CHECK); edges(f); }
   for (const f of [endN, endW]) { fill(f); edges(f); }
 }
@@ -337,29 +383,32 @@ function drawDeco(o, plane, c, kind, t) {
 }
 
 function drawFloor(o, room) {
-  for (let y = 0; y <= room.H; y++) for (let x = 0; x <= room.W; x++) dot(...P(o, x, y));
-  const a = P(o, 0, room.H), b = P(o, room.W, room.H), c = P(o, room.W, 0), S = 4;
+  for (let v = 0; v <= o.VH; v++) for (let u = 0; u <= o.VW; u++) dot(...Pv(o, u, v));
+  const a = Pv(o, 0, o.VH), b = Pv(o, o.VW, o.VH), c = Pv(o, o.VW, 0), S = 4;
   fill([a, b, c, down(c, S), down(b, S), down(a, S)]);
   fill([down(a, 1), down(b, 1), down(c, 1), down(c, S - 1), down(b, S - 1), down(a, S - 1)], DOTS);
   polyline([a, b, c]); polyline([down(a, S), down(b, S), down(c, S)]);
   line(a, down(a, S)); line(b, down(b, S)); line(c, down(c, S));
 }
 
+// Drawn as seen: the far sides of the hole show their stonework going down into the dark.
 function drawPit(o, room, x, y, z) {
-  const T = P(o, x, y, z), R = P(o, x + 1, y, z), B = P(o, x + 1, y + 1, z), L = P(o, x, y + 1, z);
+  const [u, v] = viewTile(o, x, y);
+  const pitAt = (a, b) => { const [px, py] = mapTile(o, a, b); return room.pit[py][px]; };
+  const T = Pv(o, u, v, z), R = Pv(o, u + 1, v, z), B = Pv(o, u + 1, v + 1, z), L = Pv(o, u, v + 1, z);
   fill([T, R, B, L], HATCH);
-  const openLeft = x === 0 || !room.pit[y][x - 1], openRight = y === 0 || !room.pit[y - 1][x];
+  const openLeft = u === 0 || !pitAt(u - 1, v), openRight = v === 0 || !pitAt(u, v - 1);
   g.save(); path([T, R, B, L]); g.clip();
   for (const d of [3, 7, 12, 18]) {
-    if (openLeft) line(P(o, x, y + 1, z - d), P(o, x, y, z - d));
-    if (openRight) line(P(o, x, y, z - d), P(o, x + 1, y, z - d));
+    if (openLeft) line(Pv(o, u, v + 1, z - d), Pv(o, u, v, z - d));
+    if (openRight) line(Pv(o, u, v, z - d), Pv(o, u + 1, v, z - d));
   }
-  if (openLeft && openRight) line(T, P(o, x, y, z - 30));
+  if (openLeft && openRight) line(T, Pv(o, u, v, z - 30));
   g.restore();
   if (openRight) line(T, R);
   if (openLeft) line(L, T);
-  if (x + 1 >= room.W || !room.pit[y][x + 1]) line(R, B);
-  if (y + 1 >= room.H || !room.pit[y + 1][x]) line(B, L);
+  if (u + 1 >= o.VW || !pitAt(u + 1, v)) line(R, B);
+  if (v + 1 >= o.VH || !pitAt(u, v + 1)) line(B, L);
 }
 
 function inset(o, x, y, z, i) { return [P(o, x + i, y + i, z), P(o, x + 1 - i, y + i, z), P(o, x + 1 - i, y + 1 - i, z), P(o, x + i, y + 1 - i, z)]; }
@@ -478,7 +527,7 @@ function drawMover(room, o, m, t) {
     const floor = inPit ? b.top - 2.5 : room.h[m.y][m.x];
     g.save();
     if (inPit) { // the part below the floor shows only through the pit's opening
-      const L = P(o, m.x, m.y + 1, 0), B = P(o, m.x + 1, m.y + 1, 0), R = P(o, m.x + 1, m.y, 0);
+      const [u, v] = viewTile(o, m.x, m.y), L = Pv(o, u, v + 1, 0), B = Pv(o, u + 1, v + 1, 0), R = Pv(o, u + 1, v, 0);
       path([L, B, R, [R[0], -50], [L[0], -50]]); g.clip();
     }
     box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, floor * LV, (b.top - floor) * LV, { left: barred, right: barred, top: (T, R, B, L) => { line(lerp(T, R, 0.5), lerp(L, B, 0.5)); line(lerp(T, L, 0.5), lerp(R, B, 0.5)); } });
@@ -496,7 +545,8 @@ function drawMover(room, o, m, t) {
     const top = P(o, m.x + 0.5, m.y + 0.5, b.top * LV), rod = P(o, m.x + 0.5, m.y + 0.5, (room.h[m.y][m.x] + CRUSH_HEIGHT + 4) * LV);
     line(top, rod); line([top[0] + 1, top[1]], [rod[0] + 1, rod[1]]);
     box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, b.bottom * LV, LV, { left: bricks(5), right: bricks(5) });
-    const L = P(o, b.x0 + i, b.y1 - i, b.bottom * LV), Bt = P(o, b.x1 - i, b.y1 - i, b.bottom * LV), R = P(o, b.x1 - i, b.y0 + i, b.bottom * LV);
+    const [u0, v0, u1, v1] = viewBox(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i);
+    const L = Pv(o, u0, v1, b.bottom * LV), Bt = Pv(o, u1, v1, b.bottom * LV), R = Pv(o, u1, v0, b.bottom * LV);
     for (const [a, c] of [[L, Bt], [Bt, R]]) for (let k = 0; k < 4; k++) polyline([lerp(a, c, k / 4), down(lerp(a, c, (k + 0.5) / 4), 3), lerp(a, c, (k + 1) / 4)]); // teeth
   } else throw new Error(`drawMover: unknown moving block "${m.type}"`);
 }
@@ -562,7 +612,8 @@ function drawRobot(room, o, r, t) {
   const v = robotView(r);
   const level = room.h[r.y][r.x];
   const [cx, cy] = P(o, v.x + 0.5, v.y + 0.5, level * LV);
-  blit(SPR.robot[Math.floor(t * 4) % 2], cx, cy + 2, r.dir === 'W' || r.dir === 'S');
+  const seen = viewDir(o.rot, r.dir);
+  blit(SPR.robot[Math.floor(t * 4) % 2], cx, cy + 2, seen === 'W' || seen === 'S');
 }
 
 function drawHero(game, o) {
@@ -571,7 +622,7 @@ function drawHero(game, o) {
   const ground = standLevel(game, room, f.x, f.y, f.z);
   if (f.air && ground > NOTHING && f.z - ground > 0.2) { const [gx, gy] = P(o, f.x, f.y, ground * LV); dot(gx - 2, gy); dot(gx, gy + 1); dot(gx + 2, gy); }
   const [sx, sy] = P(o, f.x, f.y, f.z * LV);
-  const face = game.hero.face, back = face === 'N' || face === 'W', flip = face === 'S' || face === 'W';
+  const face = viewDir(o.rot, game.hero.face), back = face === 'N' || face === 'W', flip = face === 'S' || face === 'W';
   const frame = f.air ? 1 : Math.floor(f.walk / 0.275) % 2;
   blit((back ? SPR.heroBack : SPR.heroFront)[frame], sx, sy + 2, flip);
 }
@@ -581,22 +632,42 @@ function renderRoom(game, t) {
   coilTops.length = 0;
   drawBackWalls(o, room, style, t);
   drawFloor(o, room);
+  // painter's order: the far squares first, by how far down the screen they are as seen
+  const depth = (x, y) => { const [u, v] = viewTile(o, x, y); return u + v; };
   const items = [];
-  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) items.push({ d: x + y, k: 0, fn: () => drawTile(game, room, o, x, y, t) });
-  for (const r of room.robots) items.push({ d: Math.max(r.x + r.y, r.px + r.py), k: 1, fn: () => drawRobot(room, o, r, t) });
-  for (const m of room.movers) if (m.box) items.push({ d: Math.floor(m.box.x1 - 0.01) + Math.floor(m.box.y1 - 0.01), k: 1, fn: () => drawMover(room, o, m, t) });
+  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) items.push({ d: depth(x, y), k: 0, fn: () => drawTile(game, room, o, x, y, t) });
+  for (const r of room.robots) items.push({ d: Math.max(depth(r.x, r.y), depth(r.px, r.py)), k: 1, fn: () => drawRobot(room, o, r, t) });
+  for (const m of room.movers) {
+    if (!m.box) continue;
+    const [, , u1, v1] = viewBox(o, m.box.x0, m.box.y0, m.box.x1, m.box.y1);
+    items.push({ d: Math.floor(u1 - 0.01) + Math.floor(v1 - 0.01), k: 1, fn: () => drawMover(room, o, m, t) });
+  }
   const f = app.free, under = tilesUnder(f.x, f.y, RADIUS);
-  items.push({ d: Math.max(...under.map(([x, y]) => x + y)), k: 2, fn: () => drawHero(game, o) });
+  items.push({ d: Math.max(...under.map(([x, y]) => depth(x, y))), k: 2, fn: () => drawHero(game, o) });
   items.sort((a, b) => a.d - b.d || a.k - b.k);
   for (const it of items) it.fn();
-  for (const dir of ['S', 'E']) {
-    const at = room.spec.exits[dir];
-    if (at === undefined) continue;
-    const [ex, ey] = exitTile(room.spec, dir, at);
-    drawArch(o, EXIT_PLANES[dir](room), at, room.h[ey][ex] * LV, true);
-  }
+  const exits = viewExits(o, room);
+  for (const side of ['S', 'E']) if (exits[side]) drawArch(o, EXIT_PLANES[side](o), exits[side].at, exits[side].base, true);
   drawCoilSparks(t);
+  drawCompass(o);
   for (const s of app.sparks) { dot(s.x, s.y); if (s.life > 12) { dot(s.x - 1, s.y); dot(s.x + 1, s.y); dot(s.x, s.y - 1); dot(s.x, s.y + 1); } }
+}
+
+// A compass in the top left corner, laid flat on the floor like the room, with north marked, so you can tell which
+// way the room has been turned.
+function drawCompass(o) {
+  const cx = 24, cy = 36, rx = 14, ry = 7;
+  const tip = (dir, k) => { const [du, dv] = DIRS[viewDir(o.rot, dir)]; return [cx + (du - dv) * rx * k, cy + (du + dv) * ry * k]; };
+  const disc = ring(cx, cy, rx, ry, 20);
+  fill(disc); edges(disc);
+  for (const d of TURN) dot(...tip(d, 0.72));
+  const n = tip('N', 0.72), s = tip('S', 0.72);
+  const side = [-(n[1] - cy) * 0.5, (n[0] - cx) * 0.12]; // across the needle
+  fill([n, [cx + side[0], cy + side[1]], [cx - side[0], cy - side[1]]], '#fff');
+  edges([s, [cx + side[0], cy + side[1]], [cx - side[0], cy - side[1]]]);
+  const [lx, ly] = tip('N', 1.45);
+  text('N', Math.round(lx - 2), Math.round(ly - 3));
+  paint(0, 2, 6, 5, 'white');
 }
 
 // ---- the panel along the bottom ----
@@ -650,6 +721,7 @@ function drawTitle(t) {
   paint(0, 17, 32, 3, 'cyan');
   paint(0, 21, 32, 1, app.tick % 50 < 32 ? 'white' : 'black');
   centred('ATOMIC CASTLE', 17, 2);
+  if (typeof TRIAL_ROOMS !== 'undefined') centred('THE ROTATION TRIAL', 34);
   for (const [sx, sy] of [[20, 50], [70, 60], [200, 48], [236, 80], [40, 110], [222, 120], [110, 44], [160, 64]]) dot(sx, sy);
   const flame = Math.floor(t * 10) % 2 + 1;
   picture(rocketCanvas(PARTS.length, flame), 92, 52, 40, 80);
@@ -661,7 +733,7 @@ function drawTitle(t) {
   centred('PARTS. FIND THEM BEFORE THE SAUCERS', 146);
   centred('LAND. ROBOTS, STEAM AND PITS ARE DEADLY.', 154);
   centred('PRESS SPACE TO START', 169);
-  centred('ARROWS WALK SPACE JUMP R RESET P PAUSE', 182);
+  centred('ARROWS WALK SPACE JUMP Z X TURN P PAUSE', 182);
   paint(0, 22, 32, 2, 'green');
   if (app.best) { paint(24, 0, 8, 1, 'green'); text(`BEST ${formatTime(app.best)}`, 194, 1); }
 }
@@ -704,6 +776,7 @@ const app = {
   free: { x: 0, y: 0, z: 0, vz: 0, air: false, jumpDir: null, jumpQueued: 0, pushT: 0, walk: 0 }, // the hero, moving freely (film-move.js)
   slide: null, reveal: SH, border: 'black', borderTimer: 0, loading: 0, sparks: [], pendingEnd: null, endTimer: 0,
   best: loadBest(), newBest: false, fatal: null,
+  rot: 0, // quarter turns of the camera around the room (Z and X)
 };
 
 function startGame() {
@@ -711,7 +784,7 @@ function startGame() {
   initMovers(app.game);
   app.game.lives = LIVES; app.game.deaths = 0; app.dying = 0;
   app.mode = 'play'; app.held = []; app.free.jumpQueued = 0; app.rocketWait = 0; app.slide = null; app.sparks = [];
-  app.pendingEnd = null; app.newBest = false; app.caption = null; app.loading = 50;
+  app.pendingEnd = null; app.newBest = false; app.caption = null; app.loading = 50; app.rot = 0;
   snapHero(app.game);
   processEvents(app.game);
 }
@@ -783,12 +856,23 @@ function finishGame(kind) {
   }
 }
 
+// The arrows walk up, right, down and left as seen, whichever way the room is turned; app.held keeps map directions.
 const KEY_DIRS = { ArrowUp: 'N', ArrowRight: 'E', ArrowDown: 'S', ArrowLeft: 'W', w: 'N', d: 'E', s: 'S', a: 'W', W: 'N', D: 'E', S: 'S', A: 'W' };
+// Turn the camera a quarter turn (X clockwise, Z anticlockwise). Held arrows keep meaning the same way on screen.
+function turnRoom(by) {
+  const before = app.rot;
+  app.rot = (app.rot + by + 4) % 4;
+  app.held = app.held.map((d) => mapDir(app.rot, viewDir(before, d)));
+  app.reveal = PLAY_TOP;
+  Sound.play('room');
+}
 function onKeyDown(key) {
   Sound.init();
   if (app.mode === 'title') { if (key === ' ' || key === 'Enter' || key === '0') { Sound.play('choose'); startGame(); return true; } }
   else if (app.mode === 'play') {
-    if (key in KEY_DIRS) { const d = KEY_DIRS[key]; app.held = app.held.filter((x) => x !== d); app.held.push(d); return true; }
+    if (key === 'z' || key === 'Z') { turnRoom(-1); return true; }
+    if (key === 'x' || key === 'X') { turnRoom(1); return true; }
+    if (key in KEY_DIRS) { const d = mapDir(app.rot, KEY_DIRS[key]); app.held = app.held.filter((x) => x !== d); app.held.push(d); return true; }
     if (key === ' ') { app.free.jumpQueued = 0.25; return true; }
     if (key === 'r' || key === 'R') { resetRoom(app.game); processEvents(app.game); return true; }
     if (key === 'p' || key === 'P' || key === 'Escape') { app.mode = 'paused'; app.held = []; return true; }
@@ -801,7 +885,7 @@ function onKeyDown(key) {
   }
   return false;
 }
-function onKeyUp(key) { if (key in KEY_DIRS) app.held = app.held.filter((x) => x !== KEY_DIRS[key]); }
+function onKeyUp(key) { if (key in KEY_DIRS) { const d = mapDir(app.rot, KEY_DIRS[key]); app.held = app.held.filter((x) => x !== d); } }
 
 function stepGame(dt) {
   app.tick++;
@@ -843,13 +927,14 @@ function render() {
     drawCaption(game);
     drawPanel(game, t);
     if (app.mode === 'paused') {
-      g.fillStyle = '#000'; g.fillRect(40, 60, 176, 52);
-      edges([[40, 60], [215, 60], [215, 111], [40, 111]]);
+      g.fillStyle = '#000'; g.fillRect(40, 60, 176, 64);
+      edges([[40, 60], [215, 60], [215, 123], [40, 123]]);
       centred('PAUSED', 66);
       text('P  CARRY ON', 56, 80);
       text(`R  RESET THIS ROOM (-${RESET_PENALTY}S)`, 56, 90);
       text('Q  QUIT TO THE TITLE', 56, 100);
-      paint(5, 7, 23, 7, 'white');
+      text('Z X  TURN THE ROOM', 56, 112);
+      paint(5, 7, 23, 9, 'white');
     }
   }
   present();
@@ -912,6 +997,7 @@ if (params.has('still')) {
     if (params.has('carry')) game.hero.carry = params.get('carry').split(',');
     if (params.has('delivered')) game.delivered = params.get('delivered').split(',');
     snapHero(game); say(room.spec.caption, 99999);
+    app.rot = Number(params.get('rot') || 0);
     if (scene === 'paused') app.mode = 'paused';
     if (scene === 'win' || scene === 'lose') { app.mode = scene; app.endTimer = Number(params.get('t') || 80); if (scene === 'win') game.delivered = PARTS.map((p) => p.id); }
   }
