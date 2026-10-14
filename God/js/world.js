@@ -282,7 +282,8 @@ function stepWalker(world, w) {
     w.pilgrim = w.pilgrim + 1 < line.length ? w.pilgrim + 1 : 0; // or, at the last, they are home
     if (!w.pilgrim) { w.arrived = true; event(world, 'arrived', { tribe: w.tribe, u: w.tu, v: w.tv }); }
   }
-  if (!w.pilgrim && !w.arrived && line[0] && w.tu === line[0].u && w.tv === line[0].v) { w.gathered = true; return; } // at the hearth: gather
+  const hearth = hearthOf(world, w.tribe);
+  if (!w.pilgrim && !w.arrived && hearth && w.tu === hearth.u && w.tv === hearth.v) { w.gathered = true; return; } // at the hearth: gather
   if (w.pilgrim || stonePull(world, w)) { // on the way to a stone: no settling or moving in on the road
     const next = nextTile(world, w);
     if (next) { w.from = { u: w.tu, v: w.tv }; w.tu = next.u; w.tv = next.v; }

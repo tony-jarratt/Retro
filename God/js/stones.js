@@ -30,20 +30,21 @@ function raiseStone(world, tribe, u, v) {
   return { ok: true };
 }
 
-// Take a stone out of a god's line; `why` is 'lowered' (by its god) or 'toppled'. Pilgrims on their way to a later
-// stone carry on along the shortened line; if the hearth goes, its gathering scatters.
+// Take a stone out of a god's line; `why` is 'lowered' (by its god) or 'toppled'. A toppled stone lies where it fell.
+// If it was the hearth, the whole line comes down with it: its gathering scatters, its pilgrims are just walkers again,
+// and the god starts a new line from scratch. Otherwise pilgrims bound for a later stone carry on along the shortened line.
 function removeStone(world, tribe, index, why) {
-  const line = world.stones[tribe], gone = line[index], t = world.terrain;
-  if (!gone) throw new RulesError('no-stone', `tribe ${tribe} has no stone ${index} to remove`);
-  line.splice(index, 1);
-  if (why !== 'lowered' && !isWater(t, gone.u, gone.v)) t.f[gone.v * t.n + gone.u] = tribe === PLAYER ? FEATURE.fallenHead : FEATURE.fallenArch;
+  const line = world.stones[tribe], t = world.terrain;
+  if (!line[index]) throw new RulesError('no-stone', `tribe ${tribe} has no stone ${index} to remove`);
+  const gone = index === 0 ? line.splice(0) : line.splice(index, 1);
+  for (const st of gone) if (why !== 'lowered' && !isWater(t, st.u, st.v)) t.f[st.v * t.n + st.u] = tribe === PLAYER ? FEATURE.fallenHead : FEATURE.fallenArch;
   for (const w of world.walkers) {
     if (w.tribe !== tribe) continue;
-    if (index === 0 && w.gathered) w.gathered = false;
+    if (index === 0) { w.gathered = false; w.pilgrim = 0; continue; }
     if (w.pilgrim > index) w.pilgrim--;
     if (w.pilgrim >= line.length) w.pilgrim = 0; // the line ends before their stone now: they are home
   }
-  event(world, why === 'lowered' ? 'lowered' : 'topple', { tribe, u: gone.u, v: gone.v });
+  event(world, why === 'lowered' ? 'lowered' : 'topple', { tribe, u: gone[0].u, v: gone[0].v, hearth: index === 0, count: gone.length });
 }
 function lowerStone(world, tribe, u, v) {
   const at = stoneAt(world, u, v);
@@ -68,7 +69,7 @@ function stepStones(world) {
       const raided = world.walkers.some((w) => w.tribe !== tribe && Math.floor(w.x) === s.u && Math.floor(w.y) === s.v);
       if (isWater(t, s.u, s.v) || raided) removeStone(world, tribe, i, 'toppled');
     }
-    if (world.stones[tribe].length < 2) continue; // a hearth alone: the gathering waits
+    if (world.stones[tribe].length < 2 || !hearthOf(world, tribe)) continue; // a hearth alone (or none): no one sets out
     for (const w of world.walkers) {
       if (w.tribe === tribe && w.gathered && w.strength >= PILGRIM_MASS) {
         w.gathered = false; w.pilgrim = 1; w.from = null;
@@ -84,7 +85,7 @@ function stonePull(world, w) {
   if (world.call) return { target: world.call, weight: 16 }; // the Call of the Stones: everyone goes
   const line = world.stones[w.tribe];
   if (w.pilgrim) return line[w.pilgrim] ? { target: line[w.pilgrim], weight: 14 } : null;
-  const hearth = line[0];
+  const hearth = hearthOf(world, w.tribe);
   if (hearth && !w.arrived && gap(hearth, { u: w.tu, v: w.tv }) <= GATHER_RADIUS) return { target: hearth, weight: 12 };
   return null;
 }

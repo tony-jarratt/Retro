@@ -109,7 +109,7 @@ function aiStones(world, tribe, pair, joined) {
   const me = world.tribes[tribe], line = world.stones[tribe];
   if (world.tick < world.rules.grace || me.manna < STONE_COST) return false;
   const raise = (spot) => spot && castPower(world, tribe, 'stone', spot.u, spot.v).ok;
-  if (!line.length) {
+  if (!line.length) { // a hearth to start with (and to start again, when its line has fallen)
     if (me.manna < world.rules.bridgeManna) return false; // it waits until it is rich
     const big = world.houses.filter((h) => h.tribe === tribe).sort((a, b) => b.level - a.level || b.pop - a.pop)[0];
     return raise(freeTileNear(world, big.u + 1, big.v + 1));

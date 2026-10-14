@@ -16,12 +16,12 @@ check('ruins: a razed house leaves rubble that nobody can build on until the lan
 
 check('ruins: a toppled stone lies where it fell, a head or an arch; one taken down by its god leaves nothing', () => {
   const w = emptyWorld();
-  raiseStone(w, PLAYER, 5, 5); raiseStone(w, RIVAL, 15, 15); raiseStone(w, PLAYER, 8, 8);
-  toppleStonesAt(w, [{ u: 5, v: 5 }, { u: 15, v: 15 }]);
-  eq([featureAt(w.terrain, 5, 5), featureAt(w.terrain, 15, 15)], [FEATURE.fallenHead, FEATURE.fallenArch]);
-  lowerStone(w, PLAYER, 8, 8);
-  eq(featureAt(w.terrain, 8, 8), FEATURE.none);
-  eq(raiseStone(w, PLAYER, 5, 5), { ok: true }, 'a stone can be raised again where one fell');
+  raiseStone(w, PLAYER, 5, 5); raiseStone(w, PLAYER, 8, 8); raiseStone(w, PLAYER, 11, 11); raiseStone(w, RIVAL, 15, 15);
+  toppleStonesAt(w, [{ u: 8, v: 8 }, { u: 15, v: 15 }]);
+  eq([featureAt(w.terrain, 8, 8), featureAt(w.terrain, 15, 15)], [FEATURE.fallenHead, FEATURE.fallenArch]);
+  lowerStone(w, PLAYER, 11, 11);
+  eq(featureAt(w.terrain, 11, 11), FEATURE.none);
+  eq(raiseStone(w, PLAYER, 8, 8), { ok: true }, 'a stone can be raised again where one fell');
 });
 
 check('the call: refused while the lands are apart; once joined it empties every house and ends in one battle', () => {

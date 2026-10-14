@@ -122,7 +122,10 @@ grow, while a rival god does the same.
     way over land by shortest path, so it uses any bridge, and waits at the shore if there's none. At the last
     stone it fights a foe within 5 squares, or settles a new village.
   - **Toppling:** a stone topples when a rival walker reaches it, when a quake or volcano covers it, or when the
-    sea does. The line closes up behind it. If the hearth falls, its gathering scatters.
+    sea does. The line closes up behind a fallen waystone. If the hearth falls, the whole line falls with it
+    (owner's call): every stone leaves a fallen head or arch, the gathering scatters, pilgrims become ordinary
+    walkers, and the god starts a new line from scratch. Taking down your own hearth clears your whole line the
+    same way, but leaves no rubble.
   - **The dark god** lays the same kind of line instead of the old hidden march. After the grace period it
     raises a hearth by its biggest house, bridges the strait, then places a waystone on its bridge and an end
     stone by your nearest house. It moves the end stone if your houses there are gone.

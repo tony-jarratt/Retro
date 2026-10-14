@@ -16,8 +16,10 @@ check('stones: raised in order at a cost, at most six, never in the sea or on an
   eq(w.stones[PLAYER].map((s) => [s.u, s.v]).slice(0, 3), [[5, 5], [6, 8], [7, 8]], 'the line is the order raised');
   eq(castPower(makeWorld(SEED, { people: false, manna: 99 }), PLAYER, 'stone', 2, 2), { ok: false, reason: 'sea' });
   eq(lowerStone(w, RIVAL, 5, 5), { ok: false, reason: 'not-yours' });
+  eq(lowerStone(w, PLAYER, 6, 8), { ok: true });
+  eq(w.stones[PLAYER].length, MAX_STONES - 1, 'a waystone taken down: the rest stand');
   eq(lowerStone(w, PLAYER, 5, 5), { ok: true });
-  eq(w.stones[PLAYER][0], { id: w.stones[PLAYER][0].id, u: 6, v: 8 }, 'the next stone is the hearth now');
+  eq(w.stones[PLAYER].length, 0, 'the hearth taken down: the whole line comes down');
 });
 
 check('stones: walkers near the hearth gather into one band there, and neither settle nor weaken while they wait', () => {
@@ -95,12 +97,15 @@ check('stones: the enemy reaching a stone, or a quake over it, topples it; the l
   eq(band.pilgrim, 0, 'the line ends before their stone: they are home');
 });
 
-check('stones: if the hearth falls, its gathering scatters', () => {
+check('stones: if the hearth falls the whole line falls with it: the gathering scatters, pilgrims are walkers again', () => {
   const w = stoneWorld();
-  raiseStone(w, PLAYER, 8, 8); raiseStone(w, PLAYER, 16, 8);
-  const g = addWalker(w, PLAYER, 8.5, 8.5, 9);
-  g.gathered = true;
+  raiseStone(w, PLAYER, 8, 8); raiseStone(w, PLAYER, 16, 8); raiseStone(w, PLAYER, 16, 16);
+  const g = addWalker(w, PLAYER, 8.5, 8.5, 9), p = addWalker(w, PLAYER, 12.5, 8.5, 20);
+  g.gathered = true; p.pilgrim = 1;
   addWalker(w, RIVAL, 8.5, 8.5, 1);
   stepStones(w);
-  eq([g.gathered, w.stones[PLAYER].length], [false, 1]);
+  eq([g.gathered, p.pilgrim, w.stones[PLAYER].length], [false, 0, 0]);
+  eq([featureAt(w.terrain, 8, 8), featureAt(w.terrain, 16, 8), featureAt(w.terrain, 16, 16)], [FEATURE.fallenHead, FEATURE.fallenHead, FEATURE.fallenHead]);
+  eq(raiseStone(w, PLAYER, 10, 10), { ok: true }, 'a new line can begin anywhere');
+  eq(hearthOf(w, PLAYER), { id: w.stones[PLAYER][0].id, u: 10, v: 10 });
 });

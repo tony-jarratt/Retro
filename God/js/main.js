@@ -322,7 +322,11 @@ function playEvents(world) {
   if (world.events.some((e) => e.type === 'razed' && e.loser === PLAYER)) say(world, 'YOUR PEOPLE ARE UNDER ATTACK');
   for (const e of world.events) if (e.type === 'call' && e.tribe === PLAYER) say(world, 'THE CALL OF THE STONES: EVERYONE TO THE LAST BATTLE', 120);
   for (const e of world.events) if (e.type === 'pilgrims') say(world, e.tribe === PLAYER ? `YOUR PILGRIMS SET OUT, ${e.strength} STRONG` : `THE DARK GOD'S PILGRIMS SET OUT, ${e.strength} STRONG`);
-  for (const e of world.events) if (e.type === 'topple') say(world, e.tribe === PLAYER ? 'ONE OF YOUR STONES HAS FALLEN' : 'A DARK STONE HAS FALLEN');
+  for (const e of world.events) if (e.type === 'topple') {
+    const all = e.hearth && e.count > 1;
+    say(world, e.tribe === PLAYER ? (all ? 'YOUR HEARTH HAS FALLEN, AND YOUR LINE WITH IT' : 'ONE OF YOUR STONES HAS FALLEN')
+      : all ? "THE DARK GOD'S LINE HAS FALLEN" : 'A DARK STONE HAS FALLEN');
+  }
   for (const e of world.events) if (e.type === 'armed') say(world, e.tribe === PLAYER ? `YOUR PEOPLE NOW FIGHT WITH ${WEAPONS[e.weapons]}` : `THE DARK GOD'S PEOPLE NOW HAVE ${WEAPONS[e.weapons]}`);
   world.events.length = 0;
 }
