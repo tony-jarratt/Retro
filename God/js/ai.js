@@ -22,7 +22,21 @@ function judgeLand(world, tribe, terrain, base) {
   }
   const minesLost = world.tribes[tribe].mines - mines(world).filter((m) => m.house && m.house.tribe === tribe).length;
   world.terrain = real;
-  return { gain: score - base, broken, minesLost };
+  return { gain: score - base.flat, broken, minesLost, levelled: base.uneven - unevenness(world, tribe, terrain) };
+}
+// How far the ground round a tribe's houses is from each house's own height: the sum, over the corners of each
+// house's 5 x 5 patch, of how many steps each is above or below. Levelling a patch takes many small moves that
+// add no flat squares at first; this rewards each of them, so the dark god works steadily towards a castle.
+function unevenness(world, tribe, terrain) {
+  let sum = 0;
+  for (const h of world.houses) {
+    if (h.tribe !== tribe) continue;
+    const level = tileCorners(world.terrain, h.u, h.v)[0]; // its height before the move
+    for (let v = h.v - 2; v <= h.v + 3; v++) for (let u = h.u - 2; u <= h.u + 3; u++) {
+      if (u >= 0 && v >= 0 && u <= terrain.n && v <= terrain.n) sum += Math.abs(terrain.h[v * terrain.w + u] - level);
+    }
+  }
+  return sum;
 }
 
 // Whether there is a way over land (no sea tiles, diagonal steps allowed) between two tiles.
@@ -116,13 +130,15 @@ function aiStones(world, tribe, pair, joined) {
   }
   if (!joined || !pair) return false;
   // Once the land joins, it only adds stones: each nearer the rival than its end stone, as far as its reach goes.
-  // When it can get no nearer, its pilgrims walk the line and fight or settle there, and their villages carry its
-  // reach on for the next stone.
   const end = line[line.length - 1], dist = (p) => Math.hypot(p.u - pair[1].u, p.v - pair[1].v);
-  if (line.length >= 2 && world.houses.some((h) => h.tribe !== tribe && gap(h, end) <= SCENT)) return false; // the line is laid
-  if (line.length >= MAX_STONES) return false;
-  const spot = reachTileToward(world, tribe, pair[1]);
-  return !!spot && dist(spot) < dist(end) - 1 && raise(spot);
+  if (line.length >= 2 && world.houses.some((h) => h.tribe !== tribe && gap(h, end) <= RALLY_RANGE)) return false; // the line is laid
+  const spot = line.length < MAX_STONES ? reachTileToward(world, tribe, pair[1]) : null;
+  if (spot && dist(spot) < dist(end) - 1) return raise(spot);
+  // It can reach no nearer. If an army holds the end stone, take the stone down: the army settles there, and the
+  // new village carries its reach on for the next stone.
+  const army = world.walkers.find((w) => w.tribe === tribe && w.rally);
+  if (line.length >= 2 && army && army.strength >= PILGRIM_MASS) return lowerStone(world, tribe, end.u, end.v).ok;
+  return false;
 }
 
 function aiThink(world, tribe) {
@@ -148,8 +164,8 @@ function aiThink(world, tribe) {
     if (spot && line.every((st) => nearer(spot) < nearer(st) - 1) && me.manna >= STONE_COST && castPower(world, tribe, 'stone', spot.u, spot.v).ok) return { stone: true };
   }
   const t = world.terrain;
-  let base = 0;
-  for (const h of mine) base += flatScore(world, h);
+  const base = { flat: 0, uneven: unevenness(world, tribe, t) };
+  for (const h of mine) base.flat += flatScore(world, h);
   const corners = new Map(); // corner index -> [u, v]
   for (const h of world.rng.shuffle(mine).slice(0, AI_HOUSES_PER_THINK)) {
     for (let v = h.v - AI_REACH; v <= h.v + 1 + AI_REACH; v++) for (let u = h.u - AI_REACH; u <= h.u + 1 + AI_REACH; u++) {
@@ -160,7 +176,7 @@ function aiThink(world, tribe) {
   for (const [u, v] of corners.values()) for (const dir of [1, -1]) {
     const r = reshape(t, u, v, dir);
     if (!r.ok || costOf(r) > me.manna) continue;
-    const j = judgeLand(world, tribe, r.terrain, base), value = j.gain - 10 * j.broken - 8 * j.minesLost;
+    const j = judgeLand(world, tribe, r.terrain, base), value = j.gain + 0.4 * j.levelled - 10 * j.broken - 8 * j.minesLost;
     if (value <= 0) continue;
     const worth = value / costOf(r);
     if (!best || worth > best.worth) best = { u, v, dir, worth };

@@ -38,7 +38,7 @@ check('people: a walker settles on flat ground with room, and not on a slope or 
   bump(w, 6, 6);
   for (const [u, v, ok] of [[5, 5, false], [10, 10, true]]) eq(canSettle(w, u, v), ok, `(${u}, ${v})`);
   addHouse(w, PLAYER, 10, 10, 1);
-  eq([canSettle(w, 12, 10), canSettle(w, 13, 10)], [false, true], 'HOUSE_GAP');
+  eq([canSettle(w, 14, 10), canSettle(w, 15, 10)], [false, true], 'HOUSE_GAP: not on a neighbour\'s patch');
   const walker = addWalker(w, PLAYER, 15.5, 15.5, 3);
   stepWorld(w);
   eq(w.walkers.length, 0, 'settled where it stood');
@@ -50,14 +50,14 @@ check('people: a walker settles on flat ground with room, and not on a slope or 
 
 check('people: a walker too big for its new house leaves the rest walking', () => {
   const w = emptyWorld();
-  addHouse(w, PLAYER, 10, 10, 1); addHouse(w, PLAYER, 10, 16, 1); addHouse(w, PLAYER, 16, 13, 1);
-  addWalker(w, PLAYER, 13.5, 13.5, 30);
+  addHouse(w, PLAYER, 5, 5, 1); addHouse(w, PLAYER, 5, 21, 1); addHouse(w, PLAYER, 21, 13, 1);
+  addWalker(w, PLAYER, 13.5, 13.5, 80); // more than even a castle holds
   stepWorld(w);
   const h = houseAt(w, 13, 13);
   assert(h, 'settled');
   // the rest walk on (and the house, full at once, sends half of its own out too)
   assert(w.walkers.length >= 1, 'some walk on');
-  eq(w.walkers.reduce((n, x) => n + x.strength, 0) + Math.floor(h.pop), 30, 'nobody lost');
+  eq(w.walkers.reduce((n, x) => n + x.strength, 0) + Math.floor(h.pop), 80, 'nobody lost');
   assert(h.pop <= CAP[h.level - 1], 'the house is not over its cap');
 });
 
@@ -116,7 +116,7 @@ check('people: left alone for ten minutes a tribe settles its island and stays s
   const w = makeWorld(SEED, { ai: [false, false] });
   for (let i = 0; i < 10 * 60 * 20; i++) stepWorld(w);
   const houses = w.houses.filter((h) => h.tribe === PLAYER).length;
-  assert(houses >= 3, `it spread (${houses} houses); trees and rocks leave less room than bare land`);
+  assert(houses >= 2, `it spread (${houses} houses); houses keep their distance, so a tribe nobody helps stays small`);
   assert(w.houses.some((h) => h.level >= 3), 'something better than a hut');
   assert(population(w, PLAYER) < 1000, `it did not run away (${population(w, PLAYER)} people)`);
 });
@@ -136,4 +136,21 @@ check('sheep: a flock grazes on dry land for ten minutes, and the sea takes any 
   stepWorld(w);
   eq(w.sheep.includes(sh), false, 'drowned');
   assert(w.events.some((e) => e.type === 'baa' && e.drowned), 'with a last bleat');
+});
+
+check('people: a band leaving a house roams out a random distance before it looks to settle', () => {
+  const w = emptyWorld(2, 40);
+  const h = addHouse(w, PLAYER, 20, 20, 1);
+  const dists = [];
+  for (let i = 0; i < 40; i++) dists.push(newRoam(w, 20.5, 20.5).dist);
+  assert(Math.min(...dists) >= ROAM_MIN && Math.max(...dists) <= ROAM_MAX, `within bounds: ${Math.min(...dists)}..${Math.max(...dists)}`);
+  assert(new Set(dists).size > 3, 'it varies');
+  h.pop = CAP[h.level - 1] - 0.01;
+  stepWorld(w);
+  const band = w.walkers[0];
+  assert(band && band.roam, 'the band sets out roaming');
+  const far = band.roam.dist;
+  for (let i = 0; i < 2000 && w.walkers.includes(band) && !w.houses.some((x) => x !== h); i++) stepWorld(w);
+  const settled = w.houses.find((x) => x !== h);
+  assert(settled && gap(settled, h) >= Math.min(far, ROAM_MIN), `it settled ${settled && gap(settled, h)} squares away (roamed ${far})`);
 });

@@ -47,9 +47,9 @@ check('rival: a walker senses the other tribe nearby, and heads for it', () => {
   eq(nearestFoe(w, far), null, 'too far to sense');
 });
 
-check('rival: the dark god only makes moves it can pay for, and gains flat ground by them', () => {
+check('rival: the dark god only makes moves it can pay for, and each gains flat ground or levels its land', () => {
   const w = makeWorld(SEED, { ai: [false, false] });
-  const own = () => w.houses.filter((h) => h.tribe === RIVAL).reduce((n, h) => n + flatScore(w, h), 0);
+  const own = () => w.houses.filter((h) => h.tribe === RIVAL).reduce((n, h) => n + flatScore(w, h), 0) * 100 - unevenness(w, RIVAL, w.terrain);
   let moves = 0;
   for (let i = 0; i < 200; i++) {
     const before = own(), r = aiThink(w, RIVAL);

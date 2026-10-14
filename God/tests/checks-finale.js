@@ -92,3 +92,15 @@ check('seasons: they turn every SEASON_TICKS, starting in spring, and a sandbox 
   eq(seasonOf(w).name, 'SPRING', 'a year goes round');
   eq(seasonOf(emptyWorld()).name, 'NONE');
 });
+
+check('the call: nobody stops to gather at a hearth on the way to the last battle', () => {
+  const w = emptyWorld(2, 30);
+  w.contest = true;
+  w.tribes[RIVAL].manna = 999;
+  raiseStone(w, RIVAL, 20, 20); raiseStone(w, RIVAL, 22, 22);
+  addHouse(w, PLAYER, 5, 5, 20); addHouse(w, RIVAL, 25, 25, 10);
+  eq(castPower(w, RIVAL, 'call', 6, 6), { ok: true });
+  const band = addWalker(w, RIVAL, 20.5, 20.5, 5); // standing on its own hearth
+  for (let i = 0; i < 100; i++) stepWorld(w);
+  eq(band.gathered, false);
+});

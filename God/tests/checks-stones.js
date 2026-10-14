@@ -35,17 +35,20 @@ check('stones: walkers near the hearth gather into one band there, and neither s
   eq(gathered[0].strength, 7, 'no wear while gathered');
 });
 
-check('stones: a full gathering sets off and walks the line in order; at an empty end it settles', () => {
+check('stones: a full gathering sets off and walks the line; it holds the end stone, and settles once that is taken down', () => {
   const w = stoneWorld(2, 30);
   raiseStone(w, PLAYER, 5, 5); raiseStone(w, PLAYER, 15, 5); raiseStone(w, PLAYER, 15, 20);
   const band = addWalker(w, PLAYER, 5.5, 5.5, PILGRIM_MASS);
   band.gathered = true;
   stepWorld(w);
   assert(band.pilgrim === 1 && w.events.some((e) => e.type === 'pilgrims'), 'it set off for the second stone');
-  run(w, 4000, () => band.arrived);
-  eq(band.arrived, true, 'it reached the end');
-  run(w, 400);
-  assert(w.houses.some((h) => h.tribe === PLAYER && gap(h, { u: 15, v: 20 }) <= 3), 'a new village by the end stone');
+  run(w, 4000, () => band.rally);
+  eq(band.rally, true, 'it rallied at the end stone');
+  run(w, 600);
+  eq([w.houses.length, Math.floor(band.x), Math.floor(band.y)], [0, 15, 20], 'holding the stone, not settling');
+  lowerStone(w, PLAYER, 15, 20);
+  run(w, 600);
+  assert(w.houses.some((h) => h.tribe === PLAYER && gap(h, { u: 15, v: 20 }) <= 4), 'with the end stone down, a new village there');
 });
 
 check('stones: pilgrims pass the waystone before the end stone', () => {
@@ -54,8 +57,8 @@ check('stones: pilgrims pass the waystone before the end stone', () => {
   const band = addWalker(w, PLAYER, 5.5, 5.5, PILGRIM_MASS);
   band.gathered = true;
   let nearWay = false;
-  run(w, 4000, () => { if (gap(w.stones[PLAYER][1], { u: band.tu, v: band.tv }) <= 1) nearWay = true; return band.arrived; });
-  eq([nearWay, band.arrived], [true, true]);
+  run(w, 4000, () => { if (gap(w.stones[PLAYER][1], { u: band.tu, v: band.tv }) <= 1) nearWay = true; return band.rally; });
+  eq([nearWay, band.rally], [true, true]);
 });
 
 check('stones: at an end stone among the enemy, the band fights', () => {
@@ -78,8 +81,8 @@ check('stones: pilgrims wait at the shore until the god joins the land', () => {
   run(w, 1500);
   assert(w.walkers.includes(band) && band.x < 14 && band.pilgrim, `waiting on the near side (x ${band.x.toFixed(1)})`);
   for (let v = 9; v <= 11; v++) for (const u of [14, 15]) w.terrain = reshape(w.terrain, u, v, 1).terrain; // a causeway
-  run(w, 2000, () => band.arrived);
-  eq(band.arrived, true, 'crossed and arrived');
+  run(w, 2000, () => band.rally);
+  eq(band.rally, true, 'crossed and rallied');
 });
 
 check('stones: the enemy reaching a stone, or a quake over it, topples it; the line closes up', () => {
@@ -108,4 +111,23 @@ check('stones: if the hearth falls the whole line falls with it: the gathering s
   eq([featureAt(w.terrain, 8, 8), featureAt(w.terrain, 16, 8), featureAt(w.terrain, 16, 16)], [FEATURE.fallenHead, FEATURE.fallenHead, FEATURE.fallenHead]);
   eq(raiseStone(w, PLAYER, 10, 10), { ok: true }, 'a new line can begin anywhere');
   eq(hearthOf(w, PLAYER), { id: w.stones[PLAYER][0].id, u: 10, v: 10 });
+});
+
+check('stones: the army at the end stone takes in each band that arrives, attacks enemies near it, and marches on to a new end', () => {
+  const w = stoneWorld(2, 40);
+  raiseStone(w, PLAYER, 5, 5); raiseStone(w, PLAYER, 15, 15);
+  const army = addWalker(w, PLAYER, 15.5, 15.5, 30); army.rally = true;
+  const band = addWalker(w, PLAYER, 13.5, 13.5, 20); band.pilgrim = 1;
+  run(w, 300, () => !w.walkers.includes(band));
+  eq([w.walkers.includes(band), army.strength], [false, 50], 'the band joined the army');
+  addHouse(w, RIVAL, 21, 15, 2);
+  run(w, 600, () => w.events.some((e) => e.type === 'razed' || e.type === 'repelled'));
+  assert(w.events.some((e) => e.type === 'razed' || e.type === 'repelled'), 'it attacked the house 6 squares off');
+  run(w, 400);
+  eq([Math.floor(army.x), Math.floor(army.y)], [15, 15], 'and came back to the stone');
+  raiseStone(w, PLAYER, 30, 30);
+  eq([army.rally, army.pilgrim], [false, 2], 'a new end: the army marches on');
+  run(w, 3000, () => army.rally);
+  run(w, 100); // it rallies on reaching the stone's side, then stands on the stone
+  eq([army.rally, Math.floor(army.x), Math.floor(army.y)], [true, 30, 30]);
 });

@@ -302,8 +302,8 @@ function drawPanel(s, game, hoverCost, beyond) {
   tablet(s, COL_A - 4, 53, COL_B + COL_W - COL_A, 9);
   if (game.message) text(s, game.message, COL_A, 54, C.gold);
   else if (game.armed) {
-    const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE, SHIFT-CLICK TO TAKE DOWN', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
-    text(s, `${p.name} (${p.cost}): ${how}`, COL_A, 54, C.red);
+    const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE ONE, OR ON YOURS TO REMOVE', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
+    text(s, p.cost ? `${p.name} (${p.cost}): ${how}` : `${p.name}: ${how}`, COL_A, 54, C.red);
   } else if (beyond) text(s, 'BEYOND YOUR REACH: RAISE A STONE NEARER', COL_A, 54, C.grey);
   else if (hoverCost) text(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, COL_A, 54, C.snow);
   // the powers, each on its own little tablet: gold when you can afford it, red-rimmed when ready to cast
@@ -364,7 +364,7 @@ function drawEnd(s, game) {
   outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + h - 16, C.grey);
 }
 
-// ---- ley lines: a dotted line in each god's colour from each stone to the next, and the gathering at each hearth ----
+// ---- ley stones' order: a number above each stone, the hearth with its gathering ----
 function drawLeyLines(s, game, ms) {
   const t = game.terrain, cam = game.cam;
   if (game.call) { // the Call of the Stones: a column of light where everyone is going
@@ -375,22 +375,15 @@ function drawLeyLines(s, game, ms) {
     }
   }
   const at = (st) => project(cam, st.u + 0.5, st.v + 0.5, groundAt(t, st.u + 0.5, st.v + 0.5));
-  game.stones.forEach((line, tribe) => {
-    for (let i = 0; i + 1 < line.length; i++) {
-      const [x0, y0] = at(line[i]), [x1, y1] = at(line[i + 1]), n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 5);
-      for (let k = 0; k <= n; k++) { // beads of light running along the line, each with a dark rim so it shows on any ground
-        if ((k + Math.floor(ms / 250)) % 3 === 0) continue;
-        const bx = Math.round(x0 + ((x1 - x0) * k) / n) - 1, by = Math.round(y0 + ((y1 - y0) * k) / n) - 1;
-        fillRect(s, bx - 1, by, 4, 2, C.black);
-        fillRect(s, bx, by, 2, 1, TRIBE_COLOURS[tribe].c);
-      }
-    }
-    if (!line.length) return;
-    const g = game.walkers.find((w) => w.tribe === tribe && w.gathered), count = `${g ? g.strength : 0}/${PILGRIM_MASS}`;
-    const [x, y] = at(line[0]), sp = STONE_SPRITES[tribe];
-    if (line[0].u >= cam.u && line[0].v >= cam.v && line[0].u < cam.u + VIEW_N && line[0].v < cam.v + VIEW_N) {
-      outlined(s, count, Math.round(x - textWidth(count) / 2), Math.round(y - sp.h - 8), TRIBE_COLOURS[tribe].c);
-    }
+  const inView = (st) => st.u >= cam.u && st.v >= cam.v && st.u < cam.u + VIEW_N && st.v < cam.v + VIEW_N;
+  game.stones.forEach((stones, tribe) => {
+    stones.forEach((st, i) => { // each stone's place in the line, above it; the hearth also shows its gathering
+      if (!inView(st)) return;
+      const g = i === 0 && game.walkers.find((w) => w.tribe === tribe && w.gathered);
+      const label = i === 0 ? `1  ${g ? g.strength : 0}/${PILGRIM_MASS}` : `${i + 1}`;
+      const [x, y] = at(st), sp = STONE_SPRITES[tribe];
+      outlined(s, label, Math.round(x - textWidth(label) / 2), Math.round(y - sp.h - 8), TRIBE_COLOURS[tribe].c);
+    });
   });
 }
 
@@ -450,13 +443,14 @@ function drawInspect(s, game) {
     const line = game.stones[p.tribe], who = p.tribe === PLAYER ? 'YOUR' : 'DARK';
     const g = game.walkers.find((w) => w.tribe === p.tribe && w.gathered);
     const lines = p.index === 0 ? [`${who} HEARTH STONE`, `${g ? g.strength : 0}/${PILGRIM_MASS} GATHERED`, line.length < 2 ? 'NO PATH YET: RAISE ANOTHER' : `THEN ON TO ${line.length - 1} MORE`]
-      : p.index === line.length - 1 ? [`${who} END STONE`, 'PILGRIMS FIGHT OR SETTLE HERE'] : [`${who} WAYSTONE ${p.index} OF ${line.length - 1}`];
+      : p.index === line.length - 1 ? [`${who} END STONE`, (() => { const a = game.walkers.find((w) => w.tribe === p.tribe && w.rally); return a ? `AN ARMY OF ${a.strength} HOLDS IT` : 'PILGRIMS RALLY HERE'; })()]
+      : [`${who} WAYSTONE ${p.index} OF ${line.length - 1}`];
     return drawTag(s, p, lines, TRIBE_COLOURS[p.tribe].c);
   }
   const thing = p.house || p.walker, tribe = thing.tribe, tr = game.tribes[tribe];
   const lines = [];
   if (p.house) lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${LEVEL_NAMES[thing.level - 1]} ${Math.floor(thing.pop)}/${CAP[thing.level - 1]}`);
-  else lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${thing.pilgrim ? 'PILGRIMS' : thing.gathered ? 'GATHERING' : 'BAND'} OF ${thing.strength}`);
+  else lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${thing.rally ? 'ARMY' : thing.pilgrim ? 'PILGRIMS' : thing.gathered ? 'GATHERING' : 'BAND'} OF ${thing.strength}`);
   lines.push(`${WEAPONS[tr.weapons]}${tr.weapons ? ` X${WEAPON_FACTOR[tr.weapons]}` : ''}`);
   if (tribe !== PLAYER) {
     const at = p.house ? { x: thing.u + 0.5, y: thing.v + 0.5 } : thing;
@@ -483,15 +477,17 @@ const TITLE_LINES = ['SHAPE THE LAND. GROW YOUR PEOPLE.', "WIPE OUT THE DARK GOD
 const HELP = [
   ["YOU ARE THE GOD OF THE BLUE PEOPLE.", "WIPE OUT THE DARK GOD'S PEOPLE TO WIN."],
   ['THE LAND', 'CLICK RAISES THE LAND, SHIFT-CLICK (OR RIGHT-CLICK) LOWERS IT. IT COSTS MANNA. YOUR PEOPLE SETTLE ON FLAT '
-    + 'GROUND, AND THE MORE FLAT LAND A HOUSE HAS AROUND IT THE BIGGER IT GROWS: TENT, HUT, COTTAGE, HOUSE, CASTLE. BIG '
+    + 'GROUND, AND THE MORE FLAT LAND A HOUSE HAS AROUND IT, AT ITS OWN HEIGHT, THE BIGGER IT GROWS: TENT, HUT, COTTAGE, '
+    + 'HOUSE, CASTLE. A CASTLE NEEDS ALL 5 BY 5 SQUARES ROUND IT LEVEL. NEW HOUSES KEEP 5 SQUARES APART. BIG '
     + 'HOUSES EARN MORE MANNA. TREES AND BOULDERS BLOCK BUILDING. RAISING THE LAND BURIES THEM. LOWERING IT DIGS DOWN: '
     + 'TREES GO, BUT BOULDERS AND MINES STAY.'],
   ['MINES', 'A HUT OR BIGGER WITH A BOULDER IN ITS LAND DIGS A MINE. MORE MINES, BETTER WEAPONS.'],
   ['POWERS', 'PRESS THE KEY, THEN CLICK THE LAND. 1 SWAMP 30, 2 QUAKE 60, 3 VOLCANO 120, 4 FLOOD 250, 5 STONE 20, '
     + '6 CALL 500. THE CALL OF THE STONES EMPTIES EVERY HOUSE ON BOTH SIDES AND SENDS EVERYONE TO ONE PLACE FOR A LAST '
     + 'BATTLE. IT NEEDS THE LANDS JOINED. RAZED HOUSES AND FALLEN STONES LEAVE RUINS UNTIL THE LAND IS RESHAPED.'],
-  ['STONES (5)', 'RAISE A LINE OF STONES. YOUR PEOPLE NEAR THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE, AND FIGHT OR '
-    + 'SETTLE AT ITS END. ENEMIES OR QUAKES TOPPLE STONES, AND IF THE FIRST FALLS, THE WHOLE LINE FALLS WITH IT.'],
+  ['STONES (5)', 'PRESS 5, THEN CLICK TO RAISE A STONE, OR CLICK ONE OF YOURS TO TAKE IT DOWN. STONES ARE FREE. YOUR PEOPLE NEAR '
+    + 'THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE AND RALLY AT THE LAST AS AN ARMY, ATTACKING ANY ENEMY NEARBY. RAISE '
+    + 'A STONE BEYOND IT TO MARCH THEM ON. TAKE THE LAST ONE DOWN AND THEY SETTLE THERE. ENEMIES OR QUAKES TOPPLE STONES, AND IF THE FIRST FALLS, THE WHOLE LINE FALLS WITH IT.'],
   ["YOUR REACH", 'YOU CAN SHAPE THE LAND AND CAST POWERS ONLY WITHIN 5 SQUARES OF YOUR HOUSES AND STONES. LAND BEYOND IS '
     + 'SHOWN DIMMED. TO REACH ACROSS THE SEA, RAISE STONES ONE BEYOND ANOTHER. THE DARK GOD IS BOUND THE SAME WAY.'],
   ['THE CAMPAIGN', 'FIVE LANDS, EACH HARDER THAN THE LAST. WIN ONE TO REACH THE NEXT, AND EARN A NEW POWER AS YOU GO. '

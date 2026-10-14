@@ -161,6 +161,10 @@ const CALL_REFUSALS = { 'no-manna': 'NOT ENOUGH MANNA', sea: 'NOT IN THE SEA', c
 function castArmed() {
   const w = app.world, id = w.armed, at = id === 'stone' || id === 'call' ? w.hoverTile : w.hover;
   if (!at && id !== 'flood') return;
+  if (id === 'stone') { // the stone toggles: one of yours comes down, anywhere else a new one goes up
+    const mine = stoneAt(w, at.u, at.v);
+    if (mine && mine.tribe === PLAYER) { lowerStone(w, PLAYER, at.u, at.v); w.armed = null; return; }
+  }
   const r = castPower(w, PLAYER, id, at ? at.u : 0, at ? at.v : 0);
   if (!r.ok) {
     say(w, id === 'stone' ? STONE_REFUSALS[r.reason] : id === 'call' ? CALL_REFUSALS[r.reason] : r.reason === 'no-manna' ? 'NOT ENOUGH MANNA' : `NO ROOM FOR A ${POWER[id].name} THERE`);
@@ -295,7 +299,7 @@ const TIPS = [
   { id: 'clear', when: (w) => w.tick > 30 * 20, text: 'TREES AND BOULDERS BLOCK BUILDING. RAISING LAND BURIES THEM. LOWERING DIGS: BOULDERS AND MINES STAY.' },
   { id: 'reach', when: (w) => w.hover && !cornerInReach(w, PLAYER, w.hover.u, w.hover.v), text: 'YOU CAN ONLY TOUCH LAND NEAR YOUR HOUSES AND STONES. DIMMED LAND IS BEYOND YOUR REACH.' },
   { id: 'stone', when: (w) => w.tick > 75 * 20 && !w.stones[PLAYER].length && w.tribes[PLAYER].manna >= STONE_COST, text: 'PRESS 5 AND CLICK NEAR YOUR VILLAGE TO RAISE A STONE. YOUR PEOPLE GATHER THERE.' },
-  { id: 'path', when: (w) => w.stones[PLAYER].length === 1 && w.walkers.some((x) => x.tribe === PLAYER && x.gathered && x.strength >= PILGRIM_MASS / 2), text: 'RAISE MORE STONES TO LAY A PATH. AT 20 YOUR PEOPLE WALK IT, AND FIGHT OR SETTLE AT ITS END.' },
+  { id: 'path', when: (w) => w.stones[PLAYER].length === 1 && w.walkers.some((x) => x.tribe === PLAYER && x.gathered && x.strength >= PILGRIM_MASS / 2), text: 'RAISE MORE STONES TO LAY A PATH. AT 20 YOUR PEOPLE WALK IT AND RALLY AT ITS END AS AN ARMY.' },
   { id: 'season', when: (w, events) => events.some((e) => e.type === 'season'), text: 'THE SEASONS TURN. SUMMER PARCHES THE LOWLANDS, WINTER SNOWS IN THE HIGH LAND. AUTUMN BRINGS MANNA.' },
   { id: 'bridge', when: (w, events) => events.some((e) => e.type === 'bridge' && e.tribe === RIVAL), text: 'THE DARK GOD IS RAISING LAND TOWARDS YOU. SINK IT, OR MEET IT WITH YOUR PILGRIMS.' },
 ];

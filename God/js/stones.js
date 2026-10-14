@@ -4,7 +4,9 @@
 // (world.stones[tribe] = [{ id, u, v }, ...]). The first is the hearth: the god's walkers within GATHER_RADIUS of it
 // are drawn there and gather into one band (a walker with `gathered` set). When the gathering is PILGRIM_MASS strong
 // it sets off as pilgrims (`pilgrim` = the index of the stone it is heading for) and walks the line stone by stone.
-// At the last stone it is home: it fights whatever foe is near, or settles. Nobody is ever ordered about: the god only
+// At the last stone it rallies (`rally`): an army that holds the end stone, merging with each band that arrives, and
+// attacks any enemy within RALLY_RANGE. Raising a stone beyond it marches the army on; taking the end stone down (or
+// losing it) lets the army settle where it stands. Nobody is ever ordered about: the god only
 // raises and takes down stones. A stone topples when the rival's walkers reach it, when a quake or volcano covers it,
 // or when the sea does; the line closes up behind it.
 
@@ -27,6 +29,8 @@ function raiseStone(world, tribe, u, v) {
   if (t.f[v * t.n + u] === FEATURE.fallenHead || t.f[v * t.n + u] === FEATURE.fallenArch) t.f[v * t.n + u] = FEATURE.none; // raised again where one fell
   if (world.stones[tribe].length >= MAX_STONES) return { ok: false, reason: 'too-many' };
   world.stones[tribe].push({ id: world.nextId++, u, v });
+  const end = world.stones[tribe].length - 1;
+  if (end >= 1) for (const w of world.walkers) if (w.tribe === tribe && w.rally) { w.rally = false; w.pilgrim = end; } // the army marches on
   return { ok: true };
 }
 
@@ -36,13 +40,14 @@ function raiseStone(world, tribe, u, v) {
 function removeStone(world, tribe, index, why) {
   const line = world.stones[tribe], t = world.terrain;
   if (!line[index]) throw new RulesError('no-stone', `tribe ${tribe} has no stone ${index} to remove`);
-  const gone = index === 0 ? line.splice(0) : line.splice(index, 1);
+  const wasEnd = index === line.length - 1, gone = index === 0 ? line.splice(0) : line.splice(index, 1);
   for (const st of gone) if (why !== 'lowered' && !isWater(t, st.u, st.v)) t.f[st.v * t.n + st.u] = tribe === PLAYER ? FEATURE.fallenHead : FEATURE.fallenArch;
   for (const w of world.walkers) {
     if (w.tribe !== tribe) continue;
-    if (index === 0) { w.gathered = false; w.pilgrim = 0; continue; }
+    if (w.rally && (index === 0 || wasEnd)) { w.rally = false; w.arrived = true; } // the end stone is gone: the army settles where it stands
+    if (index === 0) { w.gathered = false; if (w.pilgrim) { w.pilgrim = 0; w.arrived = true; } continue; }
     if (w.pilgrim > index) w.pilgrim--;
-    if (w.pilgrim >= line.length) w.pilgrim = 0; // the line ends before their stone now: they are home
+    if (w.pilgrim >= line.length) { w.pilgrim = 0; w.arrived = true; } // the line ends before their stone now: they settle
   }
   event(world, why === 'lowered' ? 'lowered' : 'topple', { tribe, u: gone[0].u, v: gone[0].v, hearth: index === 0, count: gone.length });
 }
@@ -84,6 +89,12 @@ function stepStones(world) {
 function stonePull(world, w) {
   if (world.call) return { target: world.call, weight: 16 }; // the Call of the Stones: everyone goes
   const line = world.stones[w.tribe];
+  if (w.rally) { // the army at the end stone: after any enemy near it, otherwise back to the stone
+    const end = line[line.length - 1];
+    if (!end) return null;
+    const foe = foeNear(world, w.tribe, end, RALLY_RANGE);
+    return { target: foe || end, weight: 14, holding: !foe };
+  }
   if (w.pilgrim) return line[w.pilgrim] ? { target: line[w.pilgrim], weight: 14 } : null;
   const hearth = hearthOf(world, w.tribe);
   if (hearth && !w.arrived && gap(hearth, { u: w.tu, v: w.tv }) <= GATHER_RADIUS) return { target: hearth, weight: 12 };
@@ -141,6 +152,17 @@ function reachTileToward(world, tribe, target) {
     if ((map && !map[v * t.n + u]) || isWater(t, u, v) || houseAt(world, u, v) || stoneAt(world, u, v)) continue;
     const d = Math.hypot(u - target.u, v - target.v);
     if (d < bestD) { best = { u, v }; bestD = d; }
+  }
+  return best;
+}
+
+// The nearest rival house or walker within `range` squares of a tile, as a tile { u, v }, or null.
+function foeNear(world, tribe, at, range) {
+  let best = null, bestD = range + 1;
+  for (const h of world.houses) if (h.tribe !== tribe && gap(h, at) < bestD) { best = { u: h.u, v: h.v }; bestD = gap(h, at); }
+  for (const o of world.walkers) {
+    const p = { u: Math.floor(o.x), v: Math.floor(o.y) };
+    if (o.tribe !== tribe && gap(p, at) < bestD) { best = p; bestD = gap(p, at); }
   }
   return best;
 }

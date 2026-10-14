@@ -192,6 +192,29 @@ grow, while a rival god does the same.
   is washed away. Building up clears land for farms but sits high (snowed in each winter); digging down keeps
   your mines (and weapons) but sits low (parched in summer, nearer the flood). Campaign timings after this, with
   the dark god's home moved to map 404: a passive player lasts about 20+ / 11 / 6 / 6 / 4 minutes.
+- **Room to grow: built.** New houses must stand at least 5 squares from any other (`HOUSE_GAP`), so no house
+  ever takes ground from a neighbour's 5x5 patch: flatten a patch at a house's height and it can become a castle.
+  Before this, walkers crowded in 3 squares apart and castles were almost impossible. Fewer houses but bigger ones,
+  closer to the original. The dark god now also scores how level the ground round its houses is
+  (`unevenness`), so it works steadily towards castles instead of waiting for a move that adds whole flat squares.
+  Lands 4 and 5 were tuned by their rules (sooner and richer dark god); a passive player lasts about
+  16 / 7 / 5 / 5 / 8 minutes.
+- **Roaming bands: built** (owner's idea). A band leaving a house picks a random direction and distance (5 plus a
+  random extra averaging 4, at most 18 squares) and walks out that far, turning when the sea blocks it, before it
+  looks to settle. This stops new bands circling their own castle's fields. It uses its own random stream
+  (`roamRng`). A tribe helped by the computer now reaches about 13 houses and 3 castles by minute 8.
+- **Fix:** nobody stops to gather at a hearth during the Call; a band doing so used to stall the last battle.
+- **Campaign timings now:** a passive player lasts about 17 / 14 / 12 / 9 / 6 minutes (lands 1 and 4 tuned by rules).
+- **Rallying armies: built** (owner's request). Pilgrims who reach the end stone hold it as an army: each band
+  that arrives merges in, they don't settle or wear down, and they attack any enemy within 8 squares of the stone,
+  then return. Raising a stone beyond the end marches the army on to it; taking the end stone down (or losing it)
+  lets the army settle where it stands. The dark god takes its end stone down when its army can get no nearer you,
+  so the army founds a village and carries its reach on.
+- **Campaign timings now:** a passive player lasts about 16 / 13 / 10 / 6 / 5 minutes (the Narrow Sea moved to map 2024).
+- **Stone order is shown by numbers** above each stone (the hearth: "1  12/20"), not lines: the owner found lines and
+  marching beads distracting, and a line to an off-screen stone crossed the view.
+- **Stones are free, and toggle:** press 5, then click empty ground to raise a stone or one of yours to take it
+  down (owner's calls).
 - **On the arcade menu** (games.js) as "Old Stones", credited "inspired by Populous (1989)".
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.

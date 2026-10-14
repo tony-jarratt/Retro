@@ -15,7 +15,10 @@ const REPEAT_MS = 120;     // holding the mouse button repeats a raise or lower 
 // ---- the people ----
 const PLAYER = 0, RIVAL = 1;     // tribe indices: you (the good god) and the dark god
 const WALK_SPEED = 1.2;          // tiles a second
-const HOUSE_GAP = 3;             // houses stand at least this far apart (counting diagonal steps)
+const HOUSE_GAP = 5;             // a new house stands at least this far from any other (counting diagonal steps), so it never
+                                 // takes ground from a neighbour's 5 x 5 patch: flatten a patch and the house can be a castle
+const ROAM_MIN = 5, ROAM_MEAN = 4, ROAM_MAX = 18; // a band leaving a house walks this far out before it looks to settle
+                                 // (ROAM_MIN plus a random extra averaging ROAM_MEAN, at most ROAM_MAX squares in all)
 const WEAKEN_S = 6;              // every this many seconds a walker with nowhere to live loses a tenth of its people (at least one)
 // A house's level comes from how much flat ground it has to itself (its own tile included, out of 25):
 // the lowest count for each level, tent to castle.
@@ -31,13 +34,14 @@ const FIGHT_RANGE = 0.6;         // rival walkers this close (in tiles) fight
 // ---- ley stones: the gods' way of gathering their people and sending them somewhere ----
 // A tribe's stones, in the order they were raised, make its ley line. Walkers near the first (the hearth) gather
 // there; at PILGRIM_MASS the gathering sets off along the line, and at the last stone fights or settles.
-const STONE_COST = 20;
+const STONE_COST = 0;            // stones are free: where you put them is the decision (owner's call)
 const GOD_REACH = 5;             // a god can shape land and cast powers within this many squares of its houses and stones
 const CALL_COST = 500;           // the Call of the Stones: everyone, on both sides, to one place for a last battle
 const AI_CALL_EDGE = 1.5;        // the dark god calls when its armed strength is this many times the player's
 const MAX_STONES = 6;
 const GATHER_RADIUS = 5;         // walkers this near the hearth (counting diagonal steps) answer its pull
 const PILGRIM_MASS = 20;         // a gathering this strong sets off down the ley line
+const RALLY_RANGE = 8;           // the army holding the end stone attacks enemies this near it
 
 // ---- seasons: a year of four, each SEASON_TICKS long, starting in spring ----
 // High land (HIGH_LAND or more) is safe from floods but snowed in each winter; the lowest land (LOW_LAND) is
@@ -80,7 +84,7 @@ const AI_POWER_GAP = 40 * 20;    // ...at most every 40 s
 const FAIR_RULES = { grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerManna: AI_POWER_MANNA, powerGap: AI_POWER_GAP, rivalManna: START_MANNA };
 
 // The campaign: five lands, each harder, each a fixed map. The seeds were picked (from those tried) so that a player
-// who does nothing lasts about 20+, 11, 6, 6 and 4 minutes (with seasons, god's reach and digging). A land sets the map (MAP_STYLE in terrain.js), the dark
+// who does nothing lasts about 16, 13, 10, 6 and 5 minutes (with rallying armies; lands 1 and 4 also tuned by their rules). A land sets the map (MAP_STYLE in terrain.js), the dark
 // god's rules, which powers both gods have (the stone always), and how many villages the dark god starts with.
 const MIN = 60 * 20; // ticks in a minute
 // Stars for a win: three at or under a land's par time, two within half as long again, one for any win. *tbd* from play.
@@ -92,18 +96,18 @@ function starsFor(land, seconds) {
 const LANDS = [
   { name: 'THE GREEN ISLES', seed: 2024, intro: 'LEARN TO SHAPE THE LAND. YOU HAVE STONES.', powers: [], rivalHomes: 1,
     map: { mass: 0.22, strait: 2.5, forests: 6, wood: 0.5, rock: 0.5 },
-    rules: { grace: 6 * MIN, bridgeManna: 220, powerManna: 99999, powerGap: 99 * MIN, rivalManna: 25 } },
+    rules: { grace: 12 * MIN, bridgeManna: 400, powerManna: 99999, powerGap: 99 * MIN, rivalManna: 15 } },
   { name: 'THE PINEWOODS', seed: 314, intro: 'THICK FORESTS TO CLEAR. NEW: SWAMP.', powers: ['swamp'], rivalHomes: 1,
     map: { mass: 0.2, strait: 2, forests: 20, wood: 0.9, rock: 0.8 },
     rules: { grace: 5 * MIN, bridgeManna: 180, powerManna: 240, powerGap: 75 * 20, rivalManna: 30 } },
   { name: 'THE STONY SHORE', seed: 1989, intro: 'BOULDERS EVERYWHERE: DIG MINES. NEW: QUAKE.', powers: ['swamp', 'quake'], rivalHomes: 1,
     map: { mass: 0.2, strait: 2, forests: 10, wood: 0.6, rock: 3 }, rules: FAIR_RULES },
-  { name: 'THE NARROW SEA', seed: 314, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
+  { name: 'THE NARROW SEA', seed: 2024, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
     map: { mass: 0.22, strait: 1.2, forests: 12, wood: 0.75, rock: 1.2 },
-    rules: { grace: 2 * MIN, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 } },
+    rules: { grace: 40 * 20, bridgeManna: 30, powerManna: 60, powerGap: 12 * 20, rivalManna: 200 } },
   { name: "THE DARK GOD'S HOME", seed: 404, intro: 'IT HOLDS TWO VILLAGES. NEW: FLOOD, AND THE CALL.', powers: ['swamp', 'quake', 'volcano', 'flood', 'call'], rivalHomes: 2,
     map: { mass: 0.2, strait: 2, forests: 12, wood: 0.75, rock: 1.5 },
-    rules: { grace: 90 * 20, bridgeManna: 70, powerManna: 90, powerGap: 20 * 20, rivalManna: 100 } },
+    rules: { grace: 45 * 20, bridgeManna: 40, powerManna: 70, powerGap: 15 * 20, rivalManna: 150 } },
 ];
 
 // ---- the screen ----
