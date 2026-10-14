@@ -20,6 +20,8 @@ const DEATH_TIME = 1.1;     // seconds between losing a life and coming back at 
 const CRUMBLE_DELAY = 0.5;  // seconds a crumbling block holds you
 const CRUMBLE_GONE = 3;     // seconds before it is back
 const CRUSH_HEIGHT = 3;     // levels above the floor a crusher waits
+const RIDE_WAIT = 0.45;     // seconds a ride waits after you step on before it sets off
+const RIDE_SPEED = 2.2;     // tiles a second
 
 // ---- moving blocks ----
 // Each block's position comes from the clock (game.elapsed), so they all keep to time whatever the hero does.
@@ -44,7 +46,7 @@ function crusherDrop(t, period, offset = 0) {
   return 1 - (p - 0.75) / 0.25;
 }
 
-function makeMover(spec) { return { ...spec, offset: spec.offset || 0, box: null, dx: 0, dy: 0, falling: 0, gone: 0 }; }
+function makeMover(spec) { return { ...spec, offset: spec.offset || 0, box: null, dx: 0, dy: 0, falling: 0, gone: 0, pos: 0, goal: 0, armed: 0, wasRidden: false }; }
 function initMovers(game) { for (const room of game.rooms) room.movers = (room.spec.movers || []).map(makeMover); }
 
 function moverBox(room, m, t) {
@@ -61,6 +63,11 @@ function moverBox(room, m, t) {
     if (m.gone > 0) return null;
     const top = m.level || 0;
     return { x0: m.x, y0: m.y, x1: m.x + 1, y1: m.y + 1, bottom: top - 1, top };
+  }
+  if (m.type === 'ride') {
+    if (m.gone > 0) return null;
+    const [dx, dy] = DIRS[m.dir], d = m.dist * m.pos, top = m.top || 0;
+    return { x0: m.x + dx * d, y0: m.y + dy * d, x1: m.x + dx * d + 1, y1: m.y + dy * d + 1, bottom: top - 1, top };
   }
   if (m.type === 'crusher') {
     const bottom = room.h[m.y][m.x] + CRUSH_HEIGHT * (1 - crusherDrop(t, m.period, m.offset));
@@ -88,6 +95,7 @@ function updateMovers(game, dt) {
       else if (m.falling > 0) { m.falling -= dt; if (m.falling <= 0) { m.gone = CRUMBLE_GONE; Sound.play('fill'); } }
       else if (m === riding) m.falling = CRUMBLE_DELAY;
     }
+    if (m.type === 'ride') stepRide(m, m === riding, f, dt);
     const old = m.box, box = moverBox(room, m, t);
     m.dx = old && box ? box.x0 - old.x0 : 0; m.dy = old && box ? box.y0 - old.y0 : 0;
     m.box = box;
@@ -106,6 +114,32 @@ function updateMovers(game, dt) {
         shoveHero(game, room, f, nx, ny, m);
       }
     }
+  }
+}
+
+// A ride (pos 0 at home, 1 at the far end) sets off a moment after you step onto it, for whichever end it is not at.
+// With nobody on it, a good ride drifts to the end nearer the hero; a trap crumbles as soon as it stops.
+function stepRide(m, ridden, f, dt) {
+  if (m.gone > 0) {
+    m.gone -= dt;
+    if (m.gone <= 0) { m.gone = 0; m.falling = 0; m.pos = 0; m.goal = 0; m.armed = 0; m.wasRidden = false; }
+    return;
+  }
+  if (m.falling > 0) { m.falling -= dt; if (m.falling <= 0) { m.gone = CRUMBLE_GONE; Sound.play('fill'); } return; }
+  const atEnd = m.pos === m.goal;
+  if (ridden && !m.wasRidden && atEnd) m.armed = RIDE_WAIT; // just stepped on
+  m.wasRidden = ridden;
+  if (m.armed > 0) {
+    m.armed -= dt;
+    if (m.armed <= 0) { m.armed = 0; if (ridden) m.goal = 1 - m.goal; }
+  } else if (!ridden && !m.trap && atEnd) {
+    const [dx, dy] = DIRS[m.dir], along = (f.x - m.x - 0.5) * dx + (f.y - m.y - 0.5) * dy; // the hero, along the ride's track
+    m.goal = along > m.dist / 2 ? 1 : 0;
+  }
+  if (m.pos !== m.goal) {
+    const step = RIDE_SPEED * dt / m.dist;
+    m.pos = m.goal > m.pos ? Math.min(m.goal, m.pos + step) : Math.max(m.goal, m.pos - step);
+    if (m.pos === m.goal && m.trap && m.goal === 1) m.falling = CRUMBLE_DELAY;
   }
 }
 
@@ -277,7 +311,7 @@ function respawn(game) { placeHeroAtEntry(game); game.invuln = INVULN; }
 function placeHeroAtEntry(game) { game.hero.x = game.hero.entry.x; game.hero.y = game.hero.entry.y; placeHero(game); }
 
 // Put a room's crumbling blocks back (when the room is reset).
-function resetMovers(room) { for (const m of room.movers) { m.falling = 0; m.gone = 0; } }
+function resetMovers(room) { for (const m of room.movers) { m.falling = 0; m.gone = 0; m.pos = 0; m.goal = 0; m.armed = 0; m.wasRidden = false; } }
 
 // The clock, the robots and what can hurt you. Like update() in rules.js, but a robot has to actually touch you
 // (so you can jump over one), and a steam vent only catches you with your feet on it.

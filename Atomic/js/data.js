@@ -56,6 +56,9 @@ const PARTS = [
 //     { type: 'slider', x, y, dir, dist, period, offset, top }   a block that glides back and forth dist squares
 //     { type: 'crumble', x, y, level }   a block over a pit that gives way a moment after you stand on it
 //     { type: 'crusher', x, y, period, offset }   a block that slams down onto a square from above
+//     { type: 'ride', x, y, dir, dist, mark, trap }   a block that waits until you stand on it, then glides dist squares
+//         and stays there (stand on it again to go back; with nobody on it, it comes to your side of the room).
+//         A trap ride stops wherever it gets to and crumbles; its mark says which ride is which (see clue).
 const ROOMS = [
   { id: 'airlock', name: 'Airlock', col: 0, row: 0, exits: { E: 3, S: 1 },
     caption: 'Welcome to Atomic Castle. Please wipe your feet and leave your common sense at the door.',
@@ -130,10 +133,15 @@ const ROOMS = [
     height: ['#.#.#.#.#', '.........', '.........', '3333.3333', 'xxxx.xxxx'],
     objects: ['.........', '.........', '.>.......', '.........', '.........'] },
   { id: 'bridge', name: 'Crumbling Bridge', area: 'tower', col: 2, row: 10, exits: { W: 2, E: 2 },
-    caption: 'The bridge is perfectly sound. It simply prefers not to be stood on.',
+    caption: 'The bridge has been replaced by three obliging blocks. Two of them are less obliging than they look. The Professor left a note.',
     height: ['..xxxxx..', '..xxxxx..', '..xxxxx..', '..xxxxx..', '..xxxxx..', '..xxxxx..', '..xxxxx..'],
     objects: ['.........', '.........', '.........', '.........', '.........', '.........', '.........'],
-    movers: [2, 3, 4, 5, 6].map((x) => ({ type: 'crumble', x, y: 2 })) },
+    movers: [
+      { type: 'ride', x: 2, y: 1, dir: 'E', dist: 2, mark: 'cross', trap: true },
+      { type: 'ride', x: 2, y: 3, dir: 'E', dist: 2, mark: 'ring', trap: true },
+      { type: 'ride', x: 2, y: 5, dir: 'E', dist: 4, mark: 'triangle' },
+    ],
+    clue: { side: 'S', at: 4, mark: 'triangle' } },
   { id: 'radio', name: 'Radio Room', area: 'tower', col: 3, row: 10, exits: { W: 2, S: 4 },
     caption: 'The Professor once heard Venus on this set. Venus has not called back.',
     height: ['.....#333', '......333', '.....#333', '.........', '.........', '.#.......', '.........', '.......#.', '.........'],
@@ -240,7 +248,8 @@ function checkRooms() {
     if (room.clue) {
       const c = room.clue, len = (c.side === 'N' || c.side === 'S') ? W : H;
       if (!'NESW'.includes(c.side) || !(c.at >= 1 && c.at < len - 1)) fail(room, `clue on ${c.side} at ${c.at} is not on a wall`);
-      if (!Object.values(room.marks || {}).includes(c.mark)) fail(room, `clue shows "${c.mark}", which no plate has`);
+      const shown = [...Object.values(room.marks || {}), ...(room.movers || []).map((m) => m.mark)];
+      if (!shown.includes(c.mark)) fail(room, `clue shows "${c.mark}", which no plate or block has`);
       if (room.exits[c.side] !== undefined && Math.abs(room.exits[c.side] - c.at) <= 1) fail(room, `clue on ${c.side} is in the way of the doorway`);
     }
     for (const p of plates) if (!doors.has(p)) fail(room, `plate ${p.toLowerCase()} has no door ${p}`);
@@ -254,7 +263,7 @@ function checkRooms() {
       if (room.to && room.to[dir] && (!n.to || n.to[OPPOSITE[dir]] !== room.id)) fail(room, `staircase ${dir} to ${n.id} does not lead back`);
     }
   }
-  const MOVER_FIELDS = { lift: ['low', 'high', 'period'], slider: ['dir', 'dist', 'period'], crumble: [], crusher: ['period'] };
+  const MOVER_FIELDS = { lift: ['low', 'high', 'period'], slider: ['dir', 'dist', 'period'], crumble: [], crusher: ['period'], ride: ['dir', 'dist'] };
   for (const room of ROOMS) {
     if (!['ground', 'cellar', 'tower', undefined].includes(room.area)) fail(room, `unknown area "${room.area}"`);
     for (const m of room.movers || []) {
@@ -262,7 +271,8 @@ function checkRooms() {
       if (!need) fail(room, `unknown moving block "${m.type}"`);
       for (const f of need) if (m[f] === undefined) fail(room, `${m.type} at ${m.x},${m.y} has no ${f}`);
       const tiles = [[m.x, m.y]];
-      if (m.type === 'slider') for (let i = 1; i <= m.dist; i++) tiles.push([m.x + DIRS[m.dir][0] * i, m.y + DIRS[m.dir][1] * i]);
+      if (m.mark !== undefined && !MARK_KINDS.includes(m.mark)) fail(room, `${m.type} at ${m.x},${m.y} has unknown mark "${m.mark}"`);
+      if (m.type === 'slider' || m.type === 'ride') for (let i = 1; i <= m.dist; i++) tiles.push([m.x + DIRS[m.dir][0] * i, m.y + DIRS[m.dir][1] * i]);
       for (const [x, y] of tiles) {
         if (!(x >= 0 && y >= 0 && x < room.width && y < room.rows)) fail(room, `${m.type} at ${m.x},${m.y} goes off the room at ${x},${y}`);
         if (room.height[y][x] === '#') fail(room, `${m.type} at ${m.x},${m.y} runs into a wall at ${x},${y}`);

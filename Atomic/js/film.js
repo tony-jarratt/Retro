@@ -564,6 +564,13 @@ function drawMover(room, o, m, t) {
       left: dotted, right: dotted,
       top: (T, R, B, L) => { polyline([lerp(T, L, 0.3), lerp(T, B, 0.45), lerp(R, B, 0.6)]); line(lerp(T, B, 0.45), lerp(L, B, 0.7)); },
     });
+  } else if (m.type === 'ride') {
+    const shake = m.falling > 0 ? (Math.floor(t * 30) % 2 ? 0.04 : -0.04) : 0;
+    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.4) * LV, 0.4 * LV, { left: panelled, right: panelled });
+    if (m.mark) { // flat to the screen, like the marks on plates
+      const [cx, cy] = P(o, (b.x0 + b.x1) / 2 + shake, (b.y0 + b.y1) / 2, b.top * LV);
+      strokeMark(m.mark, (a, v) => [cx - 5 + a * 10, cy - 3.5 + v * 7]);
+    }
   } else if (m.type === 'crusher') {
     const top = P(o, m.x + 0.5, m.y + 0.5, b.top * LV), rod = P(o, m.x + 0.5, m.y + 0.5, (room.h[m.y][m.x] + CRUSH_HEIGHT + 4) * LV);
     line(top, rod); line([top[0] + 1, top[1]], [rod[0] + 1, rod[1]]);

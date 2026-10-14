@@ -182,8 +182,9 @@ const SCRIPTS = [
   { room: 'towerstairs', from: 'N', to: 'W', go: () => { go('S', 2); waitUntil(() => phase(mover(0)) < 0.03); go('S', 6); leave('W', 'range'); } },
   { room: 'tlanding', from: 'S', to: 'E', go: () => { go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('N', 0); waitUntil(() => Math.abs(phase(mover(0)) - 0.55) < 0.03); go('N', 1); go('N', 2); leave('E', 'battlements'); } },
   { room: 'tlanding', from: 'E', to: 'S', go: () => { go('W', 3); go('S', 2); waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.03); stepOnto('S', 0); waitUntil(() => phase(mover(0)) < 0.1 && phase(mover(0)) > 0.02); go('S', 1); leave('S', 'towerstairs'); } },
-  { room: 'bridge', from: 'W', to: 'E', go: () => { leave('E', 'radio'); } },
-  { room: 'bridge', from: 'E', to: 'W', go: () => { leave('W', 'battlements'); } },
+  // the bridge: the triangle ride (mover 2) is the one that goes all the way across
+  { room: 'bridge', from: 'W', to: 'E', go: () => { go('S', 3); go('E', 1); stepOnto('E', 2); waitUntil(() => mover(2).pos === 1); go('E', 1); go('N', 3); leave('E', 'radio'); } },
+  { room: 'bridge', from: 'E', to: 'W', go: () => { go('W', 1); go('S', 3); waitUntil(() => mover(2).pos === 1); stepOnto('W', 2); waitUntil(() => mover(2).pos === 0); go('W', 1); go('N', 3); leave('W', 'battlements'); } },
   { room: 'radio', from: 'W', to: 'part', go: () => { go('E', 4); go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 2.98); go('E', 2); } },
   { room: 'radio', from: 'part', to: 'W', after: 'radio:W>part', go: () => { go('S', 1); go('S', 1); go('W', 7); go('N', 1); leave('W', 'bridge'); } },
   { room: 'shaft', from: 'W', to: 'E', go: () => { go('E', 2); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 1.98 && mbox(1).top < 0.02); jump('E'); waitUntil(() => on(1) && mbox(1).top > 1.98); go('E', 1); leave('E', 'loft'); } },
@@ -313,6 +314,15 @@ try {
     put('cafeteria', 5, 3); jump('E'); processEvents(g); settle();
     check(g.lives === 0 && g.over === 'lose' && g.loseCause === 'lives', `lives: losing the last life loses the game (lives ${g.lives}, over ${g.over})`);
     check(app.mode === 'lose', `lives: then the game shows the losing screen (mode ${app.mode})`);
+  }
+  { // a trap ride stops halfway over the pit and crumbles under you
+    const check = (cond, msg) => { if (cond) out.push('ok: ' + msg); else failures.push('FAIL: ' + msg); };
+    const g = enter('bridge', 'W');
+    go('N', 1); stepOnto('E', 0);
+    waitUntil(() => g.lives < LIVES, 6 * FPS); processEvents(g);
+    check(g.lives === LIVES - 1, `rides: a trap ride drops you into the pit (lives ${g.lives})`);
+    waitUntil(() => app.dying <= 0 && mover(2).pos === 0, 4 * FPS);
+    check(mover(2).pos === 0 && g.hero.x === 0, `rides: back at the doorway, the good ride is on your side (at ${mover(2).pos})`);
   }
 } catch (err) {
   failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
