@@ -94,8 +94,8 @@ function groundAt(t, x, y) {
   const [nw, ne, se, sw] = tileCorners(t, u, v);
   return nw * (1 - fx) * (1 - fy) + ne * fx * (1 - fy) + se * fx * fy + sw * (1 - fx) * fy;
 }
-// Every tree, rock, house and walker in view, as draw calls grouped by the diagonal row of tiles they stand on.
-// Each house and walker drawn also leaves its box on screen in world.picks, so the mouse can point at it.
+// Every tree, rock, house, sheep and walker in view, as draw calls grouped by the diagonal row of tiles they stand on.
+// Each house, walker and sheep drawn also leaves its box on screen in world.picks, so the mouse can point at it.
 function peopleByRow(world, ms) {
   const t = world.terrain, cam = world.cam, rows = new Map();
   world.picks = [];
@@ -116,6 +116,12 @@ function peopleByRow(world, ms) {
     add(h.u, h.v, y, (s) => drawHouse(s, h, x, y, ms));
     const sp = SPRITES[h.tribe].house[h.level - 1];
     world.picks.push({ house: h, x0: x - sp.w / 2, x1: x + sp.w / 2, y0: y - sp.h + 3, y1: y + 3, y });
+  }
+  for (const sh of world.sheep) {
+    const [x, y] = project(cam, sh.x, sh.y, groundAt(t, sh.x, sh.y));
+    const left = (sh.tx - sh.x) - (sh.ty - sh.y) < 0, sp = SHEEP_SPRITES[sh.graze > 0 ? 2 : Math.floor((world.tick + sh.id) / 8) % 2];
+    add(Math.floor(sh.x), Math.floor(sh.y), y, (s) => blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 2, left));
+    world.picks.push({ sheep: sh, x0: x - 6, x1: x + 6, y0: y - 9, y1: y + 2, y });
   }
   for (const w of world.walkers) {
     const [x, y] = project(cam, w.x, w.y, groundAt(t, w.x, w.y));
@@ -311,6 +317,7 @@ function oddsAgainst(game, mine, theirs, rivalTribe) {
 function drawInspect(s, game) {
   const p = pickedThing(game);
   if (!p) return;
+  if (p.sheep) return drawTag(s, p, [p.sheep.graze > 0 ? 'A SHEEP. IT IS GRAZING.' : 'A SHEEP. IT IS GOING SOMEWHERE.'], C.snow);
   const thing = p.house || p.walker, tribe = thing.tribe, tr = game.tribes[tribe];
   const lines = [];
   if (p.house) lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${LEVEL_NAMES[thing.level - 1]} ${Math.floor(thing.pop)}/${CAP[thing.level - 1]}`);
@@ -323,9 +330,13 @@ function drawInspect(s, game) {
     const theirs = p.house ? Math.max(1, Math.floor(thing.pop)) : thing.strength;
     lines.push(near ? `YOUR ${near.strength}: ${Math.round(oddsAgainst(game, near.strength, theirs, tribe) * 100)}% TO WIN` : 'NO BAND OF YOURS NEAR');
   }
+  drawTag(s, p, lines, TRIBE_COLOURS[tribe].c);
+}
+// A tag of a few lines above the thing pointed at, in a box edged with `edge`; a third line is in gold.
+function drawTag(s, p, lines, edge) {
   const w = Math.max(...lines.map(textWidth)) + 8, h = lines.length * 9 + 5;
   const x = Math.round(Math.max(2, Math.min(LW - w - 2, (p.x0 + p.x1) / 2 - w / 2))), y = Math.round(Math.max(70, p.y0 - h - 3));
-  fillRect(s, x - 1, y - 1, w + 2, h + 2, TRIBE_COLOURS[tribe].c);
+  fillRect(s, x - 1, y - 1, w + 2, h + 2, edge);
   fillRect(s, x, y, w, h, C.black);
   lines.forEach((l, i) => text(s, l, x + 4, y + 3 + i * 9, i === 2 ? C.gold : C.snow));
 }

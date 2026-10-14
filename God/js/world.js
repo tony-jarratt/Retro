@@ -17,7 +17,7 @@ function makeWorld(seed, opts = {}) {
     seed, terrain, tick: 0, rng: new Rng(seed ^ 0x5eed), over: null, // over: { winner } once a tribe is wiped out
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
     tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), marching: false, bridging: false, lastPower: 0, mines: 0, weapons: 0 })),
-    houses: [], walkers: [], nextId: 1,
+    houses: [], walkers: [], sheep: [], nextId: 1,
     events: [],           // what happened since the screen last looked: { type, tribe, u, v, ... }
     cam: { u: 0, v: 0 },
     hover: null,          // the corner under the mouse
@@ -34,6 +34,12 @@ function makeWorld(seed, opts = {}) {
     addHouse(world, RIVAL, dark.u, dark.v, START_PEOPLE);
     addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
     addWalker(world, RIVAL, dark.u + 0.5, dark.v + 0.5, 1);
+    for (const home of [{ u: MAP_N * 0.3, v: MAP_N * 0.32 }, { u: MAP_N * 0.7, v: MAP_N * 0.68 }]) {
+      for (let i = 0; i < SHEEP_START; i++) {
+        const spot = grassNear(world, Math.floor(home.u) + world.rng.int(13) - 6, Math.floor(home.v) + world.rng.int(13) - 6);
+        if (spot) addSheep(world, spot.u + 0.5, spot.v + 0.5);
+      }
+    }
   }
   world.ai = opts.ai ?? [false, true]; // which tribes the computer plays
   world.contest = opts.contest ?? opts.people !== false; // false: a sandbox that never ends (for the checks)
@@ -53,6 +59,45 @@ function startingTile(world, cu, cv) {
 
 function say(world, message, ticks = 50) { world.message = message; world.messageTicks = ticks; }
 const event = (world, type, fields) => world.events.push({ type, ...fields });
+
+// ---- sheep ----
+// A sheep grazes for a while (head down), then ambles to a spot a tile or two away on dry land, and grazes again.
+function addSheep(world, x, y) {
+  const sh = { id: world.nextId++, x, y, tx: x, ty: y, graze: 20 + world.rng.int(80) };
+  world.sheep.push(sh);
+  return sh;
+}
+// A dry land tile at or near (u, v) with nothing standing on it, or null.
+function grassNear(world, u, v) {
+  const t = world.terrain;
+  for (let r = 0; r <= 3; r++) for (let b = v - r; b <= v + r; b++) for (let a = u - r; a <= u + r; a++) {
+    if (a >= 0 && b >= 0 && a < t.n && b < t.n && !isWater(t, a, b) && isClear(t, a, b)) return { u: a, v: b };
+  }
+  return null;
+}
+function stepSheep(world) {
+  const t = world.terrain;
+  for (const sh of world.sheep) {
+    if (sh.graze > 0) { sh.graze--; continue; }
+    const dx = sh.tx - sh.x, dy = sh.ty - sh.y, d = Math.hypot(dx, dy), step = SHEEP_SPEED * DT;
+    if (d > step) { sh.x += (dx / d) * step; sh.y += (dy / d) * step; continue; }
+    sh.x = sh.tx; sh.y = sh.ty;
+    sh.graze = 40 + world.rng.int(120); // 2 to 8 seconds with its head down
+    const tx = sh.x + (world.rng.next() * 3 - 1.5), ty = sh.y + (world.rng.next() * 3 - 1.5);
+    if (tx > 0 && ty > 0 && tx < t.n && ty < t.n && !isWater(t, Math.floor(tx), Math.floor(ty))) { sh.tx = tx; sh.ty = ty; }
+  }
+  // the land moves under sheep too: the sea and the swamps take them
+  world.sheep = world.sheep.filter((sh) => {
+    const u = Math.floor(sh.x), v = Math.floor(sh.y);
+    if (isWater(t, u, v)) { event(world, 'baa', { u, v, drowned: true }); return false; }
+    if (featureAt(t, u, v) === FEATURE.swamp) { t.f[v * t.n + u] = FEATURE.none; event(world, 'baa', { u, v, sank: true }); return false; }
+    return true;
+  });
+  if (world.tick % LAMB_TICKS === 0 && world.sheep.length && world.sheep.length < SHEEP_MAX) { // a lamb, beside its mother
+    const mum = world.sheep[world.rng.int(world.sheep.length)], spot = grassNear(world, Math.floor(mum.x), Math.floor(mum.y));
+    if (spot) addSheep(world, spot.u + 0.5, spot.v + 0.5);
+  }
+}
 
 // ---- people ----
 function addHouse(world, tribe, u, v, pop) {
@@ -326,6 +371,7 @@ function stepWorld(world) {
   checkFooting(world);
   stepHouses(world);
   stepMines(world);
+  stepSheep(world);
   if (world.tick % AI_THINK_TICKS === 0) world.ai.forEach((on, tribe) => { if (on) aiThink(world, tribe); });
   checkWorld(world);
   const alive = world.tribes.map((_, i) => world.houses.some((h) => h.tribe === i) || world.walkers.some((w) => w.tribe === i));

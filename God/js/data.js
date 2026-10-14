@@ -28,6 +28,12 @@ const START_PEOPLE = 3;                       // in the first house; two walkers
 const SCENT = 5;                 // a walker can sense the other tribe this many squares away, and heads for it
 const FIGHT_RANGE = 0.6;         // rival walkers this close (in tiles) fight
 
+// ---- sheep (a nod to Powermonger): they graze, wander, and drown like anyone else ----
+const SHEEP_START = 7;           // on each island at the start
+const SHEEP_MAX = 16;            // a lamb turns up now and then while there are fewer than this
+const SHEEP_SPEED = 0.35;        // tiles a second
+const LAMB_TICKS = 25 * 20;      // how often a lamb may appear
+
 // ---- mines and weapons ----
 // A house of MINE_LEVEL or more with a boulder in its patch of land (the 5 x 5 it is nearest to) digs a mine in it,
 // one mine a house. A tribe's mines decide its weapons, which multiply its strength in every fight.

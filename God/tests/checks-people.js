@@ -120,3 +120,20 @@ check('people: left alone for ten minutes a tribe settles its island and stays s
   assert(w.houses.some((h) => h.level >= 3), 'something better than a hut');
   assert(population(w, PLAYER) < 1000, `it did not run away (${population(w, PLAYER)} people)`);
 });
+
+check('sheep: a flock grazes on dry land for ten minutes, and the sea takes any whose pasture sinks', () => {
+  const w = makeWorld(SEED, { ai: [false, false] });
+  assert(w.sheep.length >= 10, `a flock on each island (${w.sheep.length})`);
+  for (let i = 0; i < 10 * 60 * 20; i++) {
+    stepWorld(w);
+    for (const sh of w.sheep) assert(!isWater(w.terrain, Math.floor(sh.x), Math.floor(sh.y)), `sheep ${sh.id} is in the sea at tick ${w.tick}`);
+  }
+  assert(w.sheep.length >= 8 && w.sheep.length <= SHEEP_MAX, `still a flock (${w.sheep.length})`);
+  const sh = w.sheep[0], u = Math.floor(sh.x), v = Math.floor(sh.y);
+  sh.graze = 1000; // standing still
+  w.tribes[PLAYER].manna = 999;
+  for (let k = 0; k < MAX_H && !isWater(w.terrain, u, v); k++) for (const [a, b] of [[u, v], [u + 1, v], [u + 1, v + 1], [u, v + 1]]) shapeLand(w, a, b, -1);
+  stepWorld(w);
+  eq(w.sheep.includes(sh), false, 'drowned');
+  assert(w.events.some((e) => e.type === 'baa' && e.drowned), 'with a last bleat');
+});

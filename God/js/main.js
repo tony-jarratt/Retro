@@ -189,13 +189,14 @@ function scroll(now) {
 
 // The sounds for what has happened since the last frame (the player's people only, one of each kind).
 const EVENT_SOUNDS = { settle: 'settle', grew: 'grew', drown: 'drown', broken: 'broken', fight: 'fight', razed: 'fight', repelled: 'fight',
-  bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
-const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood']);
+  bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', baa: 'baa', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
+const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood', 'baa']);
 // Effects to draw for what has happened: splashes, dust where people fight, a volcano's glowing crater.
 function makeEffects(world, now) {
   const t = world.terrain, at = (u, v) => Math.min(...tileCorners(t, Math.min(t.n - 1, u), Math.min(t.n - 1, v)));
   for (const e of world.events) {
-    if (e.type === 'drown') app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: 0, born: now });
+    if (e.type === 'drown' || (e.type === 'baa' && e.drowned)) app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: 0, born: now });
+    else if (e.type === 'baa' && e.sank) app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
     else if (e.type === 'sink') app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
     else if (e.type === 'fight' || e.type === 'razed' || e.type === 'repelled') app.fx.push({ kind: 'dust', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
     else if (e.type === 'volcano') app.fx.push({ kind: 'lava', u: e.u, v: e.v, h: heightAt(t, e.u, e.v), born: now });
@@ -205,6 +206,13 @@ function makeEffects(world, now) {
     }
   }
   app.fx = app.fx.filter((f) => now - f.born < FX_LIFE[f.kind]);
+}
+// Now and then a sheep in view bleats.
+let lastBaa = 0;
+function bleat(world, now) {
+  if (now - lastBaa < 9000 || Math.random() > 0.004) return;
+  const cam = world.cam;
+  if (world.sheep.some((sh) => sh.x >= cam.u && sh.y >= cam.v && sh.x < cam.u + VIEW_N && sh.y < cam.v + VIEW_N)) { Sound.play('baa'); lastBaa = now; }
 }
 function playEvents(world) {
   const mine = world.events.filter((e) => (e.tribe === PLAYER || e.loser === PLAYER || EVERYONE_HEARS.has(e.type)) && EVENT_SOUNDS[e.type]);
@@ -238,7 +246,7 @@ function frame(now) {
     musicUpdate(app.music && !app.world.over); // quiet at the end, so the victory or defeat tune is heard
     makeEffects(app.world, now);
     if (title) app.world.events.length = 0; // the demo's battles make no sound
-    else playEvents(app.world);
+    else { playEvents(app.world); bleat(app.world, now); }
     renderGame(screen, app.world, now, app.fx, { hud: !title });
     if (title) drawTitle(screen, app.difficulty, now);
     if (app.paused && !title) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);

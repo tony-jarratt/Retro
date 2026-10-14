@@ -106,6 +106,10 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
   - **Inspect:** hovering over a house or walker shows a tag with what it is, its people or strength, and its
     weapons. On a dark one it also shows your nearest band's odds of winning, which is a cheap trial of the
     "visible odds" twist.
+- **Sheep: built** (a nod to Powermonger). About 7 per island graze with their heads down, then amble a tile
+  or two. The sea and swamps take them (with a last bleat and a splash). A lamb appears every 25 s while there
+  are fewer than 16. They bleat now and then when in view, and hovering shows "A SHEEP. IT IS GRAZING." They are
+  purely for charm and play no part in the rules.
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.
 

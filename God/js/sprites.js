@@ -61,3 +61,11 @@ const FEATURE_ART = {
     '.gggggggeeee.', '..eeeeeeeee..'],
 };
 const FEATURE_SPRITES = Object.fromEntries(Object.entries(FEATURE_ART).map(([f, rows]) => [f, makeSprite(outlinedArt(rows), SPRITE_KEY)]));
+
+// A sheep: walking (head up, two steps) and grazing (head down). Faces right; flipped to walk left.
+const SHEEP_ART = [
+  ['..wwww....', '.wwwwwwkk.', 'wwwwwwwkkk', 'wwwwwwgkk.', '.wwggggg..', '.k.k..k.k.', '.k.k..k.k.'],
+  ['..wwww....', '.wwwwwwkk.', 'wwwwwwwkkk', 'wwwwwwgkk.', '.wwggggg..', '.kk...kk..', '.kk...kk..'],
+  ['..wwww....', '.wwwwww...', 'wwwwwwwk..', 'wwwwwwgkk.', '.wwgggggkk', '.k.k..k.k.', '.k.k..k.k.'],
+];
+const SHEEP_SPRITES = SHEEP_ART.map((rows) => makeSprite(outlinedArt(rows), SPRITE_KEY));
