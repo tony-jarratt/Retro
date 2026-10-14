@@ -57,6 +57,9 @@ const FEATURE_ART = {
   [FEATURE.swamp]: ['.G...G.', '.G.G.G.', 'GMG.GMG'], // reeds; the bog itself is painted on the tile
   [FEATURE.mine]: ['....bbb....', '...b.b.b...', '...bbbbb...', '...b...b...', '..gb...bg..', '.gggkkkggge', 'ggggkkkggee',
     'gwgggggggee', '.ggggggeee.'], // a pithead: a winding wheel over a shaft in the rock
+  [FEATURE.ruin]: ['.g.....g...', '.gg...ggg..', '.gge.bgge..', 'ggggbbgggee', '.bbbbbbbbe.'], // rubble of a razed house
+  [FEATURE.fallenHead]: ['....gggggggg..', '..gggggggggge.', '.gkggwwggggee.', 'ggggggggggeee.', '.eeeeeeeeeee..'], // a toppled head
+  [FEATURE.fallenArch]: ['..ggggg........', '.gggggge..ggg..', 'gggggge..ggggg.', '.eeeee..gggggge', '........eeeeee.'], // a broken arch
   [FEATURE.rock]: ['....gggg.....', '..ggwwgggg...', '.gwwwgggggge.', 'gwwgggggggeee', 'ggggggggggeee', 'gggggggggeeee',
     '.gggggggeeee.', '..eeeeeeeee..'],
 };

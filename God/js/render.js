@@ -219,7 +219,7 @@ function drawBook(s, game) {
     if (!tile) continue;
     const k = tileCorners(t, tile.u, tile.v), lo = Math.min(...k), hi = Math.max(...k);
     const f = t.f[tile.v * t.n + tile.u];
-    plot(s, BOOK_X + px, BOOK_Y + py, f === FEATURE.rock ? C.grey : f === FEATURE.mine ? C.black : f === FEATURE.swamp ? C.earth : f ? C.grassDark
+    plot(s, BOOK_X + px, BOOK_Y + py, f === FEATURE.rock || f === FEATURE.ruin || f === FEATURE.fallenHead || f === FEATURE.fallenArch ? C.grey : f === FEATURE.mine ? C.black : f === FEATURE.swamp ? C.earth : f ? C.grassDark
       : hi === 0 ? C.sea : lo === 0 ? C.sand : hi >= MAX_H ? C.snow : hi >= 5 ? C.rock : hi >= 3 ? C.grass : C.grassLit);
   }
   for (const h of game.houses) { // each house a dot in its tribe's colour
@@ -249,8 +249,10 @@ function drawPanel(s, game, hoverCost) {
     outlined(s, `${who} ${WEAPONS[tr.weapons]} ${tr.mines} ${tr.mines === 1 ? 'MINE' : 'MINES'}`, x + 208, y, TRIBE_COLOURS[tribe].c);
   }
   if (game.message) outlined(s, game.message, x, 42, C.gold);
-  else if (game.armed) outlined(s, game.armed === 'flood' ? 'FLOOD: CLICK ANYWHERE. ESC CANCELS' : game.armed === 'stone' ? 'STONE: CLICK TO RAISE, SHIFT-CLICK ONE TO TAKE DOWN'
-    : `${POWER[game.armed].name}: CLICK THE LAND. ESC CANCELS`, x, 42, C.red);
+  else if (game.armed) {
+    const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE, SHIFT-CLICK TO TAKE DOWN', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
+    outlined(s, `${p.name} (${p.cost}): ${how}`, x, 42, C.red);
+  }
   else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
   for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
     if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
@@ -259,14 +261,22 @@ function drawPanel(s, game, hoverCost) {
   }
 }
 // Where each power's name sits in the panel (also where a click picks it).
-function powerSlots() {
-  let x = 156;
+function powerSlots() { // names only: the cost shows when a power is picked, and on the help card
+  let x = 170;
   return POWERS.map((p) => {
-    const label = `${p.key} ${p.name} ${p.cost}`, slot = { id: p.id, label, x, y: 56, w: textWidth(label), h: 7 };
-    x += slot.w + 8;
+    const label = `${p.key} ${p.name}`, slot = { id: p.id, label, x, y: 56, w: textWidth(label), h: 7 };
+    x += slot.w + 12;
     return slot;
   });
 }
+
+// A little star, gold when earned, dark when not.
+const STAR = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '##...##'];
+function drawStar(s, x, y, earned) {
+  STAR.forEach((row, j) => { for (let i = 0; i < 7; i++) if (row[i] === '#') plot(s, x + i, y + j, earned ? C.gold : C.earth); });
+}
+function drawStars(s, cx, y, n) { for (let i = 0; i < 3; i++) drawStar(s, cx - 13 + i * 9, y, i < n); }
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 // The end of a game: a card over the land.
 function drawEnd(s, game) {
@@ -277,17 +287,29 @@ function drawEnd(s, game) {
     : next ? ['THE DARK GOD IS DRIVEN OUT.', `ON TO ${next.name}.`]
     : land !== null ? ['THE DARK GOD IS NO MORE.', 'THE WORLD IS YOURS.'] : ['THE DARK GOD IS NO MORE.', 'YOUR PEOPLE HAVE THE LAND.'];
   const keys = !won ? 'R TRY AGAIN    ENTER TITLE SCREEN' : next ? 'ENTER ON TO THE NEXT LAND    R PLAY AGAIN' : 'ENTER TITLE SCREEN    R PLAY AGAIN';
-  const w = Math.max(230, textWidth(keys) + 20), h = 78, x = Math.round(LW / 2 - w / 2), y = 150;
+  const timed = won && land !== null, w = Math.max(230, textWidth(keys) + 20), h = timed ? 104 : 78, x = Math.round(LW / 2 - w / 2), y = 140;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, won ? TRIBE_COLOURS[PLAYER].c : C.red);
   fillRect(s, x, y, w, h, C.black);
   outlined(s, title, Math.round(LW / 2 - textWidth(title) / 2), y + 8, C.gold);
   lines.forEach((l, i) => outlined(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 26 + i * 11, C.snow));
-  outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + 62, C.grey);
+  if (timed) { // the time it took, its stars, and whether it is the best yet
+    const secs = game.over.seconds, t = `TIME ${clock(secs)}${game.over.newBest ? '  NEW BEST' : ''}`;
+    outlined(s, t, Math.round(LW / 2 - textWidth(t) / 2), y + 52, game.over.newBest ? C.gold : C.snow);
+    drawStars(s, LW / 2, y + 64, starsFor(land, secs));
+  }
+  outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + h - 16, C.grey);
 }
 
 // ---- ley lines: a dotted line in each god's colour from each stone to the next, and the gathering at each hearth ----
 function drawLeyLines(s, game, ms) {
   const t = game.terrain, cam = game.cam;
+  if (game.call) { // the Call of the Stones: a column of light where everyone is going
+    const [x, y] = project(cam, game.call.u + 0.5, game.call.v + 0.5, groundAt(t, game.call.u + 0.5, game.call.v + 0.5));
+    for (let k = 0; k < 70; k += 2) {
+      const wob = Math.round(Math.sin(ms / 120 + k / 6) * 1.5);
+      fillRect(s, Math.round(x) - 2 + wob, Math.round(y) - k, 4, 2, (k + Math.floor(ms / 80)) % 6 < 3 ? C.gold : C.snow);
+    }
+  }
   const at = (st) => project(cam, st.u + 0.5, st.v + 0.5, groundAt(t, st.u + 0.5, st.v + 0.5));
   game.stones.forEach((line, tribe) => {
     for (let i = 0; i + 1 < line.length; i++) {
@@ -400,11 +422,13 @@ const HELP = [
     + 'GROUND, AND THE MORE FLAT LAND A HOUSE HAS AROUND IT THE BIGGER IT GROWS: TENT, HUT, COTTAGE, HOUSE, CASTLE. BIG '
     + 'HOUSES EARN MORE MANNA. TREES AND BOULDERS BLOCK BUILDING. RAISING OR LOWERING THE LAND CLEARS THEM.'],
   ['MINES', 'A HUT OR BIGGER WITH A BOULDER IN ITS LAND DIGS A MINE. MORE MINES, BETTER WEAPONS.'],
-  ['POWERS', '1 SWAMP, 2 QUAKE, 3 VOLCANO, 4 FLOOD: PRESS THE KEY, THEN CLICK THE LAND.'],
+  ['POWERS', 'PRESS THE KEY, THEN CLICK THE LAND. 1 SWAMP 30, 2 QUAKE 60, 3 VOLCANO 120, 4 FLOOD 250, 5 STONE 20, '
+    + '6 CALL 500. THE CALL OF THE STONES EMPTIES EVERY HOUSE ON BOTH SIDES AND SENDS EVERYONE TO ONE PLACE FOR A LAST '
+    + 'BATTLE. IT NEEDS THE LANDS JOINED. RAZED HOUSES AND FALLEN STONES LEAVE RUINS UNTIL THE LAND IS RESHAPED.'],
   ['STONES (5)', 'RAISE A LINE OF STONES. YOUR PEOPLE NEAR THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE, AND FIGHT OR '
     + 'SETTLE AT ITS END. ENEMIES OR QUAKES TOPPLE STONES.'],
   ['THE CAMPAIGN', 'FIVE LANDS, EACH HARDER THAN THE LAST. WIN ONE TO REACH THE NEXT, AND EARN A NEW POWER AS YOU GO. '
-    + 'POWERS NOT YET EARNED ARE SHOWN DARK.'],
+    + 'POWERS NOT YET EARNED ARE SHOWN DARK. WIN QUICKLY FOR UP TO THREE STARS.'],
   ['LOOKING ABOUT', 'SWIPE, MOUSE WHEEL, ARROWS OR CLICK THE MAP BOOK. POINT AT THINGS TO INSPECT THEM. P PAUSES, M MUSIC, H HELP.'],
 ];
 function wrapText(str, maxChars) {
@@ -428,7 +452,7 @@ function drawHelp(s) {
   text(s, close, Math.round(LW / 2 - textWidth(close) / 2), y + h - 12, C.grey);
 }
 
-function drawTitle(s, land, reached, ms) {
+function drawTitle(s, land, reached, best, ms) {
   const title = 'OLD STONES', scale = 5, tw = title.length * 6 * scale - scale, tx = Math.round(LW / 2 - tw / 2);
   bigText(s, title, tx + 3, 21, C.black, scale);
   bigText(s, title, tx + 2, 20, C.earth, scale);
@@ -439,11 +463,17 @@ function drawTitle(s, land, reached, ms) {
     { str: TITLE_LINES[0], c: C.snow }, { str: TITLE_LINES[1], c: C.snow }, { str: '', c: C.snow },
     { str: `LAND ${land + 1} OF ${LANDS.length}: ${L.name}`, c: C.gold }, { str: L.intro, c: C.snow },
   ];
+  const bestSecs = best[land];
+  lines.push({ str: bestSecs ? `BEST ${clock(bestSecs)}` : 'NOT WON YET', c: C.grey, stars: bestSecs ? starsFor(land, bestSecs) : 0 });
   if (reached > 0) lines.push({ str: `1 TO ${reached + 1}: PICK A LAND YOU HAVE REACHED`, c: C.grey });
   const w = 330, h = 18 + lines.length * 11 + 12, x = Math.round(LW / 2 - w / 2), y = 300 - h;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
   fillRect(s, x, y, w, h, C.black);
-  lines.forEach((l, i) => text(s, l.str, Math.round(LW / 2 - textWidth(l.str) / 2), y + 8 + i * 11, l.c));
+  lines.forEach((l, i) => {
+    const lx = Math.round(LW / 2 - (textWidth(l.str) + (l.stars ? 32 : 0)) / 2);
+    text(s, l.str, lx, y + 8 + i * 11, l.c);
+    if (l.stars) drawStars(s, lx + textWidth(l.str) + 19, y + 8 + i * 11, l.stars);
+  });
   const help = 'H FOR HELP';
   text(s, help, Math.round(LW / 2 - textWidth(help) / 2), y + h - 12, C.grey);
   if (Math.floor(ms / 500) % 2 === 0) {

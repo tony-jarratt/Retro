@@ -7,7 +7,9 @@
 
 // Things standing on a tile (t.f, one per tile, index v * n + u): nobody can settle there, and it is not flat ground
 // for a house, until the god clears it by moving any corner of the tile.
-const FEATURE = { none: 0, tree: 1, pine: 2, rock: 3, swamp: 4, mine: 5 }; // swamps come from the power, mines are dug in boulders
+// Swamps come from the power, mines are dug in boulders; ruins are what a razed house leaves, and a toppled stone lies
+// where it fell (a head for the good god, a broken arch for the dark god).
+const FEATURE = { none: 0, tree: 1, pine: 2, rock: 3, swamp: 4, mine: 5, ruin: 6, fallenHead: 7, fallenArch: 8 };
 
 function makeTerrain(n) {
   return { n, w: n + 1, h: new Int8Array((n + 1) * (n + 1)), f: new Uint8Array(n * n) };

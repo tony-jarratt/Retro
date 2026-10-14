@@ -71,9 +71,20 @@ function bridgeStep(world, tribe, from, to) {
   return false;
 }
 
+// A tribe's armed strength: everyone it has, housed or walking, times its weapons.
+function armedStrength(world, tribe) { return population(world, tribe) * armsOf(world, tribe); }
+// The dark god sounds the Call of the Stones, at the rival's nearest house, when it can and is clearly the stronger.
+function aiCall(world, tribe) {
+  if (!world.powers.has('call') || world.call || world.tribes[tribe].manna < CALL_COST) return false;
+  const pair = nearestPair(world, tribe), rival = tribe === PLAYER ? RIVAL : PLAYER;
+  if (!pair || armedStrength(world, tribe) < AI_CALL_EDGE * armedStrength(world, rival)) return false;
+  return castPower(world, tribe, 'call', pair[1].u, pair[1].v).ok;
+}
+
 // Now and then, when rich, the dark god shakes the earth under the rival's biggest house, or bogs the ground round it.
 function aiPower(world, tribe) {
   const me = world.tribes[tribe];
+  if (aiCall(world, tribe)) return true;
   const rules = world.rules;
   if (world.tick < rules.grace || me.manna < rules.powerManna || world.tick - me.lastPower < rules.powerGap) return false;
   const targets = world.houses.filter((h) => h.tribe !== tribe).sort((a, b) => b.level - a.level || b.pop - a.pop);

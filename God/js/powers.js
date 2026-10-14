@@ -7,6 +7,8 @@
 //   Volcano    throws up a peak to full height and strews boulders down its sides
 //   Flood      the sea rises a step everywhere: every corner above sea level drops by one
 //   Stone      a ley stone at the end of the god's line (stones.js); quakes and volcanoes topple stones
+//   Call       the Call of the Stones: every house on both sides empties and everyone marches to the tile for a last
+//              battle. Only once, and only when the two peoples' lands are joined.
 // castPower returns { ok: true } or { ok: false, reason }, and charges only for a power that was cast.
 
 const POWERS = [
@@ -15,13 +17,14 @@ const POWERS = [
   { id: 'volcano', name: 'VOLCANO', key: '3', cost: 120, reach: 3 },
   { id: 'flood', name: 'FLOOD', key: '4', cost: 250, reach: 0 },
   { id: 'stone', name: 'STONE', key: '5', cost: STONE_COST, reach: 0 }, // a ley stone on the tile (see stones.js)
+  { id: 'call', name: 'CALL', key: '6', cost: CALL_COST, reach: 0 },    // the Call of the Stones, on a tile
 ];
 const POWER = Object.fromEntries(POWERS.map((p) => [p.id, p]));
 const SWAMP_TILES = 8;
 const QUAKE_SHOCKS = 30;    // random raises and lowers in an earthquake
 const ROCK_CHANCE = 0.45;   // the chance of a boulder on each square of a volcano's slopes
 
-const POWER_WORDS = { swamp: 'SPREADS A SWAMP', quake: 'SHAKES THE EARTH', volcano: 'RAISES A VOLCANO', flood: 'FLOODS THE WORLD', stone: 'RAISES A STONE' };
+const POWER_WORDS = { swamp: 'SPREADS A SWAMP', quake: 'SHAKES THE EARTH', volcano: 'RAISES A VOLCANO', flood: 'FLOODS THE WORLD', stone: 'RAISES A STONE', call: 'SOUNDS THE CALL OF THE STONES' };
 
 function castPower(world, tribe, id, u, v) {
   const p = POWER[id];
@@ -29,7 +32,7 @@ function castPower(world, tribe, id, u, v) {
   if (!world.powers.has(id)) return { ok: false, reason: 'locked' }; // not earned yet in this land
   if (world.tribes[tribe].manna < p.cost) return { ok: false, reason: 'no-manna' };
   const done = id === 'swamp' ? swamp(world, u, v) : id === 'quake' ? quake(world, u, v) : id === 'volcano' ? volcano(world, u, v)
-    : id === 'stone' ? raiseStone(world, tribe, u, v) : flood(world);
+    : id === 'stone' ? raiseStone(world, tribe, u, v) : id === 'call' ? callOfTheStones(world, tribe, u, v) : flood(world);
   if (!done.ok) return done;
   world.tribes[tribe].manna -= p.cost;
   checkFooting(world);
@@ -90,5 +93,18 @@ function flood(world) {
   for (let c = 0; c < t.h.length; c++) if (t.h[c] > 0) t.h[c]--;
   for (let b = 0; b < t.n; b++) for (let a = 0; a < t.n; a++) if (isWater(t, a, b)) t.f[b * t.n + a] = FEATURE.none;
   world.terrain = t;
+  return { ok: true };
+}
+
+function callOfTheStones(world, tribe, u, v) {
+  const t = world.terrain;
+  if (world.call) return { ok: false, reason: 'called' };
+  if (u < 0 || v < 0 || u >= t.n || v >= t.n || isWater(t, u, v)) return { ok: false, reason: 'sea' };
+  const pair = nearestPair(world, tribe);
+  if (!pair || !landPath(t, pair[0], pair[1])) return { ok: false, reason: 'apart' };
+  for (const h of world.houses) addWalker(world, h.tribe, h.u + 0.5, h.v + 0.5, Math.max(1, Math.floor(h.pop))); // everyone comes out
+  world.houses = [];
+  for (const w of world.walkers) { w.gathered = false; w.pilgrim = 0; }
+  world.call = { tribe, u, v };
   return { ok: true };
 }

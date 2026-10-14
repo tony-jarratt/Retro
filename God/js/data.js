@@ -32,6 +32,8 @@ const FIGHT_RANGE = 0.6;         // rival walkers this close (in tiles) fight
 // A tribe's stones, in the order they were raised, make its ley line. Walkers near the first (the hearth) gather
 // there; at PILGRIM_MASS the gathering sets off along the line, and at the last stone fights or settles.
 const STONE_COST = 20;
+const CALL_COST = 500;           // the Call of the Stones: everyone, on both sides, to one place for a last battle
+const AI_CALL_EDGE = 1.5;        // the dark god calls when its armed strength is this many times the player's
 const MAX_STONES = 6;
 const GATHER_RADIUS = 5;         // walkers this near the hearth (counting diagonal steps) answer its pull
 const PILGRIM_MASS = 20;         // a gathering this strong sets off down the ley line
@@ -67,6 +69,12 @@ const FAIR_RULES = { grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerM
 // who does nothing lasts about: never falls, 9, 7, 7 and 5 minutes. A land sets the map (MAP_STYLE in terrain.js), the dark
 // god's rules, which powers both gods have (the stone always), and how many villages the dark god starts with.
 const MIN = 60 * 20; // ticks in a minute
+// Stars for a win: three at or under a land's par time, two within half as long again, one for any win. *tbd* from play.
+const PAR_MINUTES = [10, 12, 14, 15, 18];
+function starsFor(land, seconds) {
+  const par = PAR_MINUTES[land] * 60;
+  return seconds <= par ? 3 : seconds <= par * 1.5 ? 2 : 1;
+}
 const LANDS = [
   { name: 'THE GREEN ISLES', seed: 2024, intro: 'LEARN TO SHAPE THE LAND. YOU HAVE STONES.', powers: [], rivalHomes: 1,
     map: { mass: 0.22, strait: 2.5, forests: 6, wood: 0.5, rock: 0.5 },
@@ -79,7 +87,7 @@ const LANDS = [
   { name: 'THE NARROW SEA', seed: 11, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
     map: { mass: 0.22, strait: 1.2, forests: 12, wood: 0.75, rock: 1.2 },
     rules: { grace: 2 * MIN, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 } },
-  { name: "THE DARK GOD'S HOME", seed: 2024, intro: 'IT HOLDS TWO VILLAGES HERE. NEW: FLOOD.', powers: ['swamp', 'quake', 'volcano', 'flood'], rivalHomes: 2,
+  { name: "THE DARK GOD'S HOME", seed: 2024, intro: 'IT HOLDS TWO VILLAGES. NEW: FLOOD, AND THE CALL.', powers: ['swamp', 'quake', 'volcano', 'flood', 'call'], rivalHomes: 2,
     map: { mass: 0.2, strait: 2, forests: 12, wood: 0.75, rock: 1.5 },
     rules: { grace: 90 * 20, bridgeManna: 70, powerManna: 90, powerGap: 20 * 20, rivalManna: 100 } },
 ];

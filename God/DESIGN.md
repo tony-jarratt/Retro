@@ -147,6 +147,20 @@ grow, while a rival god does the same.
   - **Progress:** winning a land opens the next. It's remembered in localStorage (`oldstones.reached`), with a
     warning and a fresh start if storage is blocked.
   - **Title screen:** shows the land and what's new there; 1–5 replays a land you've reached.
+- **Times, stars, ruins, the Call and ambience: built.**
+  - **Times and stars:** a winning time per land, with stars: three at par or better (par 10, 12, 14, 15 and 18
+    minutes, *tbd*), two within half as long again, one for any win. The best time per land is kept in
+    localStorage (`oldstones.best`) and shown on the title card and the victory card ("NEW BEST"). A clock sits in
+    the bottom-left corner during play.
+  - **The Call of the Stones:** power 6, 500 manna, earned in land 5. It needs the two lands joined, and can be
+    sounded once. Every house on both sides empties, and everyone marches to the chosen tile, under a column of
+    light, for one last battle. Nobody settles or wears down on the way. The dark god sounds it when it is 1.5
+    times your armed strength.
+  - **Ruins:** a razed house leaves rubble, and a toppled stone leaves a fallen head or broken arch. These block
+    building until the land is reshaped. A stone taken down by its own god leaves nothing.
+  - **Ambient sound:** surf when the shore is in view, and birdsong over quiet land (not while pilgrims march or
+    the Call is sounded).
+  - **Power row:** names only now; the cost shows when a power is armed, and on the help card.
 - **On the arcade menu** (games.js) as "Old Stones", credited "inspired by Populous (1989)".
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.

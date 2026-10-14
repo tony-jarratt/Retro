@@ -24,6 +24,7 @@ function raiseStone(world, tribe, u, v) {
   if (u < 0 || v < 0 || u >= t.n || v >= t.n) throw new TerrainError('off-map', `a stone at tile (${u}, ${v}) is off the map`);
   if (isWater(t, u, v)) return { ok: false, reason: 'sea' };
   if (stoneAt(world, u, v) || houseAt(world, u, v)) return { ok: false, reason: 'taken' };
+  if (t.f[v * t.n + u] === FEATURE.fallenHead || t.f[v * t.n + u] === FEATURE.fallenArch) t.f[v * t.n + u] = FEATURE.none; // raised again where one fell
   if (world.stones[tribe].length >= MAX_STONES) return { ok: false, reason: 'too-many' };
   world.stones[tribe].push({ id: world.nextId++, u, v });
   return { ok: true };
@@ -32,9 +33,10 @@ function raiseStone(world, tribe, u, v) {
 // Take a stone out of a god's line; `why` is 'lowered' (by its god) or 'toppled'. Pilgrims on their way to a later
 // stone carry on along the shortened line; if the hearth goes, its gathering scatters.
 function removeStone(world, tribe, index, why) {
-  const line = world.stones[tribe], gone = line[index];
+  const line = world.stones[tribe], gone = line[index], t = world.terrain;
   if (!gone) throw new RulesError('no-stone', `tribe ${tribe} has no stone ${index} to remove`);
   line.splice(index, 1);
+  if (why !== 'lowered' && !isWater(t, gone.u, gone.v)) t.f[gone.v * t.n + gone.u] = tribe === PLAYER ? FEATURE.fallenHead : FEATURE.fallenArch;
   for (const w of world.walkers) {
     if (w.tribe !== tribe) continue;
     if (index === 0 && w.gathered) w.gathered = false;
@@ -79,6 +81,7 @@ function stepStones(world) {
 // How a walker feels the stones: { target, weight } for nextTile to steer by, or null. Pilgrims head for their next
 // stone; anyone else near their own hearth is drawn to it, except a band that has walked the line and is home.
 function stonePull(world, w) {
+  if (world.call) return { target: world.call, weight: 16 }; // the Call of the Stones: everyone goes
   const line = world.stones[w.tribe];
   if (w.pilgrim) return line[w.pilgrim] ? { target: line[w.pilgrim], weight: 14 } : null;
   const hearth = line[0];

@@ -24,6 +24,7 @@ const numberParam = (name, fallback) => {
 const app = {
   mode: 'title',      // 'title' (a demo plays behind the title card) or 'play'
   reached: 0,         // the furthest land of the campaign reached (remembered in this browser)
+  best: LANDS.map(() => null), // the best winning time on each land, in seconds (remembered too)
   land: 0,            // the land picked on the title screen, or being played
   world: null,        // the game being played, or the demo behind the title
   demoTarget: null,   // where the title's camera is drifting to
@@ -59,11 +60,27 @@ function loadReached() {
 function saveReached(n) {
   try { localStorage.setItem(PROGRESS_KEY, String(n)); } catch (err) { console.warn(`Old Stones: cannot save progress (land ${n + 1}):`, err); }
 }
-// When the player wins a land, the next one opens.
+const BEST_KEY = 'oldstones.best';
+function loadBest() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BEST_KEY) || 'null');
+    if (raw === null) return LANDS.map(() => null);
+    if (!Array.isArray(raw) || raw.length !== LANDS.length) { console.warn('Old Stones: ignoring saved best times:', raw); return LANDS.map(() => null); }
+    return raw.map((x) => (Number.isFinite(x) && x > 0 ? x : null));
+  } catch (err) { console.warn('Old Stones: cannot read saved best times:', err); return LANDS.map(() => null); }
+}
+function saveBest() {
+  try { localStorage.setItem(BEST_KEY, JSON.stringify(app.best)); } catch (err) { console.warn('Old Stones: cannot save best times:', err); }
+}
+// When the player wins a land: its time (and whether it beats the best), and the next land opens.
 function recordResult(world) {
   if (world.recorded || !world.over || world.land === null) return;
   world.recorded = true;
-  if (PLAYTEST) return;
+  if (world.over.winner !== PLAYER) return;
+  const best = app.best[world.land];
+  world.over.newBest = !best || world.over.seconds < best;
+  if (PLAYTEST) return; // play-testing leaves the saved times and progress alone
+  if (world.over.newBest) { app.best[world.land] = world.over.seconds; saveBest(); }
   if (world.over.winner === PLAYER && world.land === app.reached && app.reached < LANDS.length - 1) { app.reached++; saveReached(app.reached); }
 }
 function startLand(i) {
@@ -137,11 +154,17 @@ function powerClick([x, y]) {
 }
 const STONE_REFUSALS = { 'no-manna': 'NOT ENOUGH MANNA', sea: 'A STONE WILL NOT STAND IN THE SEA', taken: 'SOMETHING STANDS THERE ALREADY',
   'too-many': `NO MORE THAN ${MAX_STONES} STONES`, 'not-yours': 'THAT IS NOT ONE OF YOUR STONES' };
+const CALL_REFUSALS = { 'no-manna': 'NOT ENOUGH MANNA', sea: 'NOT IN THE SEA', called: 'THE CALL HAS BEEN SOUNDED ALREADY',
+  apart: 'THE LANDS MUST BE JOINED FIRST' };
 function castArmed() {
-  const w = app.world, id = w.armed, at = id === 'stone' ? w.hoverTile : w.hover;
+  const w = app.world, id = w.armed, at = id === 'stone' || id === 'call' ? w.hoverTile : w.hover;
   if (!at && id !== 'flood') return;
   const r = castPower(w, PLAYER, id, at ? at.u : 0, at ? at.v : 0);
-  if (!r.ok) { say(w, id === 'stone' ? STONE_REFUSALS[r.reason] : r.reason === 'no-manna' ? 'NOT ENOUGH MANNA' : `NO ROOM FOR A ${POWER[id].name} THERE`); Sound.play('buzz'); return; }
+  if (!r.ok) {
+    say(w, id === 'stone' ? STONE_REFUSALS[r.reason] : id === 'call' ? CALL_REFUSALS[r.reason] : r.reason === 'no-manna' ? 'NOT ENOUGH MANNA' : `NO ROOM FOR A ${POWER[id].name} THERE`);
+    Sound.play('buzz');
+    return;
+  }
   if (id === 'stone') return; // stay armed, to lay out a line of stones
   w.armed = null;
   updateHover();
@@ -232,8 +255,8 @@ function scroll(now) {
 // The sounds for what has happened since the last frame (the player's people only, one of each kind).
 const EVENT_SOUNDS = { settle: 'settle', grew: 'grew', drown: 'drown', broken: 'broken', fight: 'fight', razed: 'fight', repelled: 'fight',
   bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', baa: 'baa',
-  stone: 'chime', pilgrims: 'horn', topple: 'crash', lowered: 'crash', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
-const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood', 'baa', 'stone', 'pilgrims', 'topple']);
+  stone: 'chime', pilgrims: 'horn', topple: 'crash', lowered: 'crash', call: 'call', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
+const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood', 'baa', 'stone', 'pilgrims', 'topple', 'call']);
 // Effects to draw for what has happened: splashes, dust where people fight, a volcano's glowing crater.
 function makeEffects(world, now) {
   const t = world.terrain, at = (u, v) => Math.min(...tileCorners(t, Math.min(t.n - 1, u), Math.min(t.n - 1, v)));
@@ -250,6 +273,21 @@ function makeEffects(world, now) {
   }
   app.fx = app.fx.filter((f) => now - f.born < FX_LIFE[f.kind]);
 }
+// The sound of the land in view: surf where the sea meets the shore, birdsong over quiet land.
+let lastAmbience = 0;
+function ambience(world, now) {
+  if (now - lastAmbience < 2600) return;
+  lastAmbience = now;
+  const t = world.terrain, cam = world.cam;
+  let shore = 0, land = 0;
+  for (let v = cam.v; v < cam.v + VIEW_N; v++) for (let u = cam.u; u < cam.u + VIEW_N; u++) {
+    const k = tileCorners(t, u, v), lo = Math.min(...k), hi = Math.max(...k);
+    if (lo === 0 && hi > 0) shore++; else if (lo > 0) land++;
+  }
+  const fighting = world.walkers.some((w) => w.pilgrim) || world.call;
+  if (shore >= 3 && Math.random() < 0.7) Sound.play('surf');
+  if (land >= 25 && !fighting && Math.random() < 0.35) Sound.play('birds');
+}
 // Now and then a sheep in view bleats.
 let lastBaa = 0;
 function bleat(world, now) {
@@ -261,6 +299,7 @@ function playEvents(world) {
   const mine = world.events.filter((e) => (e.tribe === PLAYER || e.loser === PLAYER || EVERYONE_HEARS.has(e.type)) && EVENT_SOUNDS[e.type]);
   for (const k of new Set(mine.map((e) => EVENT_SOUNDS[e.type]))) Sound.play(k);
   if (world.events.some((e) => e.type === 'razed' && e.loser === PLAYER)) say(world, 'YOUR PEOPLE ARE UNDER ATTACK');
+  for (const e of world.events) if (e.type === 'call' && e.tribe === PLAYER) say(world, 'THE CALL OF THE STONES: EVERYONE TO THE LAST BATTLE', 120);
   for (const e of world.events) if (e.type === 'pilgrims') say(world, e.tribe === PLAYER ? `YOUR PILGRIMS SET OUT, ${e.strength} STRONG` : `THE DARK GOD'S PILGRIMS SET OUT, ${e.strength} STRONG`);
   for (const e of world.events) if (e.type === 'topple') say(world, e.tribe === PLAYER ? 'ONE OF YOUR STONES HAS FALLEN' : 'A DARK STONE HAS FALLEN');
   for (const e of world.events) if (e.type === 'armed') say(world, e.tribe === PLAYER ? `YOUR PEOPLE NOW FIGHT WITH ${WEAPONS[e.weapons]}` : `THE DARK GOD'S PEOPLE NOW HAVE ${WEAPONS[e.weapons]}`);
@@ -291,10 +330,14 @@ function frame(now) {
     musicUpdate(app.music && !app.world.over); // quiet at the end, so the victory or defeat tune is heard
     makeEffects(app.world, now);
     if (title) app.world.events.length = 0; // the demo's battles make no sound
-    else { playEvents(app.world); bleat(app.world, now); }
+    else { playEvents(app.world); bleat(app.world, now); ambience(app.world, now); }
     renderGame(screen, app.world, now, app.fx, { hud: !title });
     if (!title) recordResult(app.world);
-    if (title) drawTitle(screen, app.land, app.reached, now);
+    if (title) drawTitle(screen, app.land, app.reached, app.best, now);
+    else { // the land and the time so far, in the corner
+      const w = app.world, when = `${w.land === null ? '' : `LAND ${w.land + 1}   `}${clock(w.over ? w.over.seconds : w.tick * DT)}`;
+      text(screen, when, 4, LH - 10, C.grey);
+    }
     if (title && PLAYTEST) outlined(screen, 'PLAY-TEST MODE: ALL LANDS OPEN', 4, 4, C.red);
     if (app.paused && !title && !app.help) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
     if (app.help) drawHelp(screen);
@@ -315,7 +358,7 @@ function stillTitle() {
   for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(app.world);
   app.world.cam = clampCam(app.world.terrain, { u: 14, v: 15 });
   renderGame(screen, app.world, 1000, [], { hud: false });
-  drawTitle(screen, app.land, app.reached, 0);
+  drawTitle(screen, app.land, app.reached, app.best, 0);
 }
 function stillGame() {
   if (params.has('land')) startLand(numberParam('land', 1) - 1); else startGame(numberParam('seed', SEED));
@@ -351,6 +394,7 @@ if (params.has('still')) {
   } catch (err) { fail(err); }
 } else {
   app.reached = PLAYTEST ? LANDS.length - 1 : loadReached();
+  app.best = loadBest();
   app.land = PLAYTEST ? 0 : app.reached;
   showTitle();
   musicRandomTune();

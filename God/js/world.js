@@ -22,6 +22,7 @@ function makeWorld(seed, opts = {}) {
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
     tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), bridging: false, bridgeAt: null, lastPower: 0, mines: 0, weapons: 0 })),
     houses: [], walkers: [], sheep: [], stones: [[], []], nextId: 1,
+    call: null,           // the Call of the Stones, once cast: { tribe, u, v }, where everyone marches for the last battle
     events: [],           // what happened since the screen last looked: { type, tribe, u, v, ... }
     cam: { u: 0, v: 0 },
     hover: null,          // the corner under the mouse
@@ -251,6 +252,7 @@ function attackHouse(world, w, h) {
   if (r.aWins) {
     w.strength = r.left;
     world.houses.splice(world.houses.indexOf(h), 1);
+    world.terrain.f[h.v * world.terrain.n + h.u] = FEATURE.ruin; // it leaves rubble, until the land is reshaped
     event(world, 'razed', { tribe: w.tribe, loser: h.tribe, u: h.u, v: h.v });
     return true;
   }
@@ -262,7 +264,7 @@ function attackHouse(world, w, h) {
 
 function stepWalker(world, w) {
   if (w.gathered) return; // waiting at the hearth stone for the rest
-  if (!w.pilgrim) w.age += DT; // pilgrims are kept going by faith
+  if (!w.pilgrim && !world.call) w.age += DT; // pilgrims, and everyone answering the Call, are kept going by faith
   if (w.age >= WEAKEN_S) { // wandering wears them down
     w.age -= WEAKEN_S;
     w.strength -= Math.max(1, Math.floor(w.strength / 10));
@@ -402,7 +404,7 @@ function stepWorld(world) {
   checkWorld(world);
   const alive = world.tribes.map((_, i) => world.houses.some((h) => h.tribe === i) || world.walkers.some((w) => w.tribe === i));
   if (world.contest && (!alive[PLAYER] || !alive[RIVAL])) {
-    world.over = { winner: alive[PLAYER] ? PLAYER : alive[RIVAL] ? RIVAL : null };
+    world.over = { winner: alive[PLAYER] ? PLAYER : alive[RIVAL] ? RIVAL : null, seconds: Math.floor(world.tick * DT) };
     event(world, alive[PLAYER] ? 'win' : 'lose', { tribe: PLAYER });
   }
 }

@@ -79,12 +79,12 @@ check('rival: a tribe with no houses and no walkers loses the game', () => {
   w.houses = w.houses.filter((h) => h.tribe !== RIVAL);
   w.walkers = w.walkers.filter((x) => x.tribe !== RIVAL);
   stepWorld(w);
-  eq(w.over, { winner: PLAYER });
+  eq(w.over, { winner: PLAYER, seconds: Math.floor(w.tick * DT) });
   assert(w.events.some((e) => e.type === 'win'), 'a win event');
   const tick = w.tick;
   stepWorld(w);
   eq(w.tick, tick + 1, 'the clock moves');
-  eq(w.over, { winner: PLAYER }, 'and nothing else happens');
+  eq(w.over.winner, PLAYER, 'and nothing else happens');
 });
 
 check('rival: two dark gods left to fight it out for 15 minutes keep the rules (balance report)', () => {
