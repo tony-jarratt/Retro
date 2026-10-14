@@ -252,6 +252,11 @@ function stepRobot(game, room, r) {
   if (stuck) { r.dir = OPPOSITE[r.dir]; r.px = r.x; r.py = r.y; return; }
   r.px = r.x; r.py = r.y; // where it came from, so the screen can slide it across
   r.x = nx; r.y = ny;
+  if (room.padAt[ny][nx]) { // robots ride the transmitter too, unless something is standing on the twin
+    const to = padPartner(room, nx, ny), hero = game.hero;
+    const heroThere = hero.room === room.index && hero.x === to.x && hero.y === to.y;
+    if (!robotAt(room, to.x, to.y) && !heroThere) { r.x = to.x; r.y = to.y; r.px = to.x; r.py = to.y; emit(game, { t: 'teleport', fromX: nx, fromY: ny, toX: to.x, toY: to.y, robot: true }); }
+  }
 }
 
 function endGame(game) {

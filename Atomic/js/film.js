@@ -7,6 +7,8 @@
 // Everything is drawn in black and white first; present() then colours each 8 x 8 cell with its ink, like a Spectrum.
 
 const params = new URLSearchParams(location.search);
+// Play-test mode (index.html?playtest): rooms are numbered, G jumps to a room by number, and lives and time never run out.
+const PLAYTEST = params.has('playtest');
 const SW = 256, SH = 192;
 const HX = 10, HY = 5, LV = 10; // half a tile across, half a tile down, one level up (screen pixels)
 const BASE_WALL_H = 44;         // the back walls of a room (taller where a doorway is high up)
@@ -541,6 +543,29 @@ function drawCoilSparks(t) {
 }
 
 // ---- the moving blocks ----
+// The open pits as one clipping shape, so the part of a block below the floor shows only through the holes.
+function clipToPits(o, room) {
+  g.beginPath();
+  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) {
+    if (!room.pit[y][x]) continue;
+    const [u, v] = viewTile(o, x, y), z = room.h[y][x] * LV, c = [Pv(o, u, v, z), Pv(o, u + 1, v, z), Pv(o, u + 1, v + 1, z), Pv(o, u, v + 1, z)];
+    g.moveTo(c[0][0], c[0][1]); for (const p of c.slice(1)) g.lineTo(p[0], p[1]); g.closePath();
+  }
+  g.clip();
+}
+// A block from `bottom` to `top` (levels). Over a pit, the part below the floor is drawn as if down inside the hole:
+// clipped to the pit openings, so it never spills over the floor in front.
+function slab(o, room, x0, y0, x1, y1, bottom, top, skin) {
+  const tx = Math.floor((x0 + x1) / 2), ty = Math.floor((y0 + y1) / 2);
+  const floor = inBounds(room, tx, ty) && room.pit[ty][tx] ? room.h[ty][tx] : -SOLID;
+  if (bottom < floor) {
+    g.save(); clipToPits(o, room);
+    box(o, x0, y0, x1, y1, bottom * LV, (Math.min(top, floor) - bottom) * LV, top <= floor ? skin : { left: skin.left, right: skin.right });
+    g.restore();
+  }
+  if (top > floor) { const b = Math.max(bottom, floor); box(o, x0, y0, x1, y1, b * LV, (top - b) * LV, skin); }
+}
+
 function drawMover(room, o, m, t) {
   const b = m.box;
   if (!b) return;
@@ -556,23 +581,20 @@ function drawMover(room, o, m, t) {
     box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, floor * LV, (b.top - floor) * LV, { left: barred, right: barred, top: (T, R, B, L) => { line(lerp(T, R, 0.5), lerp(L, B, 0.5)); line(lerp(T, L, 0.5), lerp(R, B, 0.5)); } });
     g.restore();
   } else if (m.type === 'slider') {
-    const thick = b.bottom >= 0 ? b.top - b.bottom : 0.4;
-    box(o, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, (b.top - thick) * LV, thick * LV, { left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.25), lerp(R, L, 0.25), lerp(B, T, 0.25), lerp(L, R, 0.25)]) });
+    slab(o, room, b.x0 + i, b.y0 + i, b.x1 - i, b.y1 - i, b.bottom, b.top, { left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.25), lerp(R, L, 0.25), lerp(B, T, 0.25), lerp(L, R, 0.25)]) });
   } else if (m.type === 'crumble') {
     const shake = m.falling > 0 ? (Math.floor(t * 30) % 2 ? 0.04 : -0.04) : 0;
-    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.4) * LV, 0.4 * LV, {
+    slab(o, room, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, b.top - 1, b.top, {
       left: dotted, right: dotted,
       top: (T, R, B, L) => { polyline([lerp(T, L, 0.3), lerp(T, B, 0.45), lerp(R, B, 0.6)]); line(lerp(T, B, 0.45), lerp(L, B, 0.7)); },
     });
   } else if (m.type === 'ride') {
     const shake = m.falling > 0 ? (Math.floor(t * 30) % 2 ? 0.04 : -0.04) : 0;
-    // drawn standing a few pixels proud of the floor, with a rim on top, so it stands out against the pit's hatching
-    const lift = 4;
-    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.6) * LV, 0.6 * LV + lift, {
+    slab(o, room, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, b.top - 1, b.top, {
       left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.12), lerp(R, L, 0.12), lerp(B, T, 0.12), lerp(L, R, 0.12)]),
     });
     if (m.mark) { // flat to the screen, like the marks on plates
-      const [cx, cy] = P(o, (b.x0 + b.x1) / 2 + shake, (b.y0 + b.y1) / 2, b.top * LV + lift);
+      const [cx, cy] = P(o, (b.x0 + b.x1) / 2 + shake, (b.y0 + b.y1) / 2, b.top * LV);
       strokeMark(m.mark, (a, v) => [cx - 5 + a * 10, cy - 3.5 + v * 7]);
     }
   } else if (m.type === 'crusher') {
@@ -589,7 +611,7 @@ function drawMover(room, o, m, t) {
 function drawTile(game, room, o, x, y, t) {
   const h = room.h[y][x], z = h * LV;
   if (room.wall[y][x]) { drawProp(o, propAt(room, x, y), x, y, t); return; }
-  if (room.pit[y][x]) { drawPit(o, room, x, y, z); return; }
+  if (room.pit[y][x]) return; // drawn before everything else (renderRoom)
   if (h > 0) box(o, x, y, x + 1, y + 1, 0, z, { left: dotted, right: dotted });
   if (room.initial.pit[y][x]) { const d = inset(o, x, y, z, 0.15); edges(d); line(d[0], d[2]); line(d[1], d[3]); } // a filled pit: the crate's lid
   const plate = room.plateAt[y][x];
@@ -683,6 +705,8 @@ function renderRoom(game, t) {
   coilTops.length = 0;
   drawBackWalls(o, room, style, t);
   drawFloor(o, room);
+  // the open pits first: nothing in the room is lower, so nothing should ever be painted over by one
+  for (let y = 0; y < room.H; y++) for (let x = 0; x < room.W; x++) if (room.pit[y][x]) drawPit(o, room, x, y, room.h[y][x] * LV);
   // painter's order: the far squares first, by how far down the screen they are as seen
   const depth = (x, y) => { const [u, v] = viewTile(o, x, y); return u + v; };
   const items = [];
@@ -757,10 +781,11 @@ function drawPanel(game, t) {
 function drawCaption(game) {
   paint(0, 0, 32, 2, 'white');
   const c = app.caption;
-  if (c) {
+  if (app.goto !== null) centred(`GO TO ROOM ${app.goto}${app.tick % 30 < 15 ? '-' : ' '} (1-${ROOMS.length}, ENTER)`, 4);
+  else if (c) {
     const page = Math.min(c.pages.length - 1, Math.floor(c.age / 170));
     c.pages[page].forEach((l, i) => centred(l, 1 + i * 8));
-  } else centred(ROOMS[game.hero.room].name.toUpperCase(), 4);
+  } else centred(`${PLAYTEST ? `${game.hero.room + 1} ` : ''}${ROOMS[game.hero.room].name.toUpperCase()}`, 4);
 }
 
 // ---- screens ----
@@ -773,6 +798,7 @@ function drawTitle(t) {
   paint(0, 21, 32, 1, app.tick % 50 < 32 ? 'white' : 'black');
   centred('ATOMIC CASTLE', 17, 2);
   if (typeof TRIAL_ROOMS !== 'undefined') centred('THE ROTATION TRIAL', 34);
+  if (PLAYTEST) centred('PLAY-TEST MODE. G GOES TO A ROOM', 34);
   for (const [sx, sy] of [[20, 50], [70, 60], [200, 48], [236, 80], [40, 110], [222, 120], [110, 44], [160, 64]]) dot(sx, sy);
   const flame = Math.floor(t * 10) % 2 + 1;
   picture(rocketCanvas(PARTS.length, flame), 92, 52, 40, 80);
@@ -824,7 +850,7 @@ function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; 
 function saveBest(s) { try { localStorage.setItem(BEST_KEY, String(Math.round(s))); } catch (err) { console.warn('Could not save the best time:', err); } }
 
 const app = {
-  mode: 'title', tick: 0, game: null, held: [], lastBump: -1, caption: null, rocketWait: 0,
+  mode: 'title', tick: 0, game: null, held: [], lastBump: -1, caption: null, rocketWait: 0, goto: null,
   free: { x: 0, y: 0, z: 0, vz: 0, air: false, jumpDir: null, jumpQueued: 0, pushT: 0, walk: 0 }, // the hero, moving freely (film-move.js)
   slide: null, reveal: SH, border: 'black', borderTimer: 0, loading: 0, sparks: [], pendingEnd: null, endTimer: 0,
   best: loadBest(), newBest: false, fatal: null,
@@ -834,7 +860,7 @@ const app = {
 function startGame() {
   app.game = createGame();
   initMovers(app.game);
-  app.game.lives = LIVES; app.game.deaths = 0; app.dying = 0;
+  app.game.lives = LIVES; app.game.deaths = 0; app.dying = 0; app.game.playtest = PLAYTEST; app.goto = null;
   app.mode = 'play'; app.held = []; app.free.jumpQueued = 0; app.rocketWait = 0; app.slide = null; app.sparks = [];
   app.pendingEnd = null; app.newBest = false; app.caption = null; app.loading = 50; app.rot = 0;
   snapHero(app.game);
@@ -860,7 +886,7 @@ function processEvents(game) {
       case 'step': Sound.play('step'); break;
       case 'hop': Sound.play('hop'); break;
       case 'teleport': {
-        Sound.play('beam'); flashBorder('white', 4);
+        Sound.play('beam'); if (!e.robot) flashBorder('white', 4);
         const r = cur(game);
         sparkle(game, e.fromX, e.fromY, surface(r, e.fromX, e.fromY) * LV + 8, 8); sparkle(game, e.toX, e.toY, surface(r, e.toX, e.toY) * LV + 8, 12);
         break;
@@ -928,6 +954,8 @@ function onKeyDown(key) {
   Sound.init();
   if (app.mode === 'title') { if (key === ' ' || key === 'Enter' || key === '0') { Sound.play('choose'); startGame(); return true; } }
   else if (app.mode === 'play') {
+    if (app.goto !== null) return gotoKey(key);
+    if (PLAYTEST && (key === 'g' || key === 'G')) { app.goto = ''; app.held = []; return true; }
     if (key === 'z' || key === 'Z') { turnRoom(-1); return true; }
     if (key === 'x' || key === 'X') { turnRoom(1); return true; }
     if (key in KEY_DIRS) { const d = mapDir(app.rot, KEY_DIRS[key]); app.held = app.held.filter((x) => x !== d); app.held.push(d); return true; }
@@ -942,6 +970,29 @@ function onKeyDown(key) {
     if (app.endTimer > 40 && (key === ' ' || key === 'Enter')) { Sound.play('choose'); app.mode = 'title'; return true; }
   }
   return false;
+}
+// Typing a room number in play-test mode.
+function gotoKey(key) {
+  if (key === 'Escape') app.goto = null;
+  else if (key === 'Backspace') app.goto = app.goto.slice(0, -1);
+  else if (/^[0-9]$/.test(key) && app.goto.length < 2) app.goto += key;
+  else if (key === 'Enter') {
+    const n = Number(app.goto);
+    app.goto = null;
+    if (n >= 1 && n <= ROOMS.length) jumpToRoom(n - 1);
+    else say(`There is no room ${n}. The rooms go from 1 to ${ROOMS.length}.`);
+  }
+  return true;
+}
+// Put the hero in a room at its first doorway (or the start square), as if they had just walked in.
+function jumpToRoom(idx) {
+  const game = app.game, spec = ROOMS[idx], room = game.rooms[idx];
+  const [x, y] = room.start ? [room.start.x, room.start.y] : exitTile(spec, Object.keys(spec.exits)[0], Object.values(spec.exits)[0]);
+  const first = !game.seen.has(idx);
+  game.hero.room = idx; game.hero.x = x; game.hero.y = y; game.hero.entry = { x, y }; game.hero.air = 0;
+  game.seen.add(idx); app.dying = 0; app.rot = 0;
+  emit(game, { t: 'room', room: idx, first });
+  processEvents(game);
 }
 function onKeyUp(key) { if (key in KEY_DIRS) { const d = mapDir(app.rot, KEY_DIRS[key]); app.held = app.held.filter((x) => x !== d); } }
 
@@ -1060,9 +1111,10 @@ if (params.has('still')) {
     if (scene === 'win' || scene === 'lose') { app.mode = scene; app.endTimer = Number(params.get('t') || 80); if (scene === 'win') game.delivered = PARTS.map((p) => p.id); }
   }
   for (let i = 0; i < Number(params.get('ticks') || 30); i++) stepGame(STEP_MS / 1000);
-  // keys=E40,J,N20: hold a direction for some frames, or J to jump (then wait 40 frames); for testing movement
+  // keys=E40,J,N20,Kg: hold a direction for some frames, J to jump (then wait 40 frames), or K and a key name to press it
   for (const tok of (params.get('keys') || '').split(',').filter(Boolean)) {
     if (tok === 'J') { app.held = []; onKeyDown(' '); for (let i = 0; i < 40; i++) stepGame(STEP_MS / 1000); continue; }
+    if (tok[0] === 'K') { onKeyDown(tok.slice(1)); stepGame(STEP_MS / 1000); continue; }
     const d = tok[0], n = Number(tok.slice(1));
     if (!'NESW'.includes(d) || !(n > 0)) throw new Error(`keys: cannot read "${tok}"`);
     app.held = [d];

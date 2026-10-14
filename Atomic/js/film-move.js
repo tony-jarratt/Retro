@@ -304,7 +304,8 @@ function stepFree(game, dt) {
 // the room left as it is; with no lives left the game is lost.
 function die(game, cause) {
   if (game.over || app.dying > 0 || game.invuln > 0) return;
-  game.lives--; game.deaths++;
+  if (!game.playtest) game.lives--; // play-test mode (index.html?playtest) never runs out of lives
+  game.deaths++;
   emit(game, { t: 'die', cause, lives: game.lives });
   app.dying = DEATH_TIME; app.held = [];
   if (game.lives <= 0) { game.over = 'lose'; game.loseCause = 'lives'; emit(game, { t: 'lose' }); }
@@ -320,7 +321,8 @@ function resetMovers(room) { for (const m of room.movers) { m.falling = 0; m.gon
 // (so you can jump over one), and a steam vent only catches you with your feet on it.
 function freeUpdate(game, dt) {
   if (game.over) return;
-  game.time -= dt; game.elapsed += dt;
+  if (!game.playtest) game.time -= dt; // nor out of time
+  game.elapsed += dt;
   game.invuln = Math.max(0, game.invuln - dt);
   app.rocketWait -= dt;
   if (game.time <= 0) { game.loseCause = 'time'; endGame(game); return; }

@@ -340,6 +340,9 @@ try {
     check(g.hero.x === 7 && g.hero.y === 0, `pads: the cross pad sends you to its twin in the cupboard (at ${g.hero.x},${g.hero.y})`);
     go('E', 1); holdUntil('W', () => g.hero.x !== 8); processEvents(g);
     check(g.hero.x === 6 && g.hero.y === 4, `pads: stepping off the twin and back on sends you back (at ${g.hero.x},${g.hero.y})`);
+    const rg = enter('repair', 'W'), bot = cur(rg).robots[0]; // walking south from 2,1 towards the ring pad at 2,6
+    waitUntil(() => bot.y === 0 || bot.y === 6, 10 * FPS);
+    check(bot.x === 6 && bot.y === 0, `pads: a robot that walks onto a pad comes out of its twin (robot at ${bot.x},${bot.y}, lives ${rg.lives})`);
   }
 } catch (err) {
   failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
