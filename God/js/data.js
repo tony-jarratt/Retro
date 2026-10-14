@@ -46,6 +46,14 @@ const MARCH_STRENGTH = 10;       // once the land joins, its bands this strong m
 const AI_POWER_MANNA = 160;      // after the grace period, with this much saved, it casts a swamp or earthquake on you...
 const AI_POWER_GAP = 40 * 20;    // ...at most every 40 s
 
+// How hard the dark god plays, chosen on the title screen. FAIR is the numbers above.
+const DIFFICULTIES = [
+  { name: 'GENTLE', grace: 5 * 60 * 20, bridgeManna: 200, powerManna: 260, powerGap: 75 * 20, rivalManna: 25 },
+  { name: 'FAIR', grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerManna: AI_POWER_MANNA, powerGap: AI_POWER_GAP, rivalManna: START_MANNA },
+  { name: 'CRUEL', grace: 2 * 60 * 20, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 },
+];
+const FAIR = 1;
+
 // ---- the screen ----
 const LW = 512, LH = 344;  // the low-res screen the game draws into, shown at 2x
 const VIEW_N = 10;         // the land view shows this many tiles each way

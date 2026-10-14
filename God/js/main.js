@@ -1,10 +1,12 @@
 'use strict';
 
 // The browser side: the loop, the mouse and keys, and the test hooks.
-//   index.html?seed=N        another map
+//   index.html?seed=N        that map for every game (otherwise each game is a new land)
+//   index.html?still&scene=title  the title screen
 //   index.html?manna=N       start with more manna (for trying things out)
 //   index.html?still&cam=u,v&mx=..&my=..&shape=u,v,dir;u,v,dir&cast=power,u,v;...&armed=power&ticks=N
-//                            draws one frame and stops (for screenshots); mx, my are low-res screen pixels
+//                            draws one frame and stops (for screenshots); mx, my are low-res screen pixels;
+//                            &ms=.. the clock for animations, &fxage=.. how far into an effect to catch it
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
@@ -17,14 +19,50 @@ const numberParam = (name, fallback) => {
 };
 
 const app = {
-  world: makeWorld(numberParam('seed', SEED), { manna: numberParam('manna', START_MANNA) }),
+  mode: 'title',      // 'title' (a demo plays behind the title card) or 'play'
+  difficulty: FAIR,
+  world: null,        // the game being played, or the demo behind the title
+  demoTarget: null,   // where the title's camera is drifting to
   mouse: null,        // low-res screen position, or null when off the canvas
   button: null,       // 1 raise, -1 lower, null when no button is held
   lastShape: 0,       // when the held button last shaped the land (ms)
   keys: new Set(), lastScroll: 0,
   wheel: [0, 0],      // swipe or wheel movement not yet turned into a tile's scroll
   paused: false, stopped: false, lastTime: 0, spare: 0,
+  music: true,        // M turns the background music off and on
+  fx: [],             // effects being drawn: splashes, dust, lava
 };
+
+// ---- the title screen and starting a game ----
+const randomSeed = () => 1 + Math.floor(Math.random() * 99999);
+function showTitle() {
+  app.mode = 'title';
+  app.world = makeWorld(randomSeed(), { ai: [true, true] });
+  app.fx = [];
+  app.demoTarget = null;
+}
+function startGame(seed) {
+  app.mode = 'play';
+  app.world = makeWorld(seed, { manna: numberParam('manna', START_MANNA), difficulty: app.difficulty });
+  app.world.pointer = app.mouse;
+  app.fx = [];
+  app.paused = false;
+  musicRandomTune();
+  updateHover();
+}
+// The title's camera drifts from one house to another, a tile at a time.
+let demoLastMove = 0;
+function driftDemo(now) {
+  const w = app.world;
+  if (w.over) { showTitle(); return; } // that war is over: start another
+  if (now - demoLastMove < 700) return;
+  demoLastMove = now;
+  if (!app.demoTarget || (w.cam.u === app.demoTarget.u && w.cam.v === app.demoTarget.v)) {
+    const h = w.houses.length ? w.houses[Math.floor(Math.random() * w.houses.length)] : { u: MAP_N / 2, v: MAP_N / 2 };
+    app.demoTarget = clampCam(w.terrain, { u: h.u - VIEW_N / 2, v: h.v - VIEW_N / 2 });
+  }
+  w.cam = { u: w.cam.u + Math.sign(app.demoTarget.u - w.cam.u), v: w.cam.v + Math.sign(app.demoTarget.v - w.cam.v) };
+}
 
 // ---- input ----
 function toLowRes(e) {
@@ -33,7 +71,7 @@ function toLowRes(e) {
 }
 function updateHover() {
   const w = app.world;
-  w.hover = app.mouse ? pickCorner(w.terrain, w.cam, app.mouse[0], app.mouse[1]) : null;
+  w.hover = app.mouse && app.mode === 'play' ? pickCorner(w.terrain, w.cam, app.mouse[0], app.mouse[1]) : null;
 }
 function shapeAtHover(now) {
   const w = app.world;
@@ -74,13 +112,18 @@ function castArmed() {
   updateHover();
 }
 
-canvas.addEventListener('mousemove', (e) => { app.mouse = toLowRes(e); updateHover(); });
-canvas.addEventListener('mouseleave', () => { app.mouse = null; app.button = null; updateHover(); });
+canvas.addEventListener('mousemove', (e) => { app.mouse = toLowRes(e); if (app.mode === 'play') app.world.pointer = app.mouse; updateHover(); });
+canvas.addEventListener('mouseleave', () => { app.mouse = null; app.world.pointer = null; app.button = null; updateHover(); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
   Sound.init();
   e.preventDefault();
   app.mouse = toLowRes(e);
+  if (app.mode === 'title') { // pick a difficulty, or click anywhere else to begin
+    const [x, y] = app.mouse, slot = difficultySlots().find((d) => x >= d.x - 3 && x <= d.x + d.w + 3 && y >= d.y - 3 && y <= d.y + d.h + 3);
+    if (slot) app.difficulty = slot.i; else startGame(numberParam('seed', randomSeed()));
+    return;
+  }
   // a right click lowers; on a Mac trackpad that is a two-finger click, or control-click, and shift-click lowers too
   const lower = e.button === 2 || (e.button === 0 && (e.ctrlKey || e.shiftKey));
   if (e.button === 0 && !lower && bookClick(app.mouse)) return;
@@ -101,6 +144,7 @@ window.addEventListener('mouseup', () => { app.button = null; });
 const WHEEL_STEP = 40; // wheel pixels to a tile
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (app.mode !== 'play') return;
   const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // lines or pages, on some mice
   let dx = e.deltaX * scale, dy = e.deltaY * scale;
   if (e.shiftKey && !dx) { dx = dy; dy = 0; }
@@ -116,16 +160,20 @@ canvas.addEventListener('wheel', (e) => {
 const SCROLL = { ArrowUp: [-1, -1], KeyW: [-1, -1], ArrowDown: [1, 1], KeyS: [1, 1], ArrowLeft: [-1, 1], KeyA: [-1, 1], ArrowRight: [1, -1], KeyD: [1, -1] };
 window.addEventListener('keydown', (e) => {
   Sound.init();
+  if (e.code === 'KeyM') { app.music = !app.music; say(app.world, app.music ? 'MUSIC ON' : 'MUSIC OFF', 30); }
+  if (app.mode === 'title') {
+    const pick = DIFFICULTIES.findIndex((_, i) => e.code === `Digit${i + 1}`);
+    if (pick >= 0) app.difficulty = pick;
+    if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); startGame(numberParam('seed', randomSeed())); }
+    return;
+  }
   if (SCROLL[e.code]) { e.preventDefault(); if (!app.keys.has(e.code)) { app.keys.add(e.code); app.lastScroll = 0; } }
   if (e.code === 'KeyP') app.paused = !app.paused;
   const power = POWERS.find((p) => e.code === `Digit${p.key}`);
   if (power && !app.world.over) arm(power.id);
   if (e.code === 'Escape') app.world.armed = null;
-  if (app.world.over && (e.code === 'Enter' || e.code === 'KeyR')) { // a new land, or the same one again
-    const seed = e.code === 'KeyR' ? app.world.seed : (app.world.seed * 7919 + 13) % 100000;
-    app.world = makeWorld(seed, { manna: numberParam('manna', START_MANNA) });
-    updateHover();
-  }
+  if (app.world.over && e.code === 'Enter') showTitle();
+  else if (app.world.over && e.code === 'KeyR') startGame(app.world.seed); // the same land again
 });
 window.addEventListener('keyup', (e) => app.keys.delete(e.code));
 
@@ -143,6 +191,21 @@ function scroll(now) {
 const EVENT_SOUNDS = { settle: 'settle', grew: 'grew', drown: 'drown', broken: 'broken', fight: 'fight', razed: 'fight', repelled: 'fight',
   bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
 const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood']);
+// Effects to draw for what has happened: splashes, dust where people fight, a volcano's glowing crater.
+function makeEffects(world, now) {
+  const t = world.terrain, at = (u, v) => Math.min(...tileCorners(t, Math.min(t.n - 1, u), Math.min(t.n - 1, v)));
+  for (const e of world.events) {
+    if (e.type === 'drown') app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: 0, born: now });
+    else if (e.type === 'sink') app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
+    else if (e.type === 'fight' || e.type === 'razed' || e.type === 'repelled') app.fx.push({ kind: 'dust', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
+    else if (e.type === 'volcano') app.fx.push({ kind: 'lava', u: e.u, v: e.v, h: heightAt(t, e.u, e.v), born: now });
+    else if (e.type === 'quake') for (let i = 0; i < 8; i++) {
+      const u = e.u + Math.floor(Math.random() * 7) - 3, v = e.v + Math.floor(Math.random() * 7) - 3;
+      if (u >= 0 && v >= 0 && u < t.n && v < t.n) app.fx.push({ kind: 'dust', u: u + 0.5, v: v + 0.5, h: at(u, v), born: now + i * 60 });
+    }
+  }
+  app.fx = app.fx.filter((f) => now - f.born < FX_LIFE[f.kind]);
+}
 function playEvents(world) {
   const mine = world.events.filter((e) => (e.tribe === PLAYER || e.loser === PLAYER || EVERYONE_HEARS.has(e.type)) && EVENT_SOUNDS[e.type]);
   for (const k of new Set(mine.map((e) => EVENT_SOUNDS[e.type]))) Sound.play(k);
@@ -167,36 +230,62 @@ function frame(now) {
     if (!app.lastTime) app.lastTime = now;
     app.spare = Math.min(app.spare + now - app.lastTime, 250);
     app.lastTime = now;
-    scroll(now);
+    const title = app.mode === 'title';
+    if (title) driftDemo(now);
+    else scroll(now);
     if (app.button && now - app.lastShape >= REPEAT_MS) shapeAtHover(now);
-    while (app.spare >= TICK_MS) { if (!app.paused) stepWorld(app.world); app.spare -= TICK_MS; }
-    playEvents(app.world);
-    renderGame(screen, app.world, now);
-    if (app.paused) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
+    while (app.spare >= TICK_MS) { if (!app.paused || title) stepWorld(app.world); app.spare -= TICK_MS; }
+    musicUpdate(app.music && !app.world.over); // quiet at the end, so the victory or defeat tune is heard
+    makeEffects(app.world, now);
+    if (title) app.world.events.length = 0; // the demo's battles make no sound
+    else playEvents(app.world);
+    renderGame(screen, app.world, now, app.fx, { hud: !title });
+    if (title) drawTitle(screen, app.difficulty, now);
+    if (app.paused && !title) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
+    const tuneHint = `M MUSIC ${app.music ? 'ON' : 'OFF'}`;
+    text(screen, tuneHint, LW - 4 - textWidth(tuneHint), LH - 10, C.grey);
     present(screen, presenter, ctx);
   } catch (err) { fail(err); return; }
   requestAnimationFrame(frame);
 }
 
+// Screenshot hooks: draw one frame and stop.
+function stillTitle() {
+  showTitle();
+  for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(app.world);
+  app.world.cam = clampCam(app.world.terrain, { u: 14, v: 15 });
+  renderGame(screen, app.world, 1000, [], { hud: false });
+  drawTitle(screen, app.difficulty, 0);
+}
+function stillGame() {
+  startGame(numberParam('seed', SEED));
+  const w = app.world;
+  if (params.has('cam')) { const [u, v] = params.get('cam').split(',').map(Number); w.cam = clampCam(w.terrain, { u, v }); }
+  for (const step of (params.get('shape') || '').split(';').filter(Boolean)) {
+    const [u, v, dir] = step.split(',').map(Number), r = shapeLand(w, u, v, dir);
+    if (!r.ok) console.warn(`still: shaping (${u}, ${v}) by ${dir} was refused (${r.reason})`);
+  }
+  for (const spell of (params.get('cast') || '').split(';').filter(Boolean)) { // cast=quake,20,22;flood
+    const [id, u, v] = spell.split(','), r = castPower(w, PLAYER, id, Number(u || 0), Number(v || 0));
+    if (!r.ok) console.warn(`still: casting ${spell} was refused (${r.reason})`);
+  }
+  if (params.has('armed')) w.armed = params.get('armed');
+  for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(w);
+  if (params.has('mx')) { app.mouse = [numberParam('mx', 0), numberParam('my', 0)]; w.pointer = app.mouse; updateHover(); }
+  const ms = numberParam('ms', 1000);
+  makeEffects(w, ms - numberParam('fxage', 200)); // effects from what was cast, caught a moment in
+  renderGame(screen, w, ms, app.fx);
+  if (params.has('mx')) renderGame(screen, w, ms, app.fx); // again, now that the picks (what the mouse can point at) exist
+}
+
 if (params.has('still')) {
   try {
-    const w = app.world;
-    if (params.has('cam')) { const [u, v] = params.get('cam').split(',').map(Number); w.cam = clampCam(w.terrain, { u, v }); }
-    for (const step of (params.get('shape') || '').split(';').filter(Boolean)) {
-      const [u, v, dir] = step.split(',').map(Number), r = shapeLand(w, u, v, dir);
-      if (!r.ok) console.warn(`still: shaping (${u}, ${v}) by ${dir} was refused (${r.reason})`);
-    }
-    for (const spell of (params.get('cast') || '').split(';').filter(Boolean)) { // cast=quake,20,22;flood
-      const [id, u, v] = spell.split(','), r = castPower(w, PLAYER, id, Number(u || 0), Number(v || 0));
-      if (!r.ok) console.warn(`still: casting ${spell} was refused (${r.reason})`);
-    }
-    if (params.has('armed')) w.armed = params.get('armed');
-    for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(w);
-    if (params.has('mx')) { app.mouse = [numberParam('mx', 0), numberParam('my', 0)]; updateHover(); }
-    renderGame(screen, w, numberParam('ms', 0));
+    if (params.get('scene') === 'title') stillTitle(); else stillGame();
     present(screen, presenter, ctx);
     document.title = 'STILL READY';
   } catch (err) { fail(err); }
 } else {
+  showTitle();
+  musicRandomTune();
   requestAnimationFrame(frame);
 }

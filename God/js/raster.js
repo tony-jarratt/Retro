@@ -73,6 +73,16 @@ function text(s, str, x, y, colour) {
     x += 6;
   }
 }
+// Big text: each pixel of the font drawn as a scale x scale block.
+function bigText(s, str, x, y, colour, scale) {
+  for (const raw of str.toUpperCase()) {
+    const glyph = FONT[raw];
+    if (!glyph) throw new RulesError('glyph', `the font has no "${raw}" (in "${str}")`);
+    glyph.forEach((row, j) => { for (let i = 0; i < 5; i++) if (row[i] === '#') fillRect(s, x + i * scale, y + j * scale, scale, scale, colour); });
+    x += 6 * scale;
+  }
+}
+
 // Text with a black outline, so it reads over the land.
 function outlined(s, str, x, y, colour) {
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) text(s, str, x + dx, y + dy, C.black);

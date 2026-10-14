@@ -10,11 +10,13 @@
 const DT = TICK_MS / 1000;
 
 function makeWorld(seed, opts = {}) {
-  const terrain = generateTerrain(MAP_N, seed);
+  const terrain = generateTerrain(MAP_N, seed), difficulty = opts.difficulty ?? FAIR, rules = DIFFICULTIES[difficulty];
+  if (!rules) throw new WorldError('difficulty', `there is no difficulty ${difficulty} (0 to ${DIFFICULTIES.length - 1})`);
   const world = {
+    difficulty, rules,      // how hard the dark god plays (DIFFICULTIES in data.js)
     seed, terrain, tick: 0, rng: new Rng(seed ^ 0x5eed), over: null, // over: { winner } once a tribe is wiped out
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
-    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? START_MANNA, marching: false, bridging: false, lastPower: 0, mines: 0, weapons: 0 })),
+    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), marching: false, bridging: false, lastPower: 0, mines: 0, weapons: 0 })),
     houses: [], walkers: [], nextId: 1,
     events: [],           // what happened since the screen last looked: { type, tribe, u, v, ... }
     cam: { u: 0, v: 0 },
@@ -76,17 +78,17 @@ function canSettle(world, u, v) {
 
 // The flat ground a house has to itself: the tiles in the 5 x 5 around it that are flat at its height and clear, have no other
 // house on them, and are nearer to it than to any other house (ties go to the older house).
-function flatScore(world, house) {
-  const t = world.terrain, level = tileCorners(t, house.u, house.v)[0];
-  let n = 0;
+function houseLand(world, house) {
+  const t = world.terrain, level = tileCorners(t, house.u, house.v)[0], out = [];
   for (let v = house.v - 2; v <= house.v + 2; v++) for (let u = house.u - 2; u <= house.u + 2; u++) {
     if (u < 0 || v < 0 || u >= t.n || v >= t.n || !isFlat(t, u, v) || !isClear(t, u, v) || tileCorners(t, u, v)[0] !== level) continue;
     const mine = gap(house, { u, v });
     if (world.houses.some((o) => o !== house && (gap(o, { u, v }) < mine || (gap(o, { u, v }) === mine && o.id < house.id)))) continue;
-    n++;
+    out.push({ u, v });
   }
-  return n;
+  return out;
 }
+const flatScore = (world, house) => houseLand(world, house).length;
 function houseLevel(world, house) {
   const score = flatScore(world, house);
   let level = 1;

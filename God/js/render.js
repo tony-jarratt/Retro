@@ -32,7 +32,7 @@ function facetColour(heights, shade) {
 // The land, back to front a diagonal row at a time, with the people standing on each row drawn straight after it,
 // so a hill in front hides whoever is behind it.
 function drawLand(s, world, ms) {
-  const t = world.terrain, cam = world.cam, glintFrame = Math.floor(ms / 400), people = peopleByRow(world);
+  const t = world.terrain, cam = world.cam, glintFrame = Math.floor(ms / 400), people = peopleByRow(world, ms), fields = fieldTiles(world);
   let row = 0;
   for (const { u, v } of tilesInView(cam)) {
     const r = u - cam.u + v - cam.v;
@@ -52,6 +52,19 @@ function drawLand(s, world, ms) {
       fillRect(s, Math.round(mid[0]) - 6, Math.round(mid[1]) + 1, 3, 1, C.grassDark);
       fillRect(s, Math.round(mid[0]) + 3, Math.round(mid[1]) - 2, 2, 1, C.deep);
     }
+    if (fields.has(v * t.n + u)) { // a house's farmland: a field of crops with furrows across it
+      const mid = project(cam, u + 0.5, v + 0.5, k[0][2]), f = pts.map((p) => [mid[0] + (p[0] - mid[0]) * 0.8, mid[1] + (p[1] - mid[1]) * 0.8]);
+      fillQuad(s, f[0], f[1], f[2], f[3], C.grassLit);
+      for (const d of [0.25, 0.5, 0.75]) line(s, lerp2(f[0], f[3], d), lerp2(f[1], f[2], d), C.sand);
+    }
+    if (k.every((c) => c[2] === 0)) { // foam where the sea meets the land, washing in and out
+      const mid = project(cam, u + 0.5, v + 0.5, 0), wash = Math.floor(ms / 500) % 2 ? 0.1 : 0.2;
+      for (const [du, dv, i, j] of [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]]) {
+        const a = u + du, b = v + dv;
+        if (a < 0 || b < 0 || a >= t.n || b >= t.n || isWater(t, a, b)) continue;
+        line(s, lerp2(pts[i], mid, wash), lerp2(pts[j], mid, wash), C.snow);
+      }
+    }
     if (k.every((c) => c[2] === 0)) { // a glint on the water, moving now and then
       const g = ((u * 73856093) ^ (v * 19349663) ^ (glintFrame * 83492791)) >>> 0;
       if (g % 3 === 0) {
@@ -63,6 +76,18 @@ function drawLand(s, world, ms) {
   drawPeople(s, people.get(row));
 }
 
+const lerp2 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+// The tiles that are some house's farmland (its patch of flat ground, not counting the house's own tile), as a set of
+// tile indices, for the houses in or near the view.
+function fieldTiles(world) {
+  const t = world.terrain, cam = world.cam, out = new Set();
+  for (const h of world.houses) {
+    if (h.u < cam.u - 3 || h.v < cam.v - 3 || h.u > cam.u + VIEW_N + 2 || h.v > cam.v + VIEW_N + 2) continue;
+    for (const p of houseLand(world, h)) if (p.u !== h.u || p.v !== h.v) out.add(p.v * t.n + p.u);
+  }
+  return out;
+}
+
 // The height of the land under a point (bilinear across the tile's corners).
 function groundAt(t, x, y) {
   const u = Math.min(t.n - 1, Math.floor(x)), v = Math.min(t.n - 1, Math.floor(y)), fx = x - u, fy = y - v;
@@ -70,8 +95,10 @@ function groundAt(t, x, y) {
   return nw * (1 - fx) * (1 - fy) + ne * fx * (1 - fy) + se * fx * fy + sw * (1 - fx) * fy;
 }
 // Every tree, rock, house and walker in view, as draw calls grouped by the diagonal row of tiles they stand on.
-function peopleByRow(world) {
+// Each house and walker drawn also leaves its box on screen in world.picks, so the mouse can point at it.
+function peopleByRow(world, ms) {
   const t = world.terrain, cam = world.cam, rows = new Map();
+  world.picks = [];
   const add = (u, v, y, draw) => {
     const a = u - cam.u, b = v - cam.v;
     if (a < 0 || b < 0 || a >= VIEW_N || b >= VIEW_N) return;
@@ -86,11 +113,14 @@ function peopleByRow(world) {
   }
   for (const h of world.houses) {
     const [x, y] = project(cam, h.u + 0.5, h.v + 0.5, tileCorners(t, h.u, h.v)[0]);
-    add(h.u, h.v, y, (s) => drawHouse(s, h, x, y));
+    add(h.u, h.v, y, (s) => drawHouse(s, h, x, y, ms));
+    const sp = SPRITES[h.tribe].house[h.level - 1];
+    world.picks.push({ house: h, x0: x - sp.w / 2, x1: x + sp.w / 2, y0: y - sp.h + 3, y1: y + 3, y });
   }
   for (const w of world.walkers) {
     const [x, y] = project(cam, w.x, w.y, groundAt(t, w.x, w.y));
     add(Math.floor(w.x), Math.floor(w.y), y, (s) => drawWalker(s, world, w, x, y));
+    world.picks.push({ walker: w, x0: x - 5, x1: x + 5, y0: y - 12, y1: y + 2, y });
   }
   return rows;
 }
@@ -99,9 +129,13 @@ function drawPeople(s, list) {
   list.sort((a, b) => a.y - b.y);
   for (const p of list) p.draw(s);
 }
-function drawHouse(s, h, x, y) {
+function drawHouse(s, h, x, y, ms) {
   const sp = SPRITES[h.tribe].house[h.level - 1];
   blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 3);
+  if (h.level >= 3) for (let i = 0; i < 3; i++) { // smoke from the chimney, curling up and away
+    const age = (ms / 1600 + i / 3 + h.id * 0.37) % 1, size = age < 0.3 ? 3 : age < 0.7 ? 2 : 1;
+    fillRect(s, Math.round(x - 3 + age * 5 + Math.sin(age * 6 + h.id) * 1.5), Math.round(y - sp.h + 2 - age * 14), size, size, age < 0.5 ? C.grey : C.snow);
+  }
   // a flag on a pole beside it, raised as the house fills up
   const px = x + Math.ceil(sp.w / 2), top = y - sp.h - 2, fill = h.pop / CAP[h.level - 1];
   line(s, [px, y + 1], [px, top], C.black);
@@ -222,18 +256,129 @@ function drawEnd(s, game) {
   fillRect(s, x, y, w, h, C.black);
   outlined(s, title, Math.round(LW / 2 - textWidth(title) / 2), y + 8, C.gold);
   lines.forEach((l, i) => outlined(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 26 + i * 11, C.snow));
-  const keys = 'ENTER NEW LAND    R SAME LAND';
+  const keys = 'ENTER TITLE SCREEN    R SAME LAND';
   outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + 62, C.grey);
 }
 
-function renderGame(s, game, ms) {
+// ---- short-lived effects (made from the world's events by main.js): { kind, u, v, h, born } ----
+const FX_LIFE = { splash: 700, dust: 600, lava: 10000 };
+function drawEffects(s, game, fx, ms) {
+  for (const e of fx) {
+    const age = (ms - e.born) / FX_LIFE[e.kind];
+    if (age < 0 || age >= 1) continue;
+    const [x, y] = project(game.cam, e.u, e.v, e.h);
+    if (e.kind === 'splash') { // a ring spreading on the water, and drops thrown up
+      const r = 2 + age * 12;
+      for (let i = 0; i < 10; i++) plot(s, x + Math.cos(i * 0.63) * r, y + Math.sin(i * 0.63) * r * 0.5, C.snow);
+      for (const dx of [-2, 0, 2]) plot(s, x + dx * (1 + age * 2), y - Math.sin(age * Math.PI) * (8 - Math.abs(dx)), C.glint);
+    } else if (e.kind === 'dust') { // a scuffle: puffs of dust, sparks at first
+      for (let i = 0; i < 6; i++) {
+        const a = i * 1.05 + e.u, r = 2 + age * 9;
+        fillRect(s, Math.round(x + Math.cos(a) * r), Math.round(y - 4 + Math.sin(a) * r * 0.6 - age * 4), age < 0.5 ? 3 : 2, age < 0.5 ? 3 : 2, i % 2 ? C.sand : C.grey);
+      }
+      if (age < 0.35) for (let i = 0; i < 4; i++) plot(s, x + Math.cos(i * 1.6 + ms / 40) * 4, y - 5 + Math.sin(i * 1.6 + ms / 40) * 3, C.gold);
+    } else if (e.kind === 'lava') { // a glowing crater with lava trickling down, and smoke billowing up
+      for (let i = 0; i < 26; i++) {
+        const g = ((i * 73 + Math.floor(ms / 110)) * 2654435761) >>> 0, a = (g % 628) / 100, r = (g >> 10) % 6;
+        plot(s, x + Math.cos(a) * r, y + Math.sin(a) * r * 0.5, (g >> 5) % 3 ? C.red : C.gold);
+      }
+      for (const dir of [-1, 1]) for (let i = 0; i < 10; i++) { // two streams down the front slopes
+        const flow = (i + ms / 160) % 10;
+        plot(s, x + dir * flow * 1.6, y + flow * 1.1, flow < 5 ? C.gold : C.red);
+      }
+      for (let i = 0; i < 4; i++) {
+        const rise = (ms / 1800 + i / 4) % 1, size = rise < 0.5 ? 4 : 3;
+        fillRect(s, Math.round(x - 1 + Math.sin(rise * 5 + i) * 3), Math.round(y - 5 - rise * 26), size, size, rise < 0.3 ? C.earth : rise < 0.6 ? C.grey : C.snow);
+      }
+    }
+  }
+}
+
+// The house or walker under the mouse (the one in front, if they overlap), or null.
+function pickedThing(game) {
+  if (!game.pointer || !game.picks) return null;
+  const [px, py] = game.pointer;
+  let best = null;
+  for (const p of game.picks) if (px >= p.x0 && px <= p.x1 && py >= p.y0 && py <= p.y1 && (!best || p.y > best.y)) best = p;
+  return best;
+}
+// The chance that a band of `mine` beats the rival thing of strength `theirs`, with both sides' weapons.
+function oddsAgainst(game, mine, theirs, rivalTribe) {
+  const a = mine * armsOf(game, PLAYER), b = theirs * armsOf(game, rivalTribe);
+  return a / (a + b);
+}
+// A tag over what the mouse points at: what it is, how many, its weapons, and for the dark god's, your odds against it.
+function drawInspect(s, game) {
+  const p = pickedThing(game);
+  if (!p) return;
+  const thing = p.house || p.walker, tribe = thing.tribe, tr = game.tribes[tribe];
+  const lines = [];
+  if (p.house) lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${LEVEL_NAMES[thing.level - 1]} ${Math.floor(thing.pop)}/${CAP[thing.level - 1]}`);
+  else lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} BAND OF ${thing.strength}`);
+  lines.push(`${WEAPONS[tr.weapons]}${tr.weapons ? ` X${WEAPON_FACTOR[tr.weapons]}` : ''}`);
+  if (tribe !== PLAYER) {
+    const at = p.house ? { x: thing.u + 0.5, y: thing.v + 0.5 } : thing;
+    let near = null, d = 9;
+    for (const w of game.walkers) if (w.tribe === PLAYER && Math.hypot(w.x - at.x, w.y - at.y) < d) { near = w; d = Math.hypot(w.x - at.x, w.y - at.y); }
+    const theirs = p.house ? Math.max(1, Math.floor(thing.pop)) : thing.strength;
+    lines.push(near ? `YOUR ${near.strength}: ${Math.round(oddsAgainst(game, near.strength, theirs, tribe) * 100)}% TO WIN` : 'NO BAND OF YOURS NEAR');
+  }
+  const w = Math.max(...lines.map(textWidth)) + 8, h = lines.length * 9 + 5;
+  const x = Math.round(Math.max(2, Math.min(LW - w - 2, (p.x0 + p.x1) / 2 - w / 2))), y = Math.round(Math.max(70, p.y0 - h - 3));
+  fillRect(s, x - 1, y - 1, w + 2, h + 2, TRIBE_COLOURS[tribe].c);
+  fillRect(s, x, y, w, h, C.black);
+  lines.forEach((l, i) => text(s, l, x + 4, y + 3 + i * 9, i === 2 ? C.gold : C.snow));
+}
+
+// ---- the title screen, drawn over a demo of two dark gods at war ----
+const TITLE_LINES = [
+  'SHAPE THE LAND SO YOUR PEOPLE CAN SETTLE IT.',
+  'FLAT LAND GROWS GREAT HOUSES, AND MANNA.',
+  'BOULDERS BY YOUR HOUSES BECOME MINES: BETTER ARMS.',
+  'CLICK RAISES, SHIFT-CLICK LOWERS. 1-4 CAST POWERS.',
+  'SWIPE, ARROWS OR THE MAP BOOK TO LOOK ABOUT.',
+  "WIPE OUT THE DARK GOD'S PEOPLE TO WIN.",
+];
+// Where each difficulty's name sits on the title card (also where a click picks it).
+function difficultySlots() {
+  const gap = 18, labels = DIFFICULTIES.map((d, i) => `${i + 1} ${d.name}`);
+  let x = Math.round(LW / 2 - (labels.reduce((n, l) => n + textWidth(l), 0) + gap * (labels.length - 1)) / 2);
+  return labels.map((label, i) => { const slot = { i, label, x, y: 286, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
+}
+function drawTitle(s, difficulty, ms) {
+  const title = 'OLD STONES', scale = 5, tw = title.length * 6 * scale - scale, tx = Math.round(LW / 2 - tw / 2);
+  bigText(s, title, tx + 3, 21, C.black, scale);
+  bigText(s, title, tx + 2, 20, C.earth, scale);
+  bigText(s, title, tx, 18, C.gold, scale);
+  const sub = 'A GOD GAME';
+  outlined(s, sub, Math.round(LW / 2 - textWidth(sub) / 2), 62, C.snow);
+  const w = 328, h = 120, x = Math.round(LW / 2 - w / 2), y = 196;
+  fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
+  fillRect(s, x, y, w, h, C.black);
+  TITLE_LINES.forEach((l, i) => text(s, l, x + 10, y + 8 + i * 11, i === TITLE_LINES.length - 1 ? C.gold : C.snow));
+  for (const slot of difficultySlots()) {
+    if (slot.i === difficulty) { fillRect(s, slot.x - 3, slot.y - 3, slot.w + 6, 13, C.gold); fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.black); }
+    text(s, slot.label, slot.x, slot.y, slot.i === difficulty ? C.gold : C.grey);
+  }
+  if (Math.floor(ms / 500) % 2 === 0) {
+    const go = 'PRESS ENTER OR CLICK TO BEGIN';
+    outlined(s, go, Math.round(LW / 2 - textWidth(go) / 2), y + h + 4 > LH - 10 ? y - 12 : y + h + 4, C.gold);
+  }
+}
+
+// opts.hud false: just the land and its people (the title screen's backdrop).
+function renderGame(s, game, ms, fx = [], opts = {}) {
   clearScreen(s, C.black);
   const real = game.cam;
   if (game.shake > 0) game.cam = { ...real, dx: Math.round(Math.sin(ms / 23) * 3), dy: Math.round(Math.cos(ms / 31) * 2) }; // the earth shakes
   drawLand(s, game, ms);
   drawSkirt(s, game.terrain, game.cam);
-  drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed);
+  drawEffects(s, game, fx, ms);
+  if (opts.hud === false) { game.cam = real; return; }
+  const thing = pickedThing(game);
+  if (!thing || game.armed) drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed);
   game.cam = real;
+  if (!game.armed) drawInspect(s, game);
   drawBook(s, game);
   drawPanel(s, game, game.hover ? hoverCosts(game, game.hover) : null);
   drawEnd(s, game);

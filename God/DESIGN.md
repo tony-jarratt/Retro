@@ -1,4 +1,4 @@
-# God game (working title) — design notes
+# Old Stones — design notes
 
 A god game in the spirit of the 1989 original the owner loved: shape the land so your people can settle and
 grow, while a rival god does the same. Not on the arcade menu until the prototype proves fun.
@@ -87,6 +87,25 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
     own rocks near its houses.
   - **On screen:** the panel shows each side's weapons and mine count, and armed walkers carry a blade
     coloured bronze, iron or steel.
+- **Background music: built.** `js/music.js` has three chip tunes that loop: Old Stones (D dorian, 84 bpm,
+  mysterious; the owner's favourite), Market Day (G major, 116 bpm, jaunty) and Green Hills (D major, 96 bpm,
+  pastoral). Each game picks one at random.
+  Each has a pulse lead, a harp arpeggio, a triangle bass and a soft drum, adapted from Elf's chip engine. The
+  music sits under the sound effects. M toggles it, and it goes quiet when a game ends.
+- **Charm and identity: built.**
+  - **Name:** Old Stones, after the owner's favourite tune.
+  - **Title screen:** two dark gods fight a demo war behind the title, while the camera drifts from house to
+    house. A how-to card sits in front.
+  - **Difficulty:** Gentle, Fair or Cruel (`DIFFICULTIES`). It sets the dark god's grace period, bridge and power
+    thresholds, how often it uses powers, and its starting manna. Fair is the old numbers.
+  - **Starting and ending:** Enter or a click begins. At the end, Enter returns to the title and R replays the
+    same land.
+  - **Fields:** each house's patch of farmland is drawn as crop fields with furrows.
+  - **Life:** chimney smoke from cottages and up, foam washing on the shore, splashes when people drown or sink,
+    dust and sparks where they fight, and a glowing, smoking crater with lava streams after a volcano.
+  - **Inspect:** hovering over a house or walker shows a tag with what it is, its people or strength, and its
+    weapons. On a dark one it also shows your nearest band's odds of winning, which is a cheap trial of the
+    "visible odds" twist.
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.
 

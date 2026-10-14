@@ -2,7 +2,7 @@
 
 // The dark god. Every AI_THINK_TICKS it looks at the corners round a few of its houses and tries raising and
 // lowering each on a copy of the land, with the same costs and manna as the player, and makes the move that gains its
-// houses the most flat ground for the manna (or saves up). Once it has AI_BRIDGE_MANNA saved, after a grace period,
+// houses the most flat ground for the manna (or saves up). Once it has world.rules.bridgeManna saved, after the grace period,
 // it raises land across the sea towards the player; when the land joins, its strong bands march (see nearestFoe).
 // Richer still, it casts a swamp or an earthquake on the player's biggest house (aiPower).
 
@@ -70,7 +70,8 @@ function bridgeStep(world, tribe, from, to) {
 // Now and then, when rich, the dark god shakes the earth under the rival's biggest house, or bogs the ground round it.
 function aiPower(world, tribe) {
   const me = world.tribes[tribe];
-  if (world.tick < AI_GRACE_TICKS || me.manna < AI_POWER_MANNA || world.tick - me.lastPower < AI_POWER_GAP) return false;
+  const rules = world.rules;
+  if (world.tick < rules.grace || me.manna < rules.powerManna || world.tick - me.lastPower < rules.powerGap) return false;
   const targets = world.houses.filter((h) => h.tribe !== tribe).sort((a, b) => b.level - a.level || b.pop - a.pop);
   if (!targets.length) return false;
   const h = targets[0], id = h.level >= 3 ? 'quake' : 'swamp';
@@ -86,7 +87,7 @@ function aiThink(world, tribe) {
   const me = world.tribes[tribe], pair = nearestPair(world, tribe);
   if (aiPower(world, tribe)) return { power: true };
   me.marching = !!pair && landPath(world.terrain, pair[0], pair[1]);
-  if (pair && !me.marching && world.tick >= AI_GRACE_TICKS && me.manna >= AI_BRIDGE_MANNA) {
+  if (pair && !me.marching && world.tick >= world.rules.grace && me.manna >= world.rules.bridgeManna) {
     let raised = 0;
     while (raised < AI_BRIDGE_STEPS && bridgeStep(world, tribe, pair[0], pair[1])) raised++;
     if (raised) {
