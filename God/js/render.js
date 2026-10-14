@@ -1,0 +1,245 @@
+'use strict';
+
+// Drawing a frame: the land view, the map book and the panel, all into the 16-colour screen.
+
+// ---- the land ----
+// Light comes from the viewer's left (the +v side) and from above, so slopes facing down-left are lit and slopes facing
+// down-right are shaded, like the cut faces at the front. A facet is lit, plain or shaded by how much it turns
+// towards that light compared with flat ground.
+const LIGHT = (() => { const l = [-0.35, 1, 1.4], m = Math.hypot(...l); return l.map((x) => x / m); })();
+const RISE = 0.6; // one step of height, in tiles, for the lighting
+function facetShade(p0, p1, p2) {
+  const e1 = [p1[0] - p0[0], p1[1] - p0[1], (p1[2] - p0[2]) * RISE], e2 = [p2[0] - p0[0], p2[1] - p0[1], (p2[2] - p0[2]) * RISE];
+  let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+  if (n[2] < 0) n = n.map((x) => -x);
+  const d = (n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]) / Math.hypot(...n);
+  return d > LIGHT[2] + 0.05 ? 0 : d < LIGHT[2] - 0.05 ? 2 : 1; // 0 lit, 1 plain, 2 shaded
+}
+// The colour of a facet from its corner heights: sea, sandy shore, grass, rock, snow.
+const LAND = { sand: [C.sand, C.sand, C.rockLit], grass: [C.grassLit, C.grass, C.grassDark], rock: [C.rockLit, C.rock, C.earth], snow: [C.snow, C.snow, C.grey] };
+// The grid line drawn over a facet of each colour: a shade darker.
+const GRID = { [C.sand]: C.rockLit, [C.grassLit]: C.grass, [C.grass]: C.grassDark, [C.grassDark]: C.earth, [C.rockLit]: C.rock,
+  [C.rock]: C.earth, [C.earth]: C.earth, [C.snow]: C.grey, [C.grey]: C.grey };
+function facetColour(heights, shade) {
+  const lo = Math.min(...heights), hi = Math.max(...heights);
+  if (hi === 0) return C.sea;
+  if (lo === 0) return LAND.sand[shade];
+  if (hi >= MAX_H) return LAND.snow[shade];
+  if (hi >= 5) return LAND.rock[shade];
+  return LAND.grass[shade];
+}
+
+// The land, back to front a diagonal row at a time, with the people standing on each row drawn straight after it,
+// so a hill in front hides whoever is behind it.
+function drawLand(s, world, ms) {
+  const t = world.terrain, cam = world.cam, glintFrame = Math.floor(ms / 400), people = peopleByRow(world);
+  let row = 0;
+  for (const { u, v } of tilesInView(cam)) {
+    const r = u - cam.u + v - cam.v;
+    if (r !== row) { drawPeople(s, people.get(row)); row = r; }
+    const k = [[u, v], [u + 1, v], [u + 1, v + 1], [u, v + 1]].map(([a, b]) => [a, b, heightAt(t, a, b)]);
+    const pts = k.map(([a, b, h]) => project(cam, a, b, h));
+    const colours = TILE_SPLIT.map(([i, j, l]) => {
+      const c = facetColour([k[i][2], k[j][2], k[l][2]], facetShade(k[i], k[j], k[l]));
+      fillTri(s, pts[i], pts[j], pts[l], c);
+      return c;
+    });
+    // a faint line along each tile's two back edges, so the squares of flat ground can be counted
+    if (colours[0] !== C.sea) { line(s, pts[0], pts[1], GRID[colours[0]]); line(s, pts[0], pts[3], GRID[colours[0]]); }
+    if (t.f[v * t.n + u] === FEATURE.swamp) { // a bog: dark murky water filling most of the square
+      const mid = project(cam, u + 0.5, v + 0.5, k[0][2]), bog = pts.map((p) => [mid[0] + (p[0] - mid[0]) * 0.75, mid[1] + (p[1] - mid[1]) * 0.75]);
+      fillQuad(s, bog[0], bog[1], bog[2], bog[3], C.earth);
+      fillRect(s, Math.round(mid[0]) - 6, Math.round(mid[1]) + 1, 3, 1, C.grassDark);
+      fillRect(s, Math.round(mid[0]) + 3, Math.round(mid[1]) - 2, 2, 1, C.deep);
+    }
+    if (k.every((c) => c[2] === 0)) { // a glint on the water, moving now and then
+      const g = ((u * 73856093) ^ (v * 19349663) ^ (glintFrame * 83492791)) >>> 0;
+      if (g % 3 === 0) {
+        const [cx, cy] = project(cam, u + 0.5, v + 0.5, 0), ox = (g >> 4) % 13 - 6, oy = (g >> 8) % 5 - 2;
+        fillRect(s, Math.round(cx + ox), Math.round(cy + oy), 3, 1, C.glint);
+      }
+    }
+  }
+  drawPeople(s, people.get(row));
+}
+
+// The height of the land under a point (bilinear across the tile's corners).
+function groundAt(t, x, y) {
+  const u = Math.min(t.n - 1, Math.floor(x)), v = Math.min(t.n - 1, Math.floor(y)), fx = x - u, fy = y - v;
+  const [nw, ne, se, sw] = tileCorners(t, u, v);
+  return nw * (1 - fx) * (1 - fy) + ne * fx * (1 - fy) + se * fx * fy + sw * (1 - fx) * fy;
+}
+// Every tree, rock, house and walker in view, as draw calls grouped by the diagonal row of tiles they stand on.
+function peopleByRow(world) {
+  const t = world.terrain, cam = world.cam, rows = new Map();
+  const add = (u, v, y, draw) => {
+    const a = u - cam.u, b = v - cam.v;
+    if (a < 0 || b < 0 || a >= VIEW_N || b >= VIEW_N) return;
+    if (!rows.has(a + b)) rows.set(a + b, []);
+    rows.get(a + b).push({ y, draw });
+  };
+  for (let b = cam.v; b < cam.v + VIEW_N; b++) for (let a = cam.u; a < cam.u + VIEW_N; a++) { // trees and rocks
+    const f = featureAt(t, a, b);
+    if (!f) continue;
+    const [x, y] = project(cam, a + 0.5, b + 0.5, groundAt(t, a + 0.5, b + 0.5)), sp = FEATURE_SPRITES[f];
+    add(a, b, y, (s) => blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 3, (a * 7 + b * 3) % 2 === 1));
+  }
+  for (const h of world.houses) {
+    const [x, y] = project(cam, h.u + 0.5, h.v + 0.5, tileCorners(t, h.u, h.v)[0]);
+    add(h.u, h.v, y, (s) => drawHouse(s, h, x, y));
+  }
+  for (const w of world.walkers) {
+    const [x, y] = project(cam, w.x, w.y, groundAt(t, w.x, w.y));
+    add(Math.floor(w.x), Math.floor(w.y), y, (s) => drawWalker(s, world, w, x, y));
+  }
+  return rows;
+}
+function drawPeople(s, list) {
+  if (!list) return;
+  list.sort((a, b) => a.y - b.y);
+  for (const p of list) p.draw(s);
+}
+function drawHouse(s, h, x, y) {
+  const sp = SPRITES[h.tribe].house[h.level - 1];
+  blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 3);
+  // a flag on a pole beside it, raised as the house fills up
+  const px = x + Math.ceil(sp.w / 2), top = y - sp.h - 2, fill = h.pop / CAP[h.level - 1];
+  line(s, [px, y + 1], [px, top], C.black);
+  const fy = Math.round(y - 3 - fill * (y - 3 - top));
+  fillRect(s, px + 1, fy, 4, 3, TRIBE_COLOURS[h.tribe].c);
+}
+function drawWalker(s, world, w, x, y) {
+  const tick = world.tick;
+  const sp = SPRITES[w.tribe].walker[Math.floor((tick + w.id * 3) / 6) % 2];
+  const flip = (w.tu + 0.5 - w.x) - (w.tv + 0.5 - w.y) < 0; // face the way they walk
+  blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 1, flip);
+  const arms = world.tribes[w.tribe].weapons;
+  if (arms) { // a blade in hand, bronze, iron or steel
+    const bx = Math.round(x) + (flip ? -4 : 4), by = Math.round(y) - sp.h + 3;
+    line(s, [bx, by], [bx, by + 4], [C.sand, C.grey, C.snow][arms - 1]);
+  }
+  if (w.strength >= 10) fillRect(s, Math.round(x) - 1, Math.round(y) - sp.h - 2, 3, 3, C.gold); // a strong band carries a standard
+}
+
+// The cut faces along the front two edges of the view, like a slice of cake: earth above the sea, water below.
+function drawSkirt(s, t, cam) {
+  const DEPTH = 6;
+  const face = (u0, v0, u1, v1, earth) => {
+    const h0 = heightAt(t, u0, v0), h1 = heightAt(t, u1, v1);
+    const top0 = project(cam, u0, v0, h0), top1 = project(cam, u1, v1, h1), sea0 = project(cam, u0, v0, 0), sea1 = project(cam, u1, v1, 0);
+    const bot0 = [sea0[0], sea0[1] + DEPTH], bot1 = [sea1[0], sea1[1] + DEPTH];
+    fillQuad(s, sea0, sea1, bot1, bot0, C.deep);
+    if (h0 || h1) { fillQuad(s, top0, top1, sea1, sea0, earth); line(s, top0, top1, C.grassDark); }
+  };
+  for (let a = 0; a < VIEW_N; a++) {
+    face(cam.u + a, cam.v + VIEW_N, cam.u + a + 1, cam.v + VIEW_N, C.rock);  // the front-left side
+    face(cam.u + VIEW_N, cam.v + a, cam.u + VIEW_N, cam.v + a + 1, C.earth); // the front-right side
+  }
+}
+
+function drawCursor(s, t, cam, corner, ms, armed) {
+  if (!corner) return;
+  const [x, y] = cornerPoint(t, cam, corner.u, corner.v), c = Math.floor(ms / 250) % 2 ? (armed ? C.red : C.gold) : C.snow;
+  const r = armed ? POWER[armed].reach : 0;
+  if (r) { // the square of land the power will touch, drawn on the ground
+    const at = (a, b) => { const cu = Math.max(0, Math.min(t.n, a)), cv = Math.max(0, Math.min(t.n, b)); return project(cam, cu, cv, heightAt(t, cu, cv)); };
+    const ring = [];
+    for (let i = -r; i < r; i++) ring.push([corner.u + i, corner.v - r]);
+    for (let i = -r; i < r; i++) ring.push([corner.u + r, corner.v + i]);
+    for (let i = r; i > -r; i--) ring.push([corner.u + i, corner.v + r]);
+    for (let i = r; i > -r; i--) ring.push([corner.u - r, corner.v + i]);
+    ring.forEach((p, i) => line(s, at(...p), at(...ring[(i + 1) % ring.length]), c));
+  }
+  line(s, [x - 5, y], [x, y - 3], c); line(s, [x, y - 3], [x + 5, y], c); line(s, [x + 5, y], [x, y + 3], c); line(s, [x, y + 3], [x - 5, y], c);
+  plot(s, x, y, c);
+}
+
+// ---- the map book ----
+function drawBook(s, game) {
+  const t = game.terrain, cam = game.cam;
+  fillRect(s, BOOK_X - 6, BOOK_Y - 4, 2 * MAP_N + 12, MAP_N + 8, C.earth);  // the cover
+  fillRect(s, BOOK_X - 3, BOOK_Y - 2, 2 * MAP_N + 6, MAP_N + 4, C.snow);   // the pages
+  fillRect(s, BOOK_X + MAP_N, BOOK_Y - 2, 1, MAP_N + 4, C.grey);           // the spine
+  for (let py = 0; py < MAP_N; py++) for (let px = 0; px < 2 * MAP_N; px++) {
+    const tile = bookTile(BOOK_X + px, BOOK_Y + py);
+    if (!tile) continue;
+    const k = tileCorners(t, tile.u, tile.v), lo = Math.min(...k), hi = Math.max(...k);
+    const f = t.f[tile.v * t.n + tile.u];
+    plot(s, BOOK_X + px, BOOK_Y + py, f === FEATURE.rock ? C.grey : f === FEATURE.mine ? C.black : f === FEATURE.swamp ? C.earth : f ? C.grassDark
+      : hi === 0 ? C.sea : lo === 0 ? C.sand : hi >= MAX_H ? C.snow : hi >= 5 ? C.rock : hi >= 3 ? C.grass : C.grassLit);
+  }
+  for (const h of game.houses) { // each house a dot in its tribe's colour
+    const [x, y] = bookPoint(h.u + 0.5, h.v + 0.5);
+    fillRect(s, Math.floor(x) - 1, Math.floor(y), 2, 2, TRIBE_COLOURS[h.tribe].c);
+  }
+  const N = VIEW_N, q = [[0, 0], [N, 0], [N, N], [0, N]].map(([a, b]) => bookPoint(cam.u + a, cam.v + b));
+  for (let i = 0; i < 4; i++) line(s, q[i], q[(i + 1) % 4], C.gold);
+}
+
+// ---- the panel and the message line ----
+function drawPanel(s, game, hoverCost) {
+  const x = 170, manna = game.tribes[PLAYER].manna;
+  const houses = game.houses.filter((h) => h.tribe === PLAYER).length;
+  outlined(s, `MANNA ${Math.floor(manna)}`, x, 10, C.gold);
+  outlined(s, `PEOPLE ${population(game, PLAYER)}   HOUSES ${houses}`, x + 100, 10, C.snow);
+  fillRect(s, x, 21, 202, 7, C.earth);
+  fillRect(s, x + 1, 22, Math.min(200, Math.floor(manna)), 5, C.gold);
+  // the tug of war: your people against the dark god's
+  const mine = population(game, PLAYER), theirs = population(game, RIVAL), split = Math.round((200 * mine) / Math.max(1, mine + theirs));
+  fillRect(s, x, 30, 202, 7, C.black);
+  fillRect(s, x + 1, 31, split, 5, TRIBE_COLOURS[PLAYER].c);
+  fillRect(s, x + 1 + split, 31, 200 - split, 5, TRIBE_COLOURS[RIVAL].c);
+  fillRect(s, x + 100, 29, 1, 9, C.snow);
+  for (const [tribe, y, who] of [[PLAYER, 21, 'YOU'], [RIVAL, 31, 'DARK']]) { // each side's weapons and mines
+    const tr = game.tribes[tribe];
+    outlined(s, `${who} ${WEAPONS[tr.weapons]} ${tr.mines} ${tr.mines === 1 ? 'MINE' : 'MINES'}`, x + 208, y, TRIBE_COLOURS[tribe].c);
+  }
+  if (game.message) outlined(s, game.message, x, 42, C.gold);
+  else if (game.armed) outlined(s, game.armed === 'flood' ? 'FLOOD: CLICK ANYWHERE. ESC CANCELS' : `${POWER[game.armed].name}: CLICK THE LAND. ESC CANCELS`, x, 42, C.red);
+  else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
+  for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
+    if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
+    outlined(s, slot.label, slot.x, slot.y, manna >= POWER[slot.id].cost ? C.gold : C.grey);
+  }
+}
+// Where each power's name sits in the panel (also where a click picks it).
+function powerSlots() {
+  let x = 170;
+  return POWERS.map((p) => {
+    const label = `${p.key} ${p.name} ${p.cost}`, slot = { id: p.id, label, x, y: 56, w: textWidth(label), h: 7 };
+    x += slot.w + 12;
+    return slot;
+  });
+}
+
+// The end of a game: a card over the land.
+function drawEnd(s, game) {
+  if (!game.over) return;
+  const won = game.over.winner === PLAYER, title = won ? 'VICTORY' : 'DEFEAT';
+  const lines = won ? ['THE DARK GOD IS NO MORE.', 'YOUR PEOPLE HAVE THE WORLD.'] : ['YOUR PEOPLE ARE GONE.', 'THE DARK GOD HAS THE WORLD.'];
+  const w = 230, h = 78, x = Math.round(LW / 2 - w / 2), y = 150;
+  fillRect(s, x - 2, y - 2, w + 4, h + 4, won ? TRIBE_COLOURS[PLAYER].c : C.red);
+  fillRect(s, x, y, w, h, C.black);
+  outlined(s, title, Math.round(LW / 2 - textWidth(title) / 2), y + 8, C.gold);
+  lines.forEach((l, i) => outlined(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 26 + i * 11, C.snow));
+  const keys = 'ENTER NEW LAND    R SAME LAND';
+  outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + 62, C.grey);
+}
+
+function renderGame(s, game, ms) {
+  clearScreen(s, C.black);
+  const real = game.cam;
+  if (game.shake > 0) game.cam = { ...real, dx: Math.round(Math.sin(ms / 23) * 3), dy: Math.round(Math.cos(ms / 31) * 2) }; // the earth shakes
+  drawLand(s, game, ms);
+  drawSkirt(s, game.terrain, game.cam);
+  drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed);
+  game.cam = real;
+  drawBook(s, game);
+  drawPanel(s, game, game.hover ? hoverCosts(game, game.hover) : null);
+  drawEnd(s, game);
+}
+// What raising and lowering the corner would cost ('-' when it can't be done).
+function hoverCosts(game, corner) {
+  const r = reshape(game.terrain, corner.u, corner.v, 1), l = reshape(game.terrain, corner.u, corner.v, -1);
+  return { raise: r.ok ? costOf(r) : '-', lower: l.ok ? costOf(l) : '-' };
+}
