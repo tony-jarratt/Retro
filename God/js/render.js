@@ -387,21 +387,46 @@ function drawTag(s, p, lines, edge) {
 }
 
 // ---- the title screen, drawn over a demo of two dark gods at war ----
-const TITLE_LINES = [
-  'SHAPE THE LAND SO YOUR PEOPLE CAN SETTLE IT.',
-  'FLAT LAND GROWS GREAT HOUSES, AND MANNA.',
-  'BOULDERS BY YOUR HOUSES BECOME MINES: BETTER ARMS.',
-  'CLICK RAISES, SHIFT-CLICK LOWERS. 1-4 CAST POWERS.',
-  'SWIPE, ARROWS OR THE MAP BOOK TO LOOK ABOUT.',
-  'RAISE STONES (5): YOUR PEOPLE GATHER AT THE FIRST,',
-  'THEN WALK THE LINE AND FIGHT OR SETTLE AT ITS END.',
-  "WIPE OUT THE DARK GOD'S PEOPLE TO WIN.",
+const TITLE_LINES = ['SHAPE THE LAND. GROW YOUR PEOPLE.', "WIPE OUT THE DARK GOD'S PEOPLE TO WIN."];
+
+// The help card (H, on the title screen or in play): headings, each followed by a paragraph wrapped to fit.
+const HELP = [
+  ["YOU ARE THE GOD OF THE BLUE PEOPLE.", "WIPE OUT THE DARK GOD'S PEOPLE TO WIN."],
+  ['THE LAND', 'CLICK RAISES THE LAND, SHIFT-CLICK (OR RIGHT-CLICK) LOWERS IT. IT COSTS MANNA. YOUR PEOPLE SETTLE ON FLAT '
+    + 'GROUND, AND THE MORE FLAT LAND A HOUSE HAS AROUND IT THE BIGGER IT GROWS: TENT, HUT, COTTAGE, HOUSE, CASTLE. BIG '
+    + 'HOUSES EARN MORE MANNA. TREES AND BOULDERS BLOCK BUILDING. RAISING OR LOWERING THE LAND CLEARS THEM.'],
+  ['MINES', 'A HUT OR BIGGER WITH A BOULDER IN ITS LAND DIGS A MINE. MORE MINES, BETTER WEAPONS.'],
+  ['POWERS', '1 SWAMP, 2 QUAKE, 3 VOLCANO, 4 FLOOD: PRESS THE KEY, THEN CLICK THE LAND.'],
+  ['STONES (5)', 'RAISE A LINE OF STONES. YOUR PEOPLE NEAR THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE, AND FIGHT OR '
+    + 'SETTLE AT ITS END. ENEMIES OR QUAKES TOPPLE STONES.'],
+  ['LOOKING ABOUT', 'SWIPE, MOUSE WHEEL, ARROWS OR CLICK THE MAP BOOK. POINT AT THINGS TO INSPECT THEM. P PAUSES, M MUSIC, H HELP.'],
 ];
+function wrapText(str, maxChars) {
+  const out = [];
+  let lineStr = '';
+  for (const word of str.split(' ')) {
+    if (lineStr && (lineStr + ' ' + word).length > maxChars) { out.push(lineStr); lineStr = word; } else lineStr = lineStr ? lineStr + ' ' + word : word;
+  }
+  if (lineStr) out.push(lineStr);
+  return out;
+}
+function drawHelp(s) {
+  const w = 492, x = Math.round(LW / 2 - w / 2), maxChars = Math.floor((w - 24) / 6);
+  const lines = [];
+  for (const [heading, body] of HELP) { lines.push({ str: heading, heading: true }); for (const l of wrapText(body, maxChars)) lines.push({ str: l }); }
+  const h = 12 + lines.length * 11 + 14, y = Math.round(LH / 2 - h / 2);
+  fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
+  fillRect(s, x, y, w, h, C.black);
+  lines.forEach((l, i) => text(s, l.str, x + (l.heading ? 8 : 14), y + 8 + i * 11, l.heading ? C.gold : C.snow));
+  const close = 'H OR ESC TO CLOSE';
+  text(s, close, Math.round(LW / 2 - textWidth(close) / 2), y + h - 12, C.grey);
+}
+
 // Where each difficulty's name sits on the title card (also where a click picks it).
 function difficultySlots() {
   const gap = 18, labels = DIFFICULTIES.map((d, i) => `${i + 1} ${d.name}`);
   let x = Math.round(LW / 2 - (labels.reduce((n, l) => n + textWidth(l), 0) + gap * (labels.length - 1)) / 2);
-  return labels.map((label, i) => { const slot = { i, label, x, y: 276, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
+  return labels.map((label, i) => { const slot = { i, label, x, y: 270, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
 }
 function drawTitle(s, difficulty, ms) {
   const title = 'OLD STONES', scale = 5, tw = title.length * 6 * scale - scale, tx = Math.round(LW / 2 - tw / 2);
@@ -410,10 +435,12 @@ function drawTitle(s, difficulty, ms) {
   bigText(s, title, tx, 18, C.gold, scale);
   const sub = 'A GOD GAME';
   outlined(s, sub, Math.round(LW / 2 - textWidth(sub) / 2), 62, C.snow);
-  const w = 328, h = 140, x = Math.round(LW / 2 - w / 2), y = 180;
+  const w = 260, h = 66, x = Math.round(LW / 2 - w / 2), y = 236;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
   fillRect(s, x, y, w, h, C.black);
-  TITLE_LINES.forEach((l, i) => text(s, l, x + 10, y + 8 + i * 11, i === TITLE_LINES.length - 1 ? C.gold : C.snow));
+  TITLE_LINES.forEach((l, i) => text(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 8 + i * 11, i === TITLE_LINES.length - 1 ? C.gold : C.snow));
+  const help = 'H FOR HELP';
+  text(s, help, Math.round(LW / 2 - textWidth(help) / 2), y + h - 10, C.grey);
   for (const slot of difficultySlots()) {
     if (slot.i === difficulty) { fillRect(s, slot.x - 3, slot.y - 3, slot.w + 6, 13, C.gold); fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.black); }
     text(s, slot.label, slot.x, slot.y, slot.i === difficulty ? C.gold : C.grey);

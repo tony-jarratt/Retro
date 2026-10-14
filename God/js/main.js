@@ -2,7 +2,7 @@
 
 // The browser side: the loop, the mouse and keys, and the test hooks.
 //   index.html?seed=N        that map for every game (otherwise each game is a new land)
-//   index.html?still&scene=title  the title screen
+//   index.html?still&scene=title  the title screen (scene=help: with the help card over it)
 //   index.html?manna=N       start with more manna (for trying things out)
 //   index.html?still&cam=u,v&mx=..&my=..&shape=u,v,dir;u,v,dir&cast=power,u,v;...&stones=u,v;...&armed=power&ticks=N
 //                            draws one frame and stops (for screenshots); mx, my are low-res screen pixels;
@@ -30,6 +30,7 @@ const app = {
   wheel: [0, 0],      // swipe or wheel movement not yet turned into a tile's scroll
   paused: false, stopped: false, lastTime: 0, spare: 0,
   music: true,        // M turns the background music off and on
+  help: false,        // the help card is open (H); the game waits while it is
   fx: [],             // effects being drawn: splashes, dust, lava
 };
 
@@ -123,6 +124,7 @@ canvas.addEventListener('mousedown', (e) => {
   Sound.init();
   e.preventDefault();
   app.mouse = toLowRes(e);
+  if (app.help) { app.help = false; return; } // a click closes the help card
   if (app.mode === 'title') { // pick a difficulty, or click anywhere else to begin
     const [x, y] = app.mouse, slot = difficultySlots().find((d) => x >= d.x - 3 && x <= d.x + d.w + 3 && y >= d.y - 3 && y <= d.y + d.h + 3);
     if (slot) app.difficulty = slot.i; else startGame(numberParam('seed', randomSeed()));
@@ -169,6 +171,8 @@ const SCROLL = { ArrowUp: [-1, -1], KeyW: [-1, -1], ArrowDown: [1, 1], KeyS: [1,
 window.addEventListener('keydown', (e) => {
   Sound.init();
   if (e.code === 'KeyM') { app.music = !app.music; say(app.world, app.music ? 'MUSIC ON' : 'MUSIC OFF', 30); }
+  if (e.code === 'KeyH') { app.help = !app.help; return; }
+  if (app.help) { if (e.code === 'Escape') app.help = false; return; } // nothing else while the help card is up
   if (app.mode === 'title') {
     const pick = DIFFICULTIES.findIndex((_, i) => e.code === `Digit${i + 1}`);
     if (pick >= 0) app.difficulty = pick;
@@ -252,16 +256,17 @@ function frame(now) {
     const title = app.mode === 'title';
     if (title) driftDemo(now);
     else scroll(now);
-    if (app.button && now - app.lastShape >= REPEAT_MS) shapeAtHover(now);
-    while (app.spare >= TICK_MS) { if (!app.paused || title) stepWorld(app.world); app.spare -= TICK_MS; }
+    if (app.button && !app.help && now - app.lastShape >= REPEAT_MS) shapeAtHover(now);
+    while (app.spare >= TICK_MS) { if (title || (!app.paused && !app.help)) stepWorld(app.world); app.spare -= TICK_MS; }
     musicUpdate(app.music && !app.world.over); // quiet at the end, so the victory or defeat tune is heard
     makeEffects(app.world, now);
     if (title) app.world.events.length = 0; // the demo's battles make no sound
     else { playEvents(app.world); bleat(app.world, now); }
     renderGame(screen, app.world, now, app.fx, { hud: !title });
     if (title) drawTitle(screen, app.difficulty, now);
-    if (app.paused && !title) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
-    const tuneHint = `M MUSIC ${app.music ? 'ON' : 'OFF'}`;
+    if (app.paused && !title && !app.help) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
+    if (app.help) drawHelp(screen);
+    const tuneHint = `H HELP   M MUSIC ${app.music ? 'ON' : 'OFF'}`;
     text(screen, tuneHint, LW - 4 - textWidth(tuneHint), LH - 10, C.grey);
     present(screen, presenter, ctx);
   } catch (err) { fail(err); return; }
@@ -269,6 +274,10 @@ function frame(now) {
 }
 
 // Screenshot hooks: draw one frame and stop.
+function stillHelp() {
+  stillTitle();
+  drawHelp(screen);
+}
 function stillTitle() {
   showTitle();
   for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(app.world);
@@ -303,7 +312,8 @@ function stillGame() {
 
 if (params.has('still')) {
   try {
-    if (params.get('scene') === 'title') stillTitle(); else stillGame();
+    const scene = params.get('scene');
+    if (scene === 'title') stillTitle(); else if (scene === 'help') stillHelp(); else stillGame();
     present(screen, presenter, ctx);
     document.title = 'STILL READY';
   } catch (err) { fail(err); }
