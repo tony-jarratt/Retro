@@ -219,7 +219,8 @@ function drawCursor(s, t, cam, corner, ms, armed, hoverTile) {
 // ---- the map book ----
 function drawBook(s, game) {
   const t = game.terrain, cam = game.cam;
-  fillRect(s, BOOK_X - 6, BOOK_Y - 4, 2 * MAP_N + 12, MAP_N + 8, C.earth);  // the cover
+  fillRect(s, BOOK_X - 6, BOOK_Y - 4, 2 * MAP_N + 12, MAP_N + 8, C.black);  // the cover, edged in gold like the frame
+  goldRule(s, BOOK_X - 5, BOOK_Y - 3, BOOK_X + 2 * MAP_N + 4, BOOK_Y + MAP_N + 2, C.gold);
   fillRect(s, BOOK_X - 3, BOOK_Y - 2, 2 * MAP_N + 6, MAP_N + 4, C.snow);   // the pages
   fillRect(s, BOOK_X + MAP_N, BOOK_Y - 2, 1, MAP_N + 4, C.grey);           // the spine
   for (let py = 0; py < MAP_N; py++) for (let px = 0; px < 2 * MAP_N; px++) {
@@ -238,30 +239,29 @@ function drawBook(s, game) {
   for (let i = 0; i < 4; i++) line(s, q[i], q[(i + 1) % 4], C.gold);
 }
 
-// ---- the frame and the panel: carved stone round the view, with tablets for the readouts ----
-const PANEL_H = 78, STRIP_Y = LH - 12;   // the stone panel along the top; the strip along the bottom
+// ---- the frame and the panel: gold rules round the view, with tablets for the readouts ----
+const PANEL_H = 78, STRIP_Y = LH - 12;   // the panel along the top; the strip along the bottom
 const COL_A = 156, COL_B = 332, COL_W = 168; // the two readout tablets
-// Stonework: dark earth laid in courses, with lighter mortar lines.
-function stonework(s, x, y, w, h) {
-  fillRect(s, x, y, w, h, C.earth);
-  for (let j = y + 7; j < y + h; j += 8) fillRect(s, x, j, w, 1, C.rock);
-  for (let j = y, row = 0; j < y + h; j += 8, row++) for (let i = x + (row % 2 ? 12 : 0); i < x + w; i += 24) fillRect(s, i, j, 1, Math.min(7, y + h - j), C.rock);
-}
-// A tablet: a black panel with a carved rim, lit along its top and left.
+// A tablet: a black panel with a fine gold rim, like the frame.
 function tablet(s, x, y, w, h) {
   fillRect(s, x - 2, y - 2, w + 4, h + 4, C.black);
-  fillRect(s, x - 1, y - 1, w + 2, 1, C.rockLit); fillRect(s, x - 1, y - 1, 1, h + 2, C.rockLit);
-  fillRect(s, x - 1, y + h, w + 2, 1, C.rock); fillRect(s, x + w, y - 1, 1, h + 2, C.rock);
+  goldRule(s, x - 1, y - 1, x + w, y + h, C.gold);
   fillRect(s, x, y, w, h, C.black);
 }
+// The frame round the view: black, ruled in fine gold round the screen and round the view, with small gold studs at
+// the corners.
+function goldRule(s, x0, y0, x1, y1, colour) { // a one-pixel rectangle
+  fillRect(s, x0, y0, x1 - x0 + 1, 1, colour); fillRect(s, x0, y1, x1 - x0 + 1, 1, colour);
+  fillRect(s, x0, y0, 1, y1 - y0 + 1, colour); fillRect(s, x1, y0, 1, y1 - y0 + 1, colour);
+}
 function drawFrame(s) {
-  stonework(s, 0, 0, LW, PANEL_H);
-  stonework(s, 0, PANEL_H, 6, STRIP_Y - PANEL_H);
-  stonework(s, LW - 6, PANEL_H, 6, STRIP_Y - PANEL_H);
-  stonework(s, 0, STRIP_Y, LW, LH - STRIP_Y);
-  fillRect(s, 6, PANEL_H, LW - 12, 1, C.black); fillRect(s, 6, STRIP_Y - 1, LW - 12, 1, C.black); // the view's edge
-  for (const [x, y] of [[6, PANEL_H], [LW - 7, PANEL_H], [6, STRIP_Y - 1], [LW - 7, STRIP_Y - 1]]) { // gold studs at its corners
-    fillRect(s, x - 2, y - 1, 5, 3, C.gold); fillRect(s, x - 1, y - 2, 3, 5, C.gold);
+  const vx0 = 6, vy0 = PANEL_H, vx1 = LW - 7, vy1 = STRIP_Y - 1; // the view's edge
+  fillRect(s, 0, 0, LW, PANEL_H, C.black); fillRect(s, 0, PANEL_H, 6, STRIP_Y - PANEL_H, C.black);
+  fillRect(s, LW - 6, PANEL_H, 6, STRIP_Y - PANEL_H, C.black); fillRect(s, 0, STRIP_Y, LW, LH - STRIP_Y, C.black);
+  goldRule(s, 1, 1, LW - 2, LH - 2, C.gold);
+  goldRule(s, vx0 - 1, vy0 - 1, vx1 + 1, vy1 + 1, C.gold);
+  for (const [x, y] of [[vx0 - 1, vy0 - 1], [vx1 + 1, vy0 - 1], [vx0 - 1, vy1 + 1], [vx1 + 1, vy1 + 1], [1, 1], [LW - 2, 1], [1, LH - 2], [LW - 2, LH - 2]]) {
+    plot(s, x - 1, y, C.gold); plot(s, x + 1, y, C.gold); plot(s, x, y - 1, C.gold); plot(s, x, y + 1, C.gold);
   }
 }
 
@@ -329,10 +329,9 @@ function drawTip(s, str) {
 }
 // The strip along the bottom: the keys to remember.
 function drawStrip(s, music) {
-  const keys = `H HELP   P PAUSE   M MUSIC ${music ? 'ON' : 'OFF'}`;
-  text(s, keys, 10, STRIP_Y + 3, C.sand);
-  const name = 'OLD STONES';
-  text(s, name, LW - 10 - textWidth(name), STRIP_Y + 3, C.gold);
+  const keys = `H HELP   P PAUSE   M MUSIC ${music ? 'ON' : 'OFF'}`, name = 'OLD STONES';
+  text(s, keys, 10, STRIP_Y + 2, C.sand);
+  text(s, name, LW - 10 - textWidth(name), STRIP_Y + 2, C.gold);
 }
 
 // A little star, gold when earned, dark when not.

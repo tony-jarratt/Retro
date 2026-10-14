@@ -184,7 +184,7 @@ grow, while a rival god does the same.
     Test worlds without people have no seasons.
   - **Tips:** the first land only. Each tip shows once, the first time it matters (flattening, clearing, reach,
     raising a stone, laying a path, the seasons, the dark god's bridge), one at a time, in a gold box.
-  - **Frame:** carved stonework round the screen with gold studs. The top panel has two tablets (manna, people
+  - **Frame:** black, ruled in fine gold (owner's pick over brick, stone-slab and knotwork mock-ups). The top panel has two tablets (manna, people
     and the tug of war; season, clock, land and weapons), a message line, and a row of power tablets. The keys
     sit on a bottom strip.
 - **Bury or dig: built** (owner's idea). Raising a corner buries what stands on the four tiles round it. Lowering
