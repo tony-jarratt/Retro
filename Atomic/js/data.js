@@ -39,6 +39,7 @@ const PARTS = [
 //          > < ^ v a patrolling robot, starting to move east, west, north or south
 //          ~ a steam vent   a-f a pressure plate   A-F the door that plate opens
 //          o a dud plate: looks like a pressure plate, opens nothing, and is wired to the mains (costs a life)
+//          @ a transmitter pad: step or hop onto it and you are sent to the other pad with the same mark (see marks)
 // A pit is x (the floor beneath it is level 0), y (level 1) or z (level 2): filling it leaves a floor at that level.
 // exits: the edge (N/E/S/W) and the position along it (x for N and S, y for E and W) of each doorway.
 // A doorway leads to the neighbouring room on that side, which must have a matching doorway.
@@ -46,7 +47,8 @@ const PARTS = [
 //   h i j in height are half steps (levels 0.5, 1.5, 2.5), for staircases you can walk up without jumping.
 //   to: { E: 'roomid' } sends a doorway to a room on another floor (a staircase) instead of the neighbour on the map;
 //       that room's opposite doorway must lead back, at the same position.
-//   marks: { 'x,y': 'ring' | 'cross' | 'triangle' } symbols on plates, so that real and dud plates can be told apart.
+//   marks: { 'x,y': 'ring' | 'cross' | 'triangle' } symbols on plates, so that real and dud plates can be told apart,
+//       and on transmitter pads, which come in twins with the same mark.
 //   clue: { side, at, mark } a plaque painted on a wall (N/E/S/W, `at` along it like an exit) showing the real plate's
 //       mark. Put it on the south or east wall and it is out of sight until the room is turned.
 //   area: which floor a room is on (ground, cellar or tower). The cellar and the tower are drawn on the map far away
@@ -124,10 +126,15 @@ const ROOMS = [
 
   // ---- the tower ----
   { id: 'tlanding', name: 'Tower Landing', area: 'tower', col: 0, row: 10, exits: { S: 5, E: 2 }, to: { S: 'towerstairs' },
-    caption: 'Moving floors. The Professor called them "labour-saving". Labour has yet to comment.',
-    height: ['.#.....#.', '.........', '.........', '.........', '.........', 'xxxxxxxxx', 'xxxxxxxxx', '.........', '.#.....#.'],
+    caption: 'Moving floors. The Professor called them "labour-saving". Only one of them goes all the way. The sign is behind you.',
+    height: ['.#.....#.', '.........', '.........', 'xxxxxxxxx', 'xxxxxxxxx', 'xxxxxxxxx', 'xxxxxxxxx', '.........', '.#.....#.'],
     objects: ['.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........'],
-    movers: [{ type: 'slider', x: 5, y: 6, dir: 'N', dist: 1, period: 3.2 }] },
+    movers: [
+      { type: 'ride', x: 1, y: 6, dir: 'N', dist: 3, mark: 'cross' },
+      { type: 'ride', x: 4, y: 6, dir: 'N', dist: 1, mark: 'ring', trap: true },
+      { type: 'ride', x: 7, y: 6, dir: 'N', dist: 1, mark: 'triangle', trap: true },
+    ],
+    clue: { side: 'S', at: 2, mark: 'cross' } },
   { id: 'battlements', name: 'Battlements', area: 'tower', col: 1, row: 10, exits: { W: 2, E: 2, S: 4 },
     caption: 'The battlements. A guard patrols behind the parapet, where the saucers cannot see it. Neither can you.',
     height: ['#.#.#.#.#', '.........', '.........', '3333.3333', 'xxxx.xxxx'],
@@ -143,10 +150,10 @@ const ROOMS = [
     ],
     clue: { side: 'S', at: 4, mark: 'triangle' } },
   { id: 'radio', name: 'Radio Room', area: 'tower', col: 3, row: 10, exits: { W: 2, S: 4 },
-    caption: 'The Professor once heard Venus on this set. Venus has not called back.',
-    height: ['.....#333', '......333', '.....#333', '.........', '.........', '.#.......', '.........', '.......#.', '.........'],
-    objects: ['.........', '.......$.', '.........', '.........', '.........', '.........', '.........', '.........', '.........'],
-    movers: [{ type: 'lift', x: 5, y: 1, low: 0, high: 3, period: 4 }] },
+    caption: 'The Professor once heard Venus on this set. He built a matter transmitter to pop over and ask. Step onto a pad and it sends you to its twin.',
+    height: ['..#...#..', '###...###', '.........', '.........', '.........', '.........', '.........', '......###', '......#..'],
+    objects: ['@@.....@.', '.........', '.........', '.........', '..@...@..', '.........', '.<.......', '.........', '.......@$'],
+    marks: { '0,0': 'ring', '1,0': 'triangle', '7,0': 'cross', '2,4': 'ring', '6,4': 'cross', '7,8': 'triangle' } },
   { id: 'clock', name: 'Clock Room', area: 'tower', col: 1, row: 11, exits: { N: 4, E: 4 },
     caption: 'The clock room. The pendulums keep perfect time, and anyone who gets in their way.',
     height: ['xxxx.xxxx', 'xxxx.xxxx', 'xxxx.xxxx', 'xxxx.xxxx', 'xxxx.....', 'xxxxxxxxx'],
@@ -192,19 +199,25 @@ const ROOMS = [
     objects: ['.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........', '.........'],
     movers: [0, 1, 2].map((i) => ({ type: 'lift', x: 4, y: 3 + i, low: -1.5, high: 1, period: 3, offset: i })) },
   { id: 'flooded', name: 'Flooded Store', area: 'cellar', col: 0, row: 22, exits: { N: 4, E: 4 },
-    caption: 'Not actually flooded. The Professor just liked the name.',
-    height: ['......xx.', '......xx.', '......xx.', '......xx.', '......xx.', '......xx.', '......xx.', '......xx.', '......xx.'],
-    objects: ['.........', '.........', '.........', '.........', '...*.....', '.........', '..*......', '.........', '.........'] },
+    caption: 'Not actually flooded. The Professor just liked the name. The stockroom is staff only, through the transmitter. Step on the pad and it sends you to its twin.',
+    height: ['......xx.', '......xx.', '######xx.', '......xx.', '.#....xx.', '...#..xx.', '......xx.', '..#...xx.', '......xx.'],
+    objects: ['.........', '.@.......', '.........', '.........', '...*.....', '.........', '.*.......', '.........', '@........'],
+    marks: { '1,1': 'ring', '0,8': 'ring' } },
   { id: 'furnace', name: 'Furnace', area: 'cellar', col: 1, row: 22, exits: { W: 4, N: 4, E: 4 },
     caption: 'The furnace. Hot, heavy and in a hurry.',
     height: ['xxxx.xxxx', 'xxxx.xxxx', 'xxxx.xxxx', 'xxxx.xxxx', '.........'],
     objects: ['.........', '.........', '.........', '.........', '.........'],
     movers: [[4, 1], [4, 3], [2, 4], [6, 4]].map(([x, y], i) => ({ type: 'crusher', x, y, period: 2.2, offset: i * 0.55 })) },
   { id: 'depot', name: 'Fuel Depot', area: 'cellar', col: 2, row: 22, exits: { W: 4, N: 4 },
-    caption: 'Rocket fuel, stored safely over a bottomless pit. The Professor thought of everything, apart from that.',
-    height: ['.........', '.........', '.........', '.xxxxxxx.', '.xxxxxxx.', '.xxx2xxx.', '.xxxxxxx.', '.xxxxxxx.', '.........'],
+    caption: 'Rocket fuel, stored safely over a bottomless pit. Three trolleys, one island. The delivery note is on the wall.',
+    height: ['.........', '.........', '.........', '.xxxxxxx.', '.xxxxxxx.', '.xxx.xxx.', '.xxxxxxx.', '.xxxxxxx.', '.........'],
     objects: ['.........', '.........', '.........', '.........', '.........', '....$....', '.........', '.........', '.........'],
-    movers: [{ type: 'crumble', x: 1, y: 5 }, { type: 'crumble', x: 2, y: 5 }, { type: 'lift', x: 3, y: 5, low: 0, high: 2, period: 3.5 }] },
+    movers: [
+      { type: 'ride', x: 4, y: 3, dir: 'S', dist: 1, mark: 'ring' },
+      { type: 'ride', x: 1, y: 6, dir: 'E', dist: 2, mark: 'cross', trap: true },
+      { type: 'ride', x: 7, y: 4, dir: 'W', dist: 2, mark: 'triangle', trap: true },
+    ],
+    clue: { side: 'E', at: 1, mark: 'ring' } },
 ];
 const MARK_KINDS = ['ring', 'cross', 'triangle'];
 // the floor level of each raised-floor character in a room's height rows
@@ -223,7 +236,7 @@ function checkRooms() {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const hc = room.height[y][x], oc = room.objects[y][x];
       if (!'.123hij#xyz'.includes(hc)) fail(room, `unknown height character "${hc}" at ${x},${y}`);
-      if (!'.*$RS><^v~abcdefABCDEFo'.includes(oc)) fail(room, `unknown object character "${oc}" at ${x},${y}`);
+      if (!'.*$RS><^v~abcdefABCDEFo@'.includes(oc)) fail(room, `unknown object character "${oc}" at ${x},${y}`);
       if (hc === '#' && oc !== '.') fail(room, `an object at ${x},${y} is inside a wall`);
       if ('xyz'.includes(hc) && oc !== '.') fail(room, `an object at ${x},${y} is in a pit`);
     }
@@ -232,6 +245,7 @@ function checkRooms() {
       if (!(at >= 0 && at < edgeLen)) fail(room, `exit ${dir} at ${at} is off the edge`);
       const [x, y] = exitTile(room, dir, at);
       if (room.height[y][x] === '#' || 'xyz'.includes(room.height[y][x])) fail(room, `exit ${dir} at ${at} is blocked by a wall or pit`);
+      if (room.objects[y][x] === '@') fail(room, `exit ${dir} at ${at} is on a transmitter pad`);
     }
     const doors = new Set(), plates = new Set();
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -243,8 +257,16 @@ function checkRooms() {
     for (const [key, mark] of Object.entries(room.marks || {})) {
       const [x, y] = key.split(',').map(Number);
       if (!MARK_KINDS.includes(mark)) fail(room, `unknown mark "${mark}" at ${key}`);
-      if (!(y >= 0 && y < H && x >= 0 && x < W) || !'abcdefo'.includes(room.objects[y][x])) fail(room, `mark at ${key} is not on a plate`);
+      if (!(y >= 0 && y < H && x >= 0 && x < W) || !'abcdefo@'.includes(room.objects[y][x])) fail(room, `mark at ${key} is not on a plate or pad`);
     }
+    const padMarks = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (room.objects[y][x] !== '@') continue;
+      const mark = (room.marks || {})[`${x},${y}`];
+      if (!mark) fail(room, `the transmitter pad at ${x},${y} has no mark`);
+      padMarks.push(mark);
+    }
+    for (const mark of new Set(padMarks)) if (padMarks.filter((m) => m === mark).length !== 2) fail(room, `there should be two ${mark} pads, not ${padMarks.filter((m) => m === mark).length}`);
     if (room.clue) {
       const c = room.clue, len = (c.side === 'N' || c.side === 'S') ? W : H;
       if (!'NESW'.includes(c.side) || !(c.at >= 1 && c.at < len - 1)) fail(room, `clue on ${c.side} at ${c.at} is not on a wall`);

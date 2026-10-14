@@ -180,13 +180,12 @@ const robotFar = (x, y, d = 3) => cur(run.game).robots.every((r) => Math.abs(r.x
 const SCRIPTS = [
   { room: 'towerstairs', from: 'W', to: 'N', go: () => { go('E', 5); go('N', 2); waitUntil(() => phase(mover(0)) < 0.03); go('N', 3); leave('N', 'tlanding'); } },
   { room: 'towerstairs', from: 'N', to: 'W', go: () => { go('S', 2); waitUntil(() => phase(mover(0)) < 0.03); go('S', 6); leave('W', 'range'); } },
-  { room: 'tlanding', from: 'S', to: 'E', go: () => { go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('N', 0); waitUntil(() => Math.abs(phase(mover(0)) - 0.55) < 0.03); go('N', 1); go('N', 2); leave('E', 'battlements'); } },
-  { room: 'tlanding', from: 'E', to: 'S', go: () => { go('W', 3); go('S', 2); waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.03); stepOnto('S', 0); waitUntil(() => phase(mover(0)) < 0.1 && phase(mover(0)) > 0.02); go('S', 1); leave('S', 'towerstairs'); } },
+  // tower landing and fuel depot: ride 0 is the good one
+  { room: 'tlanding', from: 'S', to: 'E', go: () => { go('N', 1); go('W', 4); stepOnto('N', 0); waitUntil(() => mover(0).pos === 1); go('N', 1); leave('E', 'battlements'); } },
+  { room: 'tlanding', from: 'E', to: 'S', go: () => { go('W', 7); waitUntil(() => mover(0).pos === 1); stepOnto('S', 0); waitUntil(() => mover(0).pos === 0); go('S', 1); go('E', 4); leave('S', 'towerstairs'); } },
   // the bridge: the triangle ride (mover 2) is the one that goes all the way across
   { room: 'bridge', from: 'W', to: 'E', go: () => { go('S', 3); go('E', 1); stepOnto('E', 2); waitUntil(() => mover(2).pos === 1); go('E', 1); go('N', 3); leave('E', 'radio'); } },
   { room: 'bridge', from: 'E', to: 'W', go: () => { go('W', 1); go('S', 3); waitUntil(() => mover(2).pos === 1); stepOnto('W', 2); waitUntil(() => mover(2).pos === 0); go('W', 1); go('N', 3); leave('W', 'battlements'); } },
-  { room: 'radio', from: 'W', to: 'part', go: () => { go('E', 4); go('N', 1); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 2.98); go('E', 2); } },
-  { room: 'radio', from: 'part', to: 'W', after: 'radio:W>part', go: () => { go('S', 1); go('S', 1); go('W', 7); go('N', 1); leave('W', 'bridge'); } },
   { room: 'shaft', from: 'W', to: 'E', go: () => { go('E', 2); waitUntil(() => phase(mover(0)) < 0.03); stepOnto('E', 0); waitUntil(() => mbox(0).top > 1.98 && mbox(1).top < 0.02); jump('E'); waitUntil(() => on(1) && mbox(1).top > 1.98); go('E', 1); leave('E', 'loft'); } },
   { room: 'shaft', from: 'E', to: 'W', go: () => { go('W', 2); waitUntil(() => mbox(1).top > 1.98 && phase(mover(1)) < 0.55); stepOnto('W', 1); waitUntil(() => mbox(1).top > 1.98 && mbox(0).top < 0.02); jump('W'); waitUntil(() => on(0) && mbox(0).top < 0.02); go('W', 1); leave('W', 'clock'); } },
   { room: 'clock', from: 'N', to: 'E', go: () => { waitUntil(() => Math.abs(phase(mover(0)) - 0.5) < 0.02); go('S', 2); waitUntil(() => Math.abs(phase(mover(1)) - 0.5) < 0.02); go('S', 2); leave('E', 'shaft'); } },
@@ -199,8 +198,8 @@ const SCRIPTS = [
   { room: 'pump', from: 'S', to: 'N', go: () => { go('N', 2); transfer('N', 2); transfer('N', 1); transfer('N', 0); waitUntil(() => Math.abs(mbox(0).top) < 0.2); go('N', 1); leave('N', 'clanding'); } },
   { room: 'boiler', from: 'N', to: 'part', go: () => { go('E', 3); go('S', 1); waitUntil(() => run.game.elapsed % 4 < 0.03); stepOnto('S', 0); waitUntil(() => mbox(0).top > 2.98); go('W', 1); go('N', 1); } },
   { room: 'boiler', from: 'part', to: 'N', after: 'boiler:N>part', go: () => { go('W', 2); go('N', 2); leave('N', 'wine'); } },
-  { room: 'depot', from: 'W', to: 'part', go: () => { go('S', 1); waitUntil(() => Math.abs(phase(mover(2)) - 0.85) < 0.01); stepOnto('E', 2); waitUntil(() => mbox(2).top > 1.98); go('E', 1); } },
-  { room: 'depot', from: 'part', to: 'W', after: 'depot:W>part', go: () => { waitUntil(() => mbox(2).top > 1.98); stepOnto('W', 2); waitUntil(() => mbox(2).top < 0.02 && mover(0).gone <= 0 && mover(1).gone <= 0); go('W', 3); go('N', 1); leave('W', 'furnace'); } },
+  { room: 'depot', from: 'W', to: 'part', go: () => { go('N', 2); go('E', 4); stepOnto('S', 0); waitUntil(() => mover(0).pos === 1); go('S', 1); } },
+  { room: 'depot', from: 'part', to: 'W', after: 'depot:W>part', go: () => { waitUntil(() => mover(0).pos === 1); stepOnto('N', 0); waitUntil(() => mover(0).pos === 0); go('N', 1); go('W', 4); go('S', 2); leave('W', 'furnace'); } },
 ];
 
 function runScript(s) {
@@ -322,7 +321,25 @@ try {
     waitUntil(() => g.lives < LIVES, 6 * FPS); processEvents(g);
     check(g.lives === LIVES - 1, `rides: a trap ride drops you into the pit (lives ${g.lives})`);
     waitUntil(() => app.dying <= 0 && mover(2).pos === 0, 4 * FPS);
-    check(mover(2).pos === 0 && g.hero.x === 0, `rides: back at the doorway, the good ride is on your side (at ${mover(2).pos})`);
+    const bridgeSaid = `rides: back at the doorway, the good ride is on your side (at ${mover(2).pos})`, bridgeOk = mover(2).pos === 0 && g.hero.x === 0;
+    // every trap ride in the castle, boarded from the floor beside it and ridden without jumping off, drops you
+    for (const spec of ROOMS) (spec.movers || []).forEach((m, i) => {
+      if (m.type !== 'ride' || !m.trap) return;
+      const tg = enter(spec.id, Object.keys(spec.exits)[0]), [dx, dy] = DIRS[m.dir];
+      tg.hero.x = m.x - dx; tg.hero.y = m.y - dy; placeHero(tg);
+      stepOnto(m.dir, i);
+      waitUntil(() => tg.lives < LIVES, 8 * FPS); processEvents(tg);
+      check(tg.lives === LIVES - 1, `rides: the ${m.mark} trap in ${spec.id} drops you (lives ${tg.lives})`);
+    });
+    check(bridgeOk, bridgeSaid);
+  }
+  { // transmitter pads: walking onto one sends you to its twin, and stepping off and back on sends you back
+    const check = (cond, msg) => { if (cond) out.push('ok: ' + msg); else failures.push('FAIL: ' + msg); };
+    const g = enter('radio', 'W');
+    go('E', 6); go('S', 1); holdUntil('S', () => g.hero.y !== 3); // onto the cross pad at 6,4
+    check(g.hero.x === 7 && g.hero.y === 0, `pads: the cross pad sends you to its twin in the cupboard (at ${g.hero.x},${g.hero.y})`);
+    go('E', 1); holdUntil('W', () => g.hero.x !== 8); processEvents(g);
+    check(g.hero.x === 6 && g.hero.y === 4, `pads: stepping off the twin and back on sends you back (at ${g.hero.x},${g.hero.y})`);
   }
 } catch (err) {
   failures.push('ERROR: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);

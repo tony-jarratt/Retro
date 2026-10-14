@@ -69,6 +69,7 @@ const SOUNDS = {
   door: (s) => { s.noise(0.25, 0.07, 'highpass', 2000); s.tone(180, 0.25, 'triangle', 0.05, 0, 320); },
   reset: (s) => { s.tone(500, 0.3, 'triangle', 0.07, 0, 150); },
   zap: (s) => { s.noise(0.12, 0.035, 'highpass', 4500); s.tone(2400, 0.12, 'sawtooth', 0.015, 0, 500); },
+  beam: (s) => { s.tone(300, 0.25, 'sine', 0.08, 0, 1400); s.noise(0.25, 0.04, 'highpass', 3500); },
   tick: (s) => s.tone(900, 0.04, 'square', 0.04),
   choose: (s) => { s.tone(520, 0.07, 'triangle', 0.1); s.tone(780, 0.1, 'triangle', 0.1, 0.06); },
   alarm: (s) => { for (let i = 0; i < 3; i++) s.tone(880, 0.12, 'square', 0.05, i * 0.3); },

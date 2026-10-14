@@ -19,7 +19,7 @@ function createRoomState(spec, index) {
   const room = {
     index, spec, W, H,
     h: makeGrid(W, H, 0), wall: makeGrid(W, H, false), pit: makeGrid(W, H, false), crates: makeGrid(W, H, 0),
-    plateAt: makeGrid(W, H, ''), doorAt: makeGrid(W, H, ''),
+    plateAt: makeGrid(W, H, ''), doorAt: makeGrid(W, H, ''), padAt: makeGrid(W, H, ''),
     robots: [], vents: [], parts: [], rocket: null, start: null, protectedTiles: new Set(),
   };
   const part = PARTS.find((p) => p.room === spec.id);
@@ -36,6 +36,7 @@ function createRoomState(spec, index) {
     else if (oc === '~') room.vents.push({ x, y, offset: room.vents.length * 0.7 });
     else if ('abcdefo'.includes(oc)) room.plateAt[y][x] = oc; // o is a dud: no door has its letter
     else if ('ABCDEF'.includes(oc)) room.doorAt[y][x] = oc;
+    else if (oc === '@') { room.padAt[y][x] = spec.marks[`${x},${y}`]; room.protectedTiles.add(`${x},${y}`); } // crates cannot be pushed onto a pad
   }
   for (const [dir, at] of Object.entries(spec.exits)) { const [x, y] = exitTile(spec, dir, at); room.protectedTiles.add(`${x},${y}`); }
   room.initial = snapshotRoom(room); // for resetting the room
@@ -183,7 +184,24 @@ function moveHero(game, x, y, kind, air = false) {
   game.steps++;
   emit(game, { t: air ? 'hop' : kind, fromX, fromY, toX: x, toY: y });
   collect(game);
+  if (cur(game).padAt[y][x]) teleport(game);
   if (!air) checkHazards(game);
+}
+
+// A transmitter pad sends whoever arrives on it to the other pad with the same mark (unless something is standing there).
+// Standing on the far pad does nothing: you have to step off and back on to go back.
+function padPartner(room, x, y) {
+  const mark = room.padAt[y][x];
+  for (let py = 0; py < room.H; py++) for (let px = 0; px < room.W; px++) if (room.padAt[py][px] === mark && (px !== x || py !== y)) return { x: px, y: py };
+  throw new RuleError(`padPartner: the ${mark} pad at ${x},${y} in ${room.spec.id} has no twin`);
+}
+function teleport(game) {
+  const hero = game.hero, room = cur(game), to = padPartner(room, hero.x, hero.y);
+  if (robotAt(room, to.x, to.y)) return bump(game, 'pad busy');
+  emit(game, { t: 'teleport', fromX: hero.x, fromY: hero.y, toX: to.x, toY: to.y });
+  hero.x = to.x; hero.y = to.y;
+  collect(game);
+  return { ok: true, kind: 'teleport' };
 }
 
 function collect(game) {

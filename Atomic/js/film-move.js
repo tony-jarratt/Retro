@@ -239,7 +239,10 @@ function syncSquare(game, landed = false) {
   const x = Math.min(room.W - 1, Math.max(0, Math.floor(f.x))), y = Math.min(room.H - 1, Math.max(0, Math.floor(f.y)));
   const moved = x !== hero.x || y !== hero.y;
   hero.x = x; hero.y = y; hero.air = f.air ? 1 : 0;
-  if ((moved || landed) && !f.air) collect(game); // pick up what you walk or land on
+  if ((moved || landed) && !f.air) {
+    collect(game); // pick up what you walk or land on
+    if (room.padAt[y][x] && teleport(game).ok) placeHero(game); // a transmitter pad
+  }
 }
 
 function stepFree(game, dt) {

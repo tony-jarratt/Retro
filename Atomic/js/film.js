@@ -65,7 +65,7 @@ const PROPS = {
   launch: ['computer'], control: ['computer', 'computer', 'coil'], reactor: ['stone', 'coil', 'stone'], store: ['barrel'], lounge: ['computer', 'still'],
   greenhouse: ['stone'], vault: ['stone', 'coil'], cellarstairs: ['barrel'], towerstairs: ['coil'], tlanding: ['stone'],
   battlements: ['stone'], radio: ['computer'], loft: ['stone'], clanding: ['barrel'], wine: ['barrel'], boiler: ['still', 'barrel'],
-  pump: ['computer', 'still'],
+  pump: ['computer', 'still'], flooded: ['barrel'],
 };
 function propAt(room, x, y) { const kinds = PROPS[room.spec.id] || ['stone']; return kinds[(x * 7 + y * 3) % kinds.length]; }
 for (const r of ROOMS) if (!ROOM_STYLE[r.id]) throw new Error(`no Filmation style for room "${r.id}"`);
@@ -566,9 +566,13 @@ function drawMover(room, o, m, t) {
     });
   } else if (m.type === 'ride') {
     const shake = m.falling > 0 ? (Math.floor(t * 30) % 2 ? 0.04 : -0.04) : 0;
-    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.4) * LV, 0.4 * LV, { left: panelled, right: panelled });
+    // drawn standing a few pixels proud of the floor, with a rim on top, so it stands out against the pit's hatching
+    const lift = 4;
+    box(o, b.x0 + i + shake, b.y0 + i, b.x1 - i + shake, b.y1 - i, (b.top - 0.6) * LV, 0.6 * LV + lift, {
+      left: panelled, right: panelled, top: (T, R, B, L) => edges([lerp(T, B, 0.12), lerp(R, L, 0.12), lerp(B, T, 0.12), lerp(L, R, 0.12)]),
+    });
     if (m.mark) { // flat to the screen, like the marks on plates
-      const [cx, cy] = P(o, (b.x0 + b.x1) / 2 + shake, (b.y0 + b.y1) / 2, b.top * LV);
+      const [cx, cy] = P(o, (b.x0 + b.x1) / 2 + shake, (b.y0 + b.y1) / 2, b.top * LV + lift);
       strokeMark(m.mark, (a, v) => [cx - 5 + a * 10, cy - 3.5 + v * 7]);
     }
   } else if (m.type === 'crusher') {
@@ -599,6 +603,17 @@ function drawTile(game, room, o, x, y, t) {
       strokeMark(mark, (a, b) => [cx - 5 + a * 10, cy - 3.5 + b * 7]);
     }
     else if (!pressed) { const d = inset(o, x, y, z + 2, 0.3); fill(d, CHECK); edges(d); } else edges(inset(o, x, y, z, 0.3));
+  }
+  const pad = room.padAt[y][x];
+  if (pad) { // a transmitter pad: a disc with its mark, and a shimmer rising off it
+    const disc = (r, zz) => { const pts = []; for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; pts.push(P(o, x + 0.5 + Math.cos(a) * r, y + 0.5 + Math.sin(a) * r, zz)); } return pts; };
+    const outer = disc(0.46, z + 1);
+    fill(outer);
+    for (let k = 0; k < 16; k += 2) line(outer[k], outer[k + 1]); // a dashed rim, so a ring mark does not look like a second rim
+    const [cx, cy] = P(o, x + 0.5, y + 0.5, z + 1);
+    strokeMark(pad, (a, b) => [cx - 6 + a * 12, cy - 4 + b * 8]);
+    strokeMark(pad, (a, b) => [cx - 5.5 + a * 11, cy - 3.5 + b * 7]); // drawn twice, so it reads as bold
+    for (let k = 0; k < 4; k++) { const rise = (t * 14 + k * 4) % 16; dot(cx - 8 + k * 5.3, cy - 6 - rise); }
   }
   const vent = ventAt(room, x, y);
   const state = vent ? ventState(vent, game.elapsed) : null;
@@ -802,7 +817,7 @@ const DEATH_LINES = {
   vent: ['Steam: nature\'s way of saying "not now".', 'Lightly poached. Please try again.', 'The vents are on a timer. You, it seems, are not.'],
   crusher: ['Flattened. The Professor will want that back in its original shape.', 'Timing is everything. Yours was not.'],
   squashed: ['Squashed between a moving block and a wall. Neither of them apologised.'],
-  zap: ['Wrong plate. The Professor did put up a sign; it is just not on this side of the room.', 'Zapped. The right plate is signposted, for those who look around.'],
+  zap: ['Wrong plate. The Professor did put up a sign. It is just not on this side of the room.', 'Zapped. The right plate is signposted, for those who look around.'],
   pit: ['The pit was deeper than it looked. Pits usually are.', 'Down you go. Mind the gap next time.', 'Gravity: still working, the Professor will be pleased to hear.'],
 };
 function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (err) { console.warn('Could not read the saved best time:', err); return 0; } }
@@ -844,6 +859,12 @@ function processEvents(game) {
     switch (e.t) {
       case 'step': Sound.play('step'); break;
       case 'hop': Sound.play('hop'); break;
+      case 'teleport': {
+        Sound.play('beam'); flashBorder('white', 4);
+        const r = cur(game);
+        sparkle(game, e.fromX, e.fromY, surface(r, e.fromX, e.fromY) * LV + 8, 8); sparkle(game, e.toX, e.toY, surface(r, e.toX, e.toY) * LV + 8, 12);
+        break;
+      }
       case 'push': Sound.play('push'); app.slide = { fromX: e.fromX, fromY: e.fromY, toX: e.toX, toY: e.toY, p: 0, dz: Math.max(0, e.drop) * LV }; break;
       case 'fill': Sound.play('fill'); say('The pit has been filled. The crate is now part of the floor. It is not complaining.'); break;
       case 'bump':
