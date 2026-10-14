@@ -165,8 +165,7 @@ function castArmed() {
     Sound.play('buzz');
     return;
   }
-  if (id === 'stone') return; // stay armed, to lay out a line of stones
-  w.armed = null;
+  w.armed = null; // back to raising and lowering (press the key again for another)
   updateHover();
 }
 

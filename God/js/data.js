@@ -32,6 +32,7 @@ const FIGHT_RANGE = 0.6;         // rival walkers this close (in tiles) fight
 // A tribe's stones, in the order they were raised, make its ley line. Walkers near the first (the hearth) gather
 // there; at PILGRIM_MASS the gathering sets off along the line, and at the last stone fights or settles.
 const STONE_COST = 20;
+const GOD_REACH = 5;             // a god can shape land and cast powers within this many squares of its houses and stones
 const CALL_COST = 500;           // the Call of the Stones: everyone, on both sides, to one place for a last battle
 const AI_CALL_EDGE = 1.5;        // the dark god calls when its armed strength is this many times the player's
 const MAX_STONES = 6;

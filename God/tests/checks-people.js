@@ -122,7 +122,7 @@ check('people: left alone for ten minutes a tribe settles its island and stays s
 });
 
 check('sheep: a flock grazes on dry land for ten minutes, and the sea takes any whose pasture sinks', () => {
-  const w = makeWorld(SEED, { ai: [false, false] });
+  const w = makeWorld(SEED, { ai: [false, false], reach: false });
   assert(w.sheep.length >= 10, `a flock on each island (${w.sheep.length})`);
   for (let i = 0; i < 10 * 60 * 20; i++) {
     stepWorld(w);

@@ -65,9 +65,9 @@ check('rival: with manna to spare after the grace period, the dark god bridges t
   const pair = nearestPair(w, RIVAL);
   eq(landPath(w.terrain, pair[0], pair[1]), false, 'apart to begin with');
   w.tick = AI_GRACE_TICKS;
-  for (let i = 0; i < 200 && !w.tribes[RIVAL].joined; i++) { w.tribes[RIVAL].manna = 500; aiThink(w, RIVAL); }
+  for (let i = 0; i < 200 && !w.tribes[RIVAL].joined; i++) { w.tribes[RIVAL].manna = 400; aiThink(w, RIVAL); } // (under the Call's 500)
   eq(w.tribes[RIVAL].joined, true, 'the land joins');
-  for (let i = 0; i < 5; i++) { w.tribes[RIVAL].manna = 500; aiThink(w, RIVAL); }
+  for (let i = 0; i < 5; i++) { w.tribes[RIVAL].manna = 400; aiThink(w, RIVAL); }
   const line = w.stones[RIVAL], end = line[line.length - 1];
   assert(line.length >= 2, `a ley line: hearth and more (${line.length} stones)`);
   assert(w.houses.some((h) => h.tribe === PLAYER && gap(h, end) <= SCENT), 'its end stone is by your houses');

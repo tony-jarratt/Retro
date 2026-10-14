@@ -27,6 +27,18 @@ function fillTri(s, a, b, c, colour) {
     for (let x = l, i = y * s.w + l; x <= r; x++, i++) s.px[i] = colour;
   }
 }
+// Like fillTri, but only every other pixel of every other row: a quarter-tone veil over what is already there.
+function veilTri(s, a, b, c, colour) {
+  const ys = [a, b, c].sort((p, q) => p[1] - q[1]), [p0, p1, p2] = ys;
+  const y0 = Math.max(0, Math.ceil(p0[1] - 0.5)), y1 = Math.min(s.h - 1, Math.ceil(p2[1] - 0.5) - 1);
+  const at = (p, q, y) => (q[1] === p[1] ? p[0] : p[0] + ((q[0] - p[0]) * (y - p[1])) / (q[1] - p[1]));
+  for (let y = y0; y <= y1; y++) {
+    if (y % 2) continue;
+    const yc = y + 0.5, xa = at(p0, p2, yc), xb = yc < p1[1] ? at(p0, p1, yc) : at(p1, p2, yc);
+    const l = Math.max(0, Math.ceil(Math.min(xa, xb) - 0.5)), r = Math.min(s.w - 1, Math.ceil(Math.max(xa, xb) - 0.5) - 1);
+    for (let x = l; x <= r; x++) if ((x + y / 2) % 2 === 0) s.px[y * s.w + x] = colour;
+  }
+}
 function fillQuad(s, a, b, c, d, colour) { fillTri(s, a, b, c, colour); fillTri(s, a, c, d, colour); }
 
 function line(s, [x0, y0], [x1, y1], colour) {

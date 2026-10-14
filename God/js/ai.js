@@ -61,10 +61,7 @@ function bridgeStep(world, tribe, from, to) {
     if (!isWater(t, u, v)) continue;
     for (const [du, dv] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
       const r = reshape(t, u + du, v + dv, 1);
-      if (r.ok && costOf(r) <= world.tribes[tribe].manna) {
-        world.tribes[tribe].bridgeAt = { u, v }; // the newest stretch of the bridge: where a waystone will go
-        return shapeLand(world, u + du, v + dv, 1, tribe).ok;
-      }
+      if (r.ok && costOf(r) <= world.tribes[tribe].manna) return shapeLand(world, u + du, v + dv, 1, tribe).ok;
     }
     return false; // the next gap cannot be filled (the map's edge, or no manna): wait
   }
@@ -78,7 +75,8 @@ function aiCall(world, tribe) {
   if (!world.powers.has('call') || world.call || world.tribes[tribe].manna < CALL_COST) return false;
   const pair = nearestPair(world, tribe), rival = tribe === PLAYER ? RIVAL : PLAYER;
   if (!pair || armedStrength(world, tribe) < AI_CALL_EDGE * armedStrength(world, rival)) return false;
-  return castPower(world, tribe, 'call', pair[1].u, pair[1].v).ok;
+  const at = reachTileToward(world, tribe, pair[1]);
+  return !!at && castPower(world, tribe, 'call', at.u, at.v).ok;
 }
 
 // Now and then, when rich, the dark god shakes the earth under the rival's biggest house, or bogs the ground round it.
@@ -87,7 +85,7 @@ function aiPower(world, tribe) {
   if (aiCall(world, tribe)) return true;
   const rules = world.rules;
   if (world.tick < rules.grace || me.manna < rules.powerManna || world.tick - me.lastPower < rules.powerGap) return false;
-  const targets = world.houses.filter((h) => h.tribe !== tribe).sort((a, b) => b.level - a.level || b.pop - a.pop);
+  const targets = world.houses.filter((h) => h.tribe !== tribe && cornerInReach(world, tribe, h.u + 1, h.v + 1)).sort((a, b) => b.level - a.level || b.pop - a.pop);
   if (!targets.length) return false;
   const h = targets[0], id = h.level >= 3 && world.powers.has('quake') ? 'quake' : 'swamp';
   if (!world.powers.has(id)) return false; // no powers in this land
@@ -105,9 +103,8 @@ function freeTileNear(world, u, v) {
   }
   return null;
 }
-// The dark god's ley line, one stone a turn: after the grace period, a hearth by its biggest house; once its land joins
-// the rival's, a waystone on the bridge it built and an end stone by the rival's nearest house. An end stone left with
-// no rival house near it is taken down, to be raised again where the rival is. Returns true if it did something.
+// The dark god's ley line, one stone a turn: after the grace period, a hearth by its biggest house; then waystones
+// carrying its reach over the bridge it builds (aiThink) and on towards the rival. Returns true if it did something.
 function aiStones(world, tribe, pair, joined) {
   const me = world.tribes[tribe], line = world.stones[tribe];
   if (world.tick < world.rules.grace || me.manna < STONE_COST) return false;
@@ -118,11 +115,14 @@ function aiStones(world, tribe, pair, joined) {
     return raise(freeTileNear(world, big.u + 1, big.v + 1));
   }
   if (!joined || !pair) return false;
-  const rivals = world.houses.filter((h) => h.tribe !== tribe), end = line[line.length - 1];
-  if (line.length >= 2 && !rivals.some((h) => gap(h, end) <= SCENT)) return lowerStone(world, tribe, end.u, end.v).ok;
-  if (line.length === 1 && me.bridgeAt) { const way = freeTileNear(world, me.bridgeAt.u, me.bridgeAt.v); me.bridgeAt = null; if (raise(way)) return true; }
-  if (line.length >= 2 && rivals.some((h) => gap(h, end) <= SCENT)) return false; // the line is laid
-  return raise(freeTileNear(world, pair[1].u + 1, pair[1].v));
+  // Once the land joins, it only adds stones: each nearer the rival than its end stone, as far as its reach goes.
+  // When it can get no nearer, its pilgrims walk the line and fight or settle there, and their villages carry its
+  // reach on for the next stone.
+  const end = line[line.length - 1], dist = (p) => Math.hypot(p.u - pair[1].u, p.v - pair[1].v);
+  if (line.length >= 2 && world.houses.some((h) => h.tribe !== tribe && gap(h, end) <= SCENT)) return false; // the line is laid
+  if (line.length >= MAX_STONES) return false;
+  const spot = reachTileToward(world, tribe, pair[1]);
+  return !!spot && dist(spot) < dist(end) - 1 && raise(spot);
 }
 
 function aiThink(world, tribe) {
@@ -142,6 +142,10 @@ function aiThink(world, tribe) {
       event(world, 'bridge', { tribe });
       return { bridge: raised };
     }
+    // the gap is beyond its reach: a waystone on the furthest land it can reach, nearer the rival than its others
+    const line = world.stones[tribe], spot = line.length && line.length < MAX_STONES - 1 ? reachTileToward(world, tribe, pair[1]) : null;
+    const nearer = (p) => Math.hypot(p.u - pair[1].u, p.v - pair[1].v);
+    if (spot && line.every((st) => nearer(spot) < nearer(st) - 1) && me.manna >= STONE_COST && castPower(world, tribe, 'stone', spot.u, spot.v).ok) return { stone: true };
   }
   const t = world.terrain;
   let base = 0;

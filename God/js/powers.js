@@ -9,7 +9,8 @@
 //   Stone      a ley stone at the end of the god's line (stones.js); quakes and volcanoes topple stones
 //   Call       the Call of the Stones: every house on both sides empties and everyone marches to the tile for a last
 //              battle. Only once, and only when the two peoples' lands are joined.
-// castPower returns { ok: true } or { ok: false, reason }, and charges only for a power that was cast.
+// castPower returns { ok: true } or { ok: false, reason }, and charges only for a power that was cast. Every power but the
+// flood must be cast within the god's reach (stones.js).
 
 const POWERS = [
   { id: 'swamp', name: 'SWAMP', key: '1', cost: 30, reach: 3 },
@@ -31,6 +32,8 @@ function castPower(world, tribe, id, u, v) {
   if (!p) throw new RulesError('no-power', `there is no power "${id}"`);
   if (!world.powers.has(id)) return { ok: false, reason: 'locked' }; // not earned yet in this land
   if (world.tribes[tribe].manna < p.cost) return { ok: false, reason: 'no-manna' };
+  const onTile = id === 'stone' || id === 'call';
+  if (id !== 'flood' && !(onTile ? tileInReach(world, tribe, u, v) : cornerInReach(world, tribe, u, v))) return { ok: false, reason: 'reach' };
   const done = id === 'swamp' ? swamp(world, u, v) : id === 'quake' ? quake(world, u, v) : id === 'volcano' ? volcano(world, u, v)
     : id === 'stone' ? raiseStone(world, tribe, u, v) : id === 'call' ? callOfTheStones(world, tribe, u, v) : flood(world);
   if (!done.ok) return done;

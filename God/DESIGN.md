@@ -143,7 +143,7 @@ grow, while a rival god does the same.
   - **What a land sets:** its map style (`MAP_STYLE` in terrain.js: island size, strait width, forests, rock),
     the dark god's rules, and which powers both gods have. Powers not yet earned show dark and are refused.
   - **Seeds:** chosen from ten tried, so that a player who does nothing lasts about: never falls, 9, 7, 7 and 5
-    minutes.
+    minutes (before god's reach; see below for after).
   - **Progress:** winning a land opens the next. It's remembered in localStorage (`oldstones.reached`), with a
     warning and a fresh start if storage is blocked.
   - **Title screen:** shows the land and what's new there; 1–5 replays a land you've reached.
@@ -161,6 +161,17 @@ grow, while a rival god does the same.
   - **Ambient sound:** surf when the shore is in view, and birdsong over quiet land (not while pilgrims march or
     the Call is sounded).
   - **Power row:** names only now; the cost shows when a power is armed, and on the help card.
+- **God's reach: built** (tied to the stones).
+  - **The rule:** a god can shape land and cast powers only within 5 squares of its own houses and stones. The
+    flood is exempt, since it covers the world anyway. Stones must be raised within reach too, so you reach across
+    the sea by raising stones one beyond another.
+  - **On screen:** land beyond your reach is veiled, and the panel says "BEYOND YOUR REACH" when you point there.
+  - **The dark god** is bound the same way. It builds its bridge in hops, with a waystone wherever the gap is
+    beyond its reach, then only adds stones nearer you. When it can get no nearer, its pilgrims fight or settle
+    at the end stone, and their villages carry its reach on. It casts powers only on houses within its reach.
+  - **Sandboxes:** test worlds without people have no limit (`reachRule`).
+  - **Timings with reach:** a passive player lasts never / never / 6 / 4 / 7 minutes across the five lands.
+  - **Stones:** placing a stone returns you to raise and lower (owner's preference); press 5 again for another.
 - **On the arcade menu** (games.js) as "Old Stones", credited "inspired by Populous (1989)".
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.

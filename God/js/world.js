@@ -20,7 +20,7 @@ function makeWorld(seed, opts = {}) {
     powers: new Set(land ? [...land.powers, 'stone'] : POWERS.map((p) => p.id)), // the powers both gods have here
     seed, terrain, tick: 0, rng: new Rng(seed ^ 0x5eed), over: null, // over: { winner } once a tribe is wiped out
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
-    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), bridging: false, bridgeAt: null, lastPower: 0, mines: 0, weapons: 0 })),
+    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), bridging: false, lastPower: 0, mines: 0, weapons: 0 })),
     houses: [], walkers: [], sheep: [], stones: [[], []], nextId: 1,
     call: null,           // the Call of the Stones, once cast: { tribe, u, v }, where everyone marches for the last battle
     events: [],           // what happened since the screen last looked: { type, tribe, u, v, ... }
@@ -50,6 +50,7 @@ function makeWorld(seed, opts = {}) {
   }
   world.ai = opts.ai ?? [false, true]; // which tribes the computer plays
   world.contest = opts.contest ?? opts.people !== false; // false: a sandbox that never ends (for the checks)
+  world.reachRule = opts.reach ?? opts.people !== false;  // false: the gods can touch the land anywhere (stones.js)
   return world;
 }
 
@@ -371,11 +372,13 @@ function population(world, tribe) {
 }
 
 // ---- the god's hand ----
-const REFUSALS = { edge: 'THE SEA AT THE EDGE WILL NOT MOVE', 'max-height': 'NO HIGHER', 'sea-bed': 'THAT IS THE SEA BED', 'no-manna': 'NOT ENOUGH MANNA' };
+const REFUSALS = { edge: 'THE SEA AT THE EDGE WILL NOT MOVE', 'max-height': 'NO HIGHER', 'sea-bed': 'THAT IS THE SEA BED', 'no-manna': 'NOT ENOUGH MANNA',
+  reach: 'BEYOND YOUR REACH: RAISE A STONE NEARER' };
 
 // Raise (dir 1) or lower (dir -1) a corner for a tribe's god, paying for every corner that moves. Returns
 // { ok: true, cost } or { ok: false, reason }; a refusal to the player also puts a message up.
 function shapeLand(world, u, v, dir, tribe = PLAYER) {
+  if (!cornerInReach(world, tribe, u, v)) { if (tribe === PLAYER) say(world, REFUSALS.reach); return { ok: false, reason: 'reach' }; }
   const r = reshape(world.terrain, u, v, dir);
   if (!r.ok) { if (tribe === PLAYER) say(world, REFUSALS[r.reason]); return r; }
   const cost = costOf(r);

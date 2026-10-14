@@ -65,10 +65,17 @@ check('powers: a flood lowers every corner above the sea a step; the lowest hous
   checkTerrain(w.terrain);
 });
 
-check('powers: after the grace period a rich dark god casts on your biggest house', () => {
+check('powers: a rich dark god cannot cast on your houses from beyond its reach', () => {
   const w = makeWorld(SEED, { ai: [false, false] });
   w.tick = AI_GRACE_TICKS;
-  w.tribes[RIVAL].manna = 500;
+  w.tribes[RIVAL].manna = 400;
+  eq(aiPower(w, RIVAL), false, 'your island is beyond its reach');
+});
+
+check('powers: after the grace period a rich dark god casts on your biggest house, once it is within reach', () => {
+  const w = makeWorld(SEED, { ai: [false, false], reach: false });
+  w.tick = AI_GRACE_TICKS;
+  w.tribes[RIVAL].manna = 400;
   eq(aiPower(w, RIVAL), true);
   assert(w.events.some((e) => e.type === 'swamp' || e.type === 'quake'), 'it cast something');
   assert(w.message.startsWith('THE DARK GOD'), `it says so: ${w.message}`);

@@ -33,6 +33,7 @@ function facetColour(heights, shade) {
 // so a hill in front hides whoever is behind it.
 function drawLand(s, world, ms) {
   const t = world.terrain, cam = world.cam, glintFrame = Math.floor(ms / 400), people = peopleByRow(world, ms), fields = fieldTiles(world);
+  const reach = world.ai[PLAYER] ? null : reachMap(world, PLAYER); // dim what a human player cannot touch (not in the title demo)
   let row = 0;
   for (const { u, v } of tilesInView(cam)) {
     const r = u - cam.u + v - cam.v;
@@ -57,6 +58,7 @@ function drawLand(s, world, ms) {
       fillQuad(s, f[0], f[1], f[2], f[3], C.grassLit);
       for (const d of [0.25, 0.5, 0.75]) line(s, lerp2(f[0], f[3], d), lerp2(f[1], f[2], d), C.sand);
     }
+    if (reach && !reach[v * t.n + u]) { for (const [i, j, l] of TILE_SPLIT) veilTri(s, pts[i], pts[j], pts[l], C.black); } // beyond your reach
     if (k.every((c) => c[2] === 0)) { // foam where the sea meets the land, washing in and out
       const mid = project(cam, u + 0.5, v + 0.5, 0), wash = Math.floor(ms / 500) % 2 ? 0.1 : 0.2;
       for (const [du, dv, i, j] of [[0, -1, 0, 1], [1, 0, 1, 2], [0, 1, 2, 3], [-1, 0, 3, 0]]) {
@@ -231,7 +233,7 @@ function drawBook(s, game) {
 }
 
 // ---- the panel and the message line ----
-function drawPanel(s, game, hoverCost) {
+function drawPanel(s, game, hoverCost, beyond) {
   const x = 170, manna = game.tribes[PLAYER].manna;
   const houses = game.houses.filter((h) => h.tribe === PLAYER).length;
   outlined(s, `MANNA ${Math.floor(manna)}`, x, 10, C.gold);
@@ -253,6 +255,7 @@ function drawPanel(s, game, hoverCost) {
     const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE, SHIFT-CLICK TO TAKE DOWN', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
     outlined(s, `${p.name} (${p.cost}): ${how}`, x, 42, C.red);
   }
+  else if (beyond) outlined(s, 'BEYOND YOUR REACH: RAISE A STONE NEARER', x, 42, C.grey);
   else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
   for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
     if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
@@ -427,6 +430,8 @@ const HELP = [
     + 'BATTLE. IT NEEDS THE LANDS JOINED. RAZED HOUSES AND FALLEN STONES LEAVE RUINS UNTIL THE LAND IS RESHAPED.'],
   ['STONES (5)', 'RAISE A LINE OF STONES. YOUR PEOPLE NEAR THE FIRST GATHER THERE. AT 20 THEY WALK THE LINE, AND FIGHT OR '
     + 'SETTLE AT ITS END. ENEMIES OR QUAKES TOPPLE STONES.'],
+  ["YOUR REACH", 'YOU CAN SHAPE THE LAND AND CAST POWERS ONLY WITHIN 5 SQUARES OF YOUR HOUSES AND STONES. LAND BEYOND IS '
+    + 'SHOWN DIMMED. TO REACH ACROSS THE SEA, RAISE STONES ONE BEYOND ANOTHER. THE DARK GOD IS BOUND THE SAME WAY.'],
   ['THE CAMPAIGN', 'FIVE LANDS, EACH HARDER THAN THE LAST. WIN ONE TO REACH THE NEXT, AND EARN A NEW POWER AS YOU GO. '
     + 'POWERS NOT YET EARNED ARE SHOWN DARK. WIN QUICKLY FOR UP TO THREE STARS.'],
   ['LOOKING ABOUT', 'SWIPE, MOUSE WHEEL, ARROWS OR CLICK THE MAP BOOK. POINT AT THINGS TO INSPECT THEM. P PAUSES, M MUSIC, H HELP.'],
@@ -497,11 +502,12 @@ function renderGame(s, game, ms, fx = [], opts = {}) {
   game.cam = real;
   if (!game.armed) drawInspect(s, game);
   drawBook(s, game);
-  drawPanel(s, game, game.hover ? hoverCosts(game, game.hover) : null);
+  drawPanel(s, game, game.hover ? hoverCosts(game, game.hover) : null, game.hover && !cornerInReach(game, PLAYER, game.hover.u, game.hover.v));
   drawEnd(s, game);
 }
 // What raising and lowering the corner would cost ('-' when it can't be done).
 function hoverCosts(game, corner) {
+  if (!cornerInReach(game, PLAYER, corner.u, corner.v)) return null; // the panel says it is beyond reach
   const r = reshape(game.terrain, corner.u, corner.v, 1), l = reshape(game.terrain, corner.u, corner.v, -1);
   return { raise: r.ok ? costOf(r) : '-', lower: l.ok ? costOf(l) : '-' };
 }

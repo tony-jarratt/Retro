@@ -105,3 +105,41 @@ function landSteps(t, target) {
   }
   return steps;
 }
+
+// ---- a god's reach ----
+// A god can touch the land only near its own: within GOD_REACH squares (diagonal steps count one) of its houses and
+// its stones. Raising stones, each within reach of the last, is how a god reaches across the sea. A world made
+// without people (the checks' sandboxes) has no limit. Returns a 0/1 map indexed v * n + u, or null for no limit.
+function reachMap(world, tribe) {
+  if (!world.reachRule) return null;
+  const t = world.terrain, n = t.n, map = new Uint8Array(n * n);
+  const mark = (cu, cv) => {
+    for (let v = Math.max(0, cv - GOD_REACH); v <= Math.min(n - 1, cv + GOD_REACH); v++) {
+      for (let u = Math.max(0, cu - GOD_REACH); u <= Math.min(n - 1, cu + GOD_REACH); u++) map[v * n + u] = 1;
+    }
+  };
+  for (const h of world.houses) if (h.tribe === tribe) mark(h.u, h.v);
+  for (const st of world.stones[tribe]) mark(st.u, st.v);
+  return map;
+}
+function tileInReach(world, tribe, u, v) {
+  const map = reachMap(world, tribe);
+  return !map || map[v * world.terrain.n + u] === 1;
+}
+// A corner is in reach if any of the four tiles round it is.
+function cornerInReach(world, tribe, u, v) {
+  const map = reachMap(world, tribe), n = world.terrain.n;
+  if (!map) return true;
+  return [[u - 1, v - 1], [u, v - 1], [u - 1, v], [u, v]].some(([a, b]) => a >= 0 && b >= 0 && a < n && b < n && map[b * n + a] === 1);
+}
+// The free dry tile within a god's reach that is nearest a target (to reach towards it), or null.
+function reachTileToward(world, tribe, target) {
+  const t = world.terrain, map = reachMap(world, tribe);
+  let best = null, bestD = Infinity;
+  for (let v = 0; v < t.n; v++) for (let u = 0; u < t.n; u++) {
+    if ((map && !map[v * t.n + u]) || isWater(t, u, v) || houseAt(world, u, v) || stoneAt(world, u, v)) continue;
+    const d = Math.hypot(u - target.u, v - target.v);
+    if (d < bestD) { best = { u, v }; bestD = d; }
+  }
+  return best;
+}
