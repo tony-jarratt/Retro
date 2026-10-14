@@ -6,7 +6,7 @@ PORT=9333
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="$(mktemp -d)"
 "$CH" --headless=new --disable-gpu --allow-file-access-from-files --user-data-dir="$PROFILE" \
-  --remote-debugging-port=$PORT "file://$HERE/check.html?debug" >/dev/null 2>&1 &
+  --remote-debugging-port=$PORT "file://$HERE/check.html?playtest" >/dev/null 2>&1 &
 PID=$!
 TITLE=""
 for i in $(seq 1 120); do

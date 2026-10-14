@@ -1,6 +1,7 @@
 'use strict';
 
 // The browser side: the loop, the mouse and keys, and the test hooks.
+//   index.html?playtest      every land open on the title screen (saved progress is not touched)
 //   index.html?seed=N        that map in place of each land's own
 //   index.html?still&land=N  a still of land N (1 to 5) of the campaign
 //   index.html?still&scene=title  the title screen (scene=help: with the help card over it)
@@ -10,6 +11,7 @@
 //                            &ms=.. the clock for animations, &fxage=.. how far into an effect to catch it
 
 const params = new URLSearchParams(location.search);
+const PLAYTEST = params.has('playtest'); // index.html?playtest: every land open, and saved progress left alone (as in the other games)
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
 const screen = makeScreen(LW, LH), presenter = makePresenter(screen);
 const numberParam = (name, fallback) => {
@@ -61,6 +63,7 @@ function saveReached(n) {
 function recordResult(world) {
   if (world.recorded || !world.over || world.land === null) return;
   world.recorded = true;
+  if (PLAYTEST) return;
   if (world.over.winner === PLAYER && world.land === app.reached && app.reached < LANDS.length - 1) { app.reached++; saveReached(app.reached); }
 }
 function startLand(i) {
@@ -292,6 +295,7 @@ function frame(now) {
     renderGame(screen, app.world, now, app.fx, { hud: !title });
     if (!title) recordResult(app.world);
     if (title) drawTitle(screen, app.land, app.reached, now);
+    if (title && PLAYTEST) outlined(screen, 'PLAY-TEST MODE: ALL LANDS OPEN', 4, 4, C.red);
     if (app.paused && !title && !app.help) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
     if (app.help) drawHelp(screen);
     const tuneHint = `H HELP   M MUSIC ${app.music ? 'ON' : 'OFF'}`;
@@ -346,8 +350,8 @@ if (params.has('still')) {
     document.title = 'STILL READY';
   } catch (err) { fail(err); }
 } else {
-  app.reached = loadReached();
-  app.land = app.reached;
+  app.reached = PLAYTEST ? LANDS.length - 1 : loadReached();
+  app.land = PLAYTEST ? 0 : app.reached;
   showTitle();
   musicRandomTune();
   requestAnimationFrame(frame);

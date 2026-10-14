@@ -152,6 +152,8 @@ grow, while a rival god does the same.
   rally) yet.
 
 ## Test hooks
+- `index.html?playtest`: all five lands open on the title screen, and saved progress is left alone. Atomic
+  Castle and Elf use the same switch name.
 - `tests/run-jsc.sh`: the rules checks.
 - `index.html?seed=N`: another map.
 - `index.html?manna=N`: more manna for trying things out.

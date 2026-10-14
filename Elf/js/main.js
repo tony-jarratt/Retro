@@ -5,7 +5,8 @@ const ctx = canvas.getContext('2d');
 
 const START_LIVES = 3;
 const HI_SCORE_KEY = 'elf-bow-hiscore';
-const DEBUG = new URLSearchParams(location.search).has('debug');
+// index.html?playtest: play-test keys (N finishes the level, K loses a life). The same switch name as the other games.
+const PLAYTEST = new URLSearchParams(location.search).has('playtest');
 
 let LEVELS;
 try {
@@ -60,7 +61,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') Sound.muted = !Sound.muted;
   if (e.code === 'KeyP' && (G.mode === 'play' || G.mode === 'intro')) G.paused = !G.paused;
   if ((e.code === 'Enter' || e.code === 'Space') && (G.mode === 'title' || G.mode === 'gameOver' || G.mode === 'victory')) startGame();
-  if (DEBUG && G.mode === 'play') {
+  if (PLAYTEST && G.mode === 'play') {
     if (e.code === 'KeyN') finishLevel();
     if (e.code === 'KeyK') die('dog');
   }

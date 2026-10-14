@@ -191,7 +191,7 @@ try { buildLevel(bad, 0); check(false, 'floating item rejected'); } catch (e) { 
   let levelsSeen = new Set();
   for (let i = 0; i < 40000; i++) {
     if (i % 25 === 0) { for (const c of codes) press('keyup', c); press('keydown', codes[Math.floor(Math.random() * codes.length)]); }
-    if (i % 3000 === 2999) press('keydown', 'KeyN'); // debug: skip level
+    if (i % 3000 === 2999) press('keydown', 'KeyN'); // play-test key: skip level
     step();
     if (i % 5 === 0) render();
     if (G.lv) levelsSeen.add(G.lv.index);
