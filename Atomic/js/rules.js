@@ -34,7 +34,7 @@ function createRoomState(spec, index) {
     else if (oc === 'S') { room.start = { x, y }; room.protectedTiles.add(`${x},${y}`); }
     else if ('><^v'.includes(oc)) room.robots.push({ x, y, px: x, py: y, dir: { '>': 'E', '<': 'W', '^': 'N', v: 'S' }[oc], t: 0 });
     else if (oc === '~') room.vents.push({ x, y, offset: room.vents.length * 0.7 });
-    else if ('abcdef'.includes(oc)) room.plateAt[y][x] = oc;
+    else if ('abcdefo'.includes(oc)) room.plateAt[y][x] = oc; // o is a dud: no door has its letter
     else if ('ABCDEF'.includes(oc)) room.doorAt[y][x] = oc;
   }
   for (const [dir, at] of Object.entries(spec.exits)) { const [x, y] = exitTile(spec, dir, at); room.protectedTiles.add(`${x},${y}`); }

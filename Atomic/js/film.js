@@ -302,14 +302,36 @@ function viewExits(o, room) {
 // what hangs on each wall of the room: style.deco gives the north and west walls, and the other two copy them
 function decoFor(style, dir) { return { N: style.deco[0], W: style.deco[1], S: style.deco[0], E: style.deco[1] }[dir]; }
 
+// The symbols on marked plates and clue plaques, as strokes in a 1 x 1 box; pt(a, b) places a point of the box.
+function strokeMark(kind, pt) {
+  if (kind === 'ring') { const pts = []; for (let i = 0; i <= 12; i++) { const th = i * Math.PI / 6; pts.push(pt(0.5 + Math.cos(th) * 0.45, 0.5 + Math.sin(th) * 0.45)); } polyline(pts); }
+  else if (kind === 'cross') { line(pt(0.1, 0.1), pt(0.9, 0.9)); line(pt(0.1, 0.9), pt(0.9, 0.1)); }
+  else if (kind === 'triangle') polyline([pt(0.5, 0.05), pt(0.95, 0.9), pt(0.05, 0.9), pt(0.5, 0.05)]);
+  else throw new Error(`strokeMark: unknown mark "${kind}"`);
+}
+// A framed plaque on a wall, centred `c` tiles along it, showing the mark of the plate that works.
+function drawClue(o, plane, c, mark) {
+  const pt = (a, v) => planePt(o, plane, a, v);
+  const outer = [pt(c - 0.6, 10), pt(c + 0.6, 10), pt(c + 0.6, 36), pt(c - 0.6, 36)];
+  const inner = [pt(c - 0.48, 12), pt(c + 0.48, 12), pt(c + 0.48, 34), pt(c - 0.48, 34)];
+  fill(outer); edges(outer); edges(inner);
+  strokeMark(mark, (a, b) => pt(c - 0.35 + a * 0.7, 31 - b * 16));
+}
+
 function drawBackWalls(o, room, style, t) {
   const W = o.VW, H = o.VH, k = 0.35, exits = viewExits(o, room);
   const exitBase = (side) => (exits[side] ? exits[side].base : 0);
   const WALL_H = Math.max(BASE_WALL_H, exitBase('N') + 34, exitBase('W') + 34); // tall enough for a raised doorway
   const at = (side) => (exits[side] ? exits[side].at : undefined);
+  const clue = room.spec.clue;
+  const clueAt = (side) => { // where the clue plaque is along this wall as seen, if it is on this wall
+    if (!clue || clue.side !== mapDir(o.rot, side)) return undefined;
+    const [u, v] = viewTile(o, ...exitTile(room.spec, clue.side, clue.at));
+    return side === 'N' ? u : v;
+  };
   const walls = [
-    { plane: { fixed: 'v', at: 0 }, len: W, exit: at('N'), base: exitBase('N'), deco: decoFor(style, mapDir(o.rot, 'N')) },
-    { plane: { fixed: 'u', at: 0 }, len: H, exit: at('W'), base: exitBase('W'), deco: decoFor(style, mapDir(o.rot, 'W')) },
+    { plane: { fixed: 'v', at: 0 }, len: W, exit: at('N'), base: exitBase('N'), deco: decoFor(style, mapDir(o.rot, 'N')), clue: clueAt('N') },
+    { plane: { fixed: 'u', at: 0 }, len: H, exit: at('W'), base: exitBase('W'), deco: decoFor(style, mapDir(o.rot, 'W')), clue: clueAt('W') },
   ];
   for (const w of walls) {
     const pt = (a, v) => planePt(o, w.plane, a, v);
@@ -322,12 +344,13 @@ function drawBackWalls(o, room, style, t) {
       }
     }
     const free = [];
-    for (let i = 1; i < w.len - 1; i++) if (w.exit === undefined || Math.abs(i - w.exit) > 1) free.push(i);
+    for (let i = 1; i < w.len - 1; i++) if ((w.exit === undefined || Math.abs(i - w.exit) > 1) && (w.clue === undefined || Math.abs(i - w.clue) > 1)) free.push(i);
     if (free.length) {
       const i = free.reduce((best, c) => (Math.abs(c - w.len * 0.4) < Math.abs(best - w.len * 0.4) ? c : best));
       drawDeco(o, w.plane, i + 0.5, w.deco, t);
     } else console.warn(`room "${room.spec.id}": no free stretch of wall for its ${w.deco}`);
     if (w.exit !== undefined) drawArch(o, w.plane, w.exit, w.base, false);
+    if (w.clue !== undefined) drawClue(o, w.plane, w.clue + 0.5, clue.mark);
   }
   line(Pv(o, 0, 0, 0), Pv(o, 0, 0, WALL_H));
   // the tops of the walls, to show how thick they are, and their two cut ends
@@ -561,8 +584,14 @@ function drawTile(game, room, o, x, y, t) {
   const plate = room.plateAt[y][x];
   if (plate) {
     const pressed = room.crates[y][x] > 0 || (game.hero.x === x && game.hero.y === y);
+    const mark = (room.spec.marks || {})[`${x},${y}`], top = pressed ? z : z + 2;
     edges(inset(o, x, y, z, 0.2));
-    if (!pressed) { const d = inset(o, x, y, z + 2, 0.3); fill(d, CHECK); edges(d); } else edges(inset(o, x, y, z, 0.3));
+    if (mark) { // drawn flat to the screen rather than in perspective, so the symbols stay easy to tell apart
+      const d = inset(o, x, y, top, 0.08), [cx, cy] = P(o, x + 0.5, y + 0.5, top);
+      fill(d); edges(d);
+      strokeMark(mark, (a, b) => [cx - 5 + a * 10, cy - 3.5 + b * 7]);
+    }
+    else if (!pressed) { const d = inset(o, x, y, z + 2, 0.3); fill(d, CHECK); edges(d); } else edges(inset(o, x, y, z, 0.3));
   }
   const vent = ventAt(room, x, y);
   const state = vent ? ventState(vent, game.elapsed) : null;
@@ -766,6 +795,7 @@ const DEATH_LINES = {
   vent: ['Steam: nature\'s way of saying "not now".', 'Lightly poached. Please try again.', 'The vents are on a timer. You, it seems, are not.'],
   crusher: ['Flattened. The Professor will want that back in its original shape.', 'Timing is everything. Yours was not.'],
   squashed: ['Squashed between a moving block and a wall. Neither of them apologised.'],
+  zap: ['Wrong plate. The Professor did put up a sign; it is just not on this side of the room.', 'Zapped. The right plate is signposted, for those who look around.'],
   pit: ['The pit was deeper than it looked. Pits usually are.', 'Down you go. Mind the gap next time.', 'Gravity: still working, the Professor will be pleased to hear.'],
 };
 function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (err) { console.warn('Could not read the saved best time:', err); return 0; } }
@@ -1012,6 +1042,6 @@ if (params.has('still')) {
   }
   app.held = [];
   const log = document.createElement('pre'); log.id = 'log'; log.style.display = 'none'; document.body.appendChild(log);
-  log.textContent = ['hero', JSON.stringify(app.free), 'square', app.game && app.game.hero.x, app.game && app.game.hero.y, 'room', app.game && cur(app.game).spec.id, 'time', app.game && app.game.time.toFixed(1), 'carry', app.game && app.game.hero.carry.join('/')].join(' ');
+  log.textContent = ['hero', JSON.stringify(app.free), 'square', app.game && app.game.hero.x, app.game && app.game.hero.y, 'room', app.game && cur(app.game).spec.id, 'time', app.game && app.game.time.toFixed(1), 'carry', app.game && app.game.hero.carry.join('/'), 'lives', app.game && app.game.lives].join(' ');
   render();
 } else if (!params.has('norun')) requestAnimationFrame(frame); // the tests load the page without starting the loop

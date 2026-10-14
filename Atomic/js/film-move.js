@@ -263,7 +263,7 @@ function stepFree(game, dt) {
   syncSquare(game, landed);
 }
 
-// Robots, steam, pits, crushers and being squashed cost a life. You come back at the doorway you came in by, with
+// Robots, steam, pits, crushers, dud plates and being squashed cost a life. You come back at the doorway you came in by, with
 // the room left as it is; with no lives left the game is lost.
 function die(game, cause) {
   if (game.over || app.dying > 0 || game.invuln > 0) return;
@@ -299,5 +299,7 @@ function freeUpdate(game, dt) {
     if (Math.hypot(v.x + 0.5 - f.x, v.y + 0.5 - f.y) < 0.6 && f.z < room.h[r.y][r.x] + 0.9) { die(game, 'robot'); return; }
   }
   const vent = ventAt(room, game.hero.x, game.hero.y);
-  if (!f.air && vent && room.crates[vent.y][vent.x] === 0 && ventState(vent, game.elapsed) === 'on') die(game, 'vent');
+  if (!f.air && vent && room.crates[vent.y][vent.x] === 0 && ventState(vent, game.elapsed) === 'on') { die(game, 'vent'); return; }
+  const hx = game.hero.x, hy = game.hero.y;
+  if (!f.air && room.plateAt[hy][hx] === 'o' && room.crates[hy][hx] === 0) die(game, 'zap');
 }

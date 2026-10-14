@@ -38,6 +38,7 @@ const PARTS = [
 // objects: . nothing  * crate  $ rocket part  R the rocket  S where you start
 //          > < ^ v a patrolling robot, starting to move east, west, north or south
 //          ~ a steam vent   a-f a pressure plate   A-F the door that plate opens
+//          o a dud plate: looks like a pressure plate, opens nothing, and is wired to the mains (costs a life)
 // A pit is x (the floor beneath it is level 0), y (level 1) or z (level 2): filling it leaves a floor at that level.
 // exits: the edge (N/E/S/W) and the position along it (x for N and S, y for E and W) of each doorway.
 // A doorway leads to the neighbouring room on that side, which must have a matching doorway.
@@ -45,6 +46,9 @@ const PARTS = [
 //   h i j in height are half steps (levels 0.5, 1.5, 2.5), for staircases you can walk up without jumping.
 //   to: { E: 'roomid' } sends a doorway to a room on another floor (a staircase) instead of the neighbour on the map;
 //       that room's opposite doorway must lead back, at the same position.
+//   marks: { 'x,y': 'ring' | 'cross' | 'triangle' } symbols on plates, so that real and dud plates can be told apart.
+//   clue: { side, at, mark } a plaque painted on a wall (N/E/S/W, `at` along it like an exit) showing the real plate's
+//       mark. Put it on the south or east wall and it is out of sight until the room is turned.
 //   area: which floor a room is on (ground, cellar or tower). The cellar and the tower are drawn on the map far away
 //       from the ground floor (rows 20+ and 10+) so their rooms never neighbour it by accident.
 //   movers: the moving blocks (see film-move.js):
@@ -90,9 +94,10 @@ const ROOMS = [
     height: ['.....##..', '11...##..', '11...##..', '11...xx..', '11...##..', '.....##..', '.....##..'],
     objects: ['.........', '.........', '.*.......', '.........', '.........', '.........', '.........'] },
   { id: 'lounge', name: 'Lounge', col: 1, row: 2, exits: { N: 4, W: 3, E: 3 },
-    caption: 'A relaxing space. Sit down, put your feet up, and avoid the doors.',
+    caption: 'A relaxing space. One plate opens the door. The other two are wired to the mains. The Professor put up a sign, somewhere.',
     height: ['......#..', '......#..', '......#..', '.........', '......#..', '......#..', '......#..'],
-    objects: ['.........', '.........', '....*....', '......A..', '.........', '..a......', '.........'] },
+    objects: ['.........', '.........', '....*....', '......A..', '.........', '.o.o.a...', '.........'],
+    marks: { '1,5': 'cross', '3,5': 'triangle', '5,5': 'ring' }, clue: { side: 'S', at: 4, mark: 'ring' } },
   { id: 'greenhouse', name: 'Greenhouse', col: 2, row: 2, exits: { N: 4, W: 3, E: 3 },
     caption: 'Giant plants. The Professor\'s idea. The plants were not consulted.',
     height: ['.....xxxx', '.....x113', '.....x111', '.....x111', '.....xxxx', '.........', '.........', '.#.....#.', '.........'],
@@ -191,6 +196,7 @@ const ROOMS = [
     objects: ['.........', '.........', '.........', '.........', '.........', '....$....', '.........', '.........', '.........'],
     movers: [{ type: 'crumble', x: 1, y: 5 }, { type: 'crumble', x: 2, y: 5 }, { type: 'lift', x: 3, y: 5, low: 0, high: 2, period: 3.5 }] },
 ];
+const MARK_KINDS = ['ring', 'cross', 'triangle'];
 // the floor level of each raised-floor character in a room's height rows
 const LEVEL_CHARS = { 1: 1, 2: 2, 3: 3, h: 0.5, i: 1.5, j: 2.5 };
 const ROOM_INDEX = Object.fromEntries(ROOMS.map((r, i) => [r.id, i]));
@@ -207,7 +213,7 @@ function checkRooms() {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const hc = room.height[y][x], oc = room.objects[y][x];
       if (!'.123hij#xyz'.includes(hc)) fail(room, `unknown height character "${hc}" at ${x},${y}`);
-      if (!'.*$RS><^v~abcdefABCDEF'.includes(oc)) fail(room, `unknown object character "${oc}" at ${x},${y}`);
+      if (!'.*$RS><^v~abcdefABCDEFo'.includes(oc)) fail(room, `unknown object character "${oc}" at ${x},${y}`);
       if (hc === '#' && oc !== '.') fail(room, `an object at ${x},${y} is inside a wall`);
       if ('xyz'.includes(hc) && oc !== '.') fail(room, `an object at ${x},${y} is in a pit`);
     }
@@ -224,6 +230,17 @@ function checkRooms() {
       if ('ABCDEF'.includes(oc)) doors.add(oc);
     }
     for (const d of doors) if (!plates.has(d)) fail(room, `door ${d} has no plate ${d.toLowerCase()}`);
+    for (const [key, mark] of Object.entries(room.marks || {})) {
+      const [x, y] = key.split(',').map(Number);
+      if (!MARK_KINDS.includes(mark)) fail(room, `unknown mark "${mark}" at ${key}`);
+      if (!(y >= 0 && y < H && x >= 0 && x < W) || !'abcdefo'.includes(room.objects[y][x])) fail(room, `mark at ${key} is not on a plate`);
+    }
+    if (room.clue) {
+      const c = room.clue, len = (c.side === 'N' || c.side === 'S') ? W : H;
+      if (!'NESW'.includes(c.side) || !(c.at >= 1 && c.at < len - 1)) fail(room, `clue on ${c.side} at ${c.at} is not on a wall`);
+      if (!Object.values(room.marks || {}).includes(c.mark)) fail(room, `clue shows "${c.mark}", which no plate has`);
+      if (room.exits[c.side] !== undefined && Math.abs(room.exits[c.side] - c.at) <= 1) fail(room, `clue on ${c.side} is in the way of the doorway`);
+    }
     for (const p of plates) if (!doors.has(p)) fail(room, `plate ${p.toLowerCase()} has no door ${p}`);
   });
   const neighbour = (room, dir) => (room.to && room.to[dir] ? ROOMS.find((r) => r.id === room.to[dir]) : null) || ROOMS.find((r) => r.col === room.col + { E: 1, W: -1, N: 0, S: 0 }[dir] && r.row === room.row + { N: -1, S: 1, E: 0, W: 0 }[dir]);
