@@ -39,6 +39,19 @@ const MAX_STONES = 6;
 const GATHER_RADIUS = 5;         // walkers this near the hearth (counting diagonal steps) answer its pull
 const PILGRIM_MASS = 20;         // a gathering this strong sets off down the ley line
 
+// ---- seasons: a year of four, each SEASON_TICKS long, starting in spring ----
+// High land (HIGH_LAND or more) is safe from floods but snowed in each winter; the lowest land (LOW_LAND) is
+// parched each summer. growth and manna multiply a house's rates, by its height; wear multiplies how fast
+// wanderers tire.
+const SEASON_TICKS = 60 * 20;
+const HIGH_LAND = 3, LOW_LAND = 1;
+const SEASONS = [
+  { name: 'SPRING', says: 'SPRING: EVERYTHING GROWS', growth: () => 1.5, manna: () => 1, wear: 1 },
+  { name: 'SUMMER', says: 'SUMMER: THE SUN PARCHES THE LOWLANDS', growth: (h) => (h <= LOW_LAND ? 0.5 : 1), manna: () => 1, wear: 1 },
+  { name: 'AUTUMN', says: 'AUTUMN: HARVEST, AND MANNA FLOWS', growth: () => 1, manna: () => 1.5, wear: 1 },
+  { name: 'WINTER', says: 'WINTER: SNOW ON THE HIGH LAND', growth: (h) => (h >= HIGH_LAND ? 0 : 0.6), manna: (h) => (h >= HIGH_LAND ? 0 : 1), wear: 2 },
+];
+
 // ---- sheep (a nod to Powermonger): they graze, wander, and drown like anyone else ----
 const SHEEP_START = 7;           // on each island at the start
 const SHEEP_MAX = 16;            // a lamb turns up now and then while there are fewer than this
@@ -66,8 +79,8 @@ const AI_POWER_GAP = 40 * 20;    // ...at most every 40 s
 // the manna it starts with. FAIR_RULES are the numbers above; each land in the campaign has its own.
 const FAIR_RULES = { grace: AI_GRACE_TICKS, bridgeManna: AI_BRIDGE_MANNA, powerManna: AI_POWER_MANNA, powerGap: AI_POWER_GAP, rivalManna: START_MANNA };
 
-// The campaign: five lands, each harder, each a fixed map. The seeds were picked (from ten tried) so that a player
-// who does nothing lasts about: never falls, 9, 7, 7 and 5 minutes. A land sets the map (MAP_STYLE in terrain.js), the dark
+// The campaign: five lands, each harder, each a fixed map. The seeds were picked (from those tried) so that a player
+// who does nothing lasts about 20+, 11, 6, 6 and 4 minutes (with seasons, god's reach and digging). A land sets the map (MAP_STYLE in terrain.js), the dark
 // god's rules, which powers both gods have (the stone always), and how many villages the dark god starts with.
 const MIN = 60 * 20; // ticks in a minute
 // Stars for a win: three at or under a land's par time, two within half as long again, one for any win. *tbd* from play.
@@ -80,15 +93,15 @@ const LANDS = [
   { name: 'THE GREEN ISLES', seed: 2024, intro: 'LEARN TO SHAPE THE LAND. YOU HAVE STONES.', powers: [], rivalHomes: 1,
     map: { mass: 0.22, strait: 2.5, forests: 6, wood: 0.5, rock: 0.5 },
     rules: { grace: 6 * MIN, bridgeManna: 220, powerManna: 99999, powerGap: 99 * MIN, rivalManna: 25 } },
-  { name: 'THE PINEWOODS', seed: 11, intro: 'THICK FORESTS TO CLEAR. NEW: SWAMP.', powers: ['swamp'], rivalHomes: 1,
+  { name: 'THE PINEWOODS', seed: 314, intro: 'THICK FORESTS TO CLEAR. NEW: SWAMP.', powers: ['swamp'], rivalHomes: 1,
     map: { mass: 0.2, strait: 2, forests: 20, wood: 0.9, rock: 0.8 },
     rules: { grace: 5 * MIN, bridgeManna: 180, powerManna: 240, powerGap: 75 * 20, rivalManna: 30 } },
   { name: 'THE STONY SHORE', seed: 1989, intro: 'BOULDERS EVERYWHERE: DIG MINES. NEW: QUAKE.', powers: ['swamp', 'quake'], rivalHomes: 1,
     map: { mass: 0.2, strait: 2, forests: 10, wood: 0.6, rock: 3 }, rules: FAIR_RULES },
-  { name: 'THE NARROW SEA', seed: 11, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
+  { name: 'THE NARROW SEA', seed: 314, intro: 'A NARROW SEA: THE DARK GOD IS CLOSE. NEW: VOLCANO.', powers: ['swamp', 'quake', 'volcano'], rivalHomes: 1,
     map: { mass: 0.22, strait: 1.2, forests: 12, wood: 0.75, rock: 1.2 },
     rules: { grace: 2 * MIN, bridgeManna: 80, powerManna: 110, powerGap: 25 * 20, rivalManna: 70 } },
-  { name: "THE DARK GOD'S HOME", seed: 2024, intro: 'IT HOLDS TWO VILLAGES. NEW: FLOOD, AND THE CALL.', powers: ['swamp', 'quake', 'volcano', 'flood', 'call'], rivalHomes: 2,
+  { name: "THE DARK GOD'S HOME", seed: 404, intro: 'IT HOLDS TWO VILLAGES. NEW: FLOOD, AND THE CALL.', powers: ['swamp', 'quake', 'volcano', 'flood', 'call'], rivalHomes: 2,
     map: { mass: 0.2, strait: 2, forests: 12, wood: 0.75, rock: 1.5 },
     rules: { grace: 90 * 20, bridgeManna: 70, powerManna: 90, powerGap: 20 * 20, rivalManna: 100 } },
 ];

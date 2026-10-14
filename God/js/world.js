@@ -51,6 +51,7 @@ function makeWorld(seed, opts = {}) {
   world.ai = opts.ai ?? [false, true]; // which tribes the computer plays
   world.contest = opts.contest ?? opts.people !== false; // false: a sandbox that never ends (for the checks)
   world.reachRule = opts.reach ?? opts.people !== false;  // false: the gods can touch the land anywhere (stones.js)
+  world.seasons = opts.seasons ?? opts.people !== false;  // false: no seasons (the checks' sandboxes)
   return world;
 }
 
@@ -265,7 +266,7 @@ function attackHouse(world, w, h) {
 
 function stepWalker(world, w) {
   if (w.gathered) return; // waiting at the hearth stone for the rest
-  if (!w.pilgrim && !world.call) w.age += DT; // pilgrims, and everyone answering the Call, are kept going by faith
+  if (!w.pilgrim && !world.call) w.age += DT * seasonOf(world).wear; // pilgrims, and those answering the Call, are kept going by faith
   if (w.age >= WEAKEN_S) { // wandering wears them down
     w.age -= WEAKEN_S;
     w.strength -= Math.max(1, Math.floor(w.strength / 10));
@@ -343,6 +344,13 @@ function checkFooting(world) {
   });
 }
 
+// The season now. A world without seasons (the checks' sandboxes) is always an even, mild one.
+const NO_SEASON = { name: 'NONE', says: '', growth: () => 1, manna: () => 1, wear: 1 };
+function seasonOf(world) { return world.seasons ? SEASONS[Math.floor(world.tick / SEASON_TICKS) % SEASONS.length] : NO_SEASON; }
+function stepSeason(world) {
+  if (world.seasons && world.tick % SEASON_TICKS === 0 && world.tick > 0) event(world, 'season', { season: seasonOf(world).name });
+}
+
 function stepHouses(world) {
   for (const h of world.houses) {
     const level = houseLevel(world, h);
@@ -352,8 +360,9 @@ function stepHouses(world) {
     }
     const cap = CAP[h.level - 1];
     if (h.pop - cap >= 1) addWalker(world, h.tribe, h.u + 0.5, h.v + 0.5, Math.floor(h.pop - cap), h.id); // shrunk: the overflow leaves
-    h.pop = Math.min(cap, h.pop + GROWTH[h.level - 1] * DT);
-    world.tribes[h.tribe].manna += MANNA[h.level - 1] * DT;
+    const season = seasonOf(world), height = tileCorners(world.terrain, h.u, h.v)[0];
+    h.pop = Math.min(cap, h.pop + GROWTH[h.level - 1] * season.growth(height) * DT);
+    world.tribes[h.tribe].manna += MANNA[h.level - 1] * season.manna(height) * DT;
     if (h.pop >= cap) { // full: half of them set out to find somewhere new
       const leaving = Math.floor(cap / 2);
       h.pop -= leaving;
@@ -400,6 +409,7 @@ function stepWorld(world) {
   walkerFights(world);
   checkFooting(world);
   stepStones(world);
+  stepSeason(world);
   stepHouses(world);
   stepMines(world);
   stepSheep(world);

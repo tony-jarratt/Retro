@@ -170,8 +170,25 @@ grow, while a rival god does the same.
     beyond its reach, then only adds stones nearer you. When it can get no nearer, its pilgrims fight or settle
     at the end stone, and their villages carry its reach on. It casts powers only on houses within its reach.
   - **Sandboxes:** test worlds without people have no limit (`reachRule`).
-  - **Timings with reach:** a passive player lasts never / never / 6 / 4 / 7 minutes across the five lands.
+  - **Timings with reach and seasons** (after re-picking the Pinewoods and Narrow Sea maps): a passive player lasts
+    14 / 9 / 6 / 5 / 3 minutes across the five lands.
   - **Stones:** placing a stone returns you to raise and lower (owner's preference); press 5 again for another.
+- **Seasons, tips, and the frame: built.**
+  - **Seasons:** a year of four 60-second seasons, starting in spring. Spring grows everything x1.5. Summer
+    parches the lowest land (height 1: growth x0.5). Autumn is the harvest (manna x1.5). Winter snows in the high
+    land (height 3+: no growth or manna; elsewhere growth x0.6) and wanderers wear twice as fast. On screen: snow
+    on the high land, sandy parched lowlands, golden fields and turning trees, and a season icon in the panel.
+    Test worlds without people have no seasons.
+  - **Tips:** the first land only. Each tip shows once, the first time it matters (flattening, clearing, reach,
+    raising a stone, laying a path, the seasons, the dark god's bridge), one at a time, in a gold box.
+  - **Frame:** carved stonework round the screen with gold studs. The top panel has two tablets (manna, people
+    and the tug of war; season, clock, land and weapons), a message line, and a row of power tablets. The keys
+    sit on a bottom strip.
+- **Bury or dig: built** (owner's idea). Raising a corner buries what stands on the four tiles round it. Lowering
+  digs down, so boulders, mines and fallen stones stay while trees, rubble and bogs go; anything sunk into the sea
+  is washed away. Building up clears land for farms but sits high (snowed in each winter); digging down keeps
+  your mines (and weapons) but sits low (parched in summer, nearer the flood). Campaign timings after this, with
+  the dark god's home moved to map 404: a passive player lasts about 20+ / 11 / 6 / 6 / 4 minutes.
 - **On the arcade menu** (games.js) as "Old Stones", credited "inspired by Populous (1989)".
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.

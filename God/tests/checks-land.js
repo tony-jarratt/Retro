@@ -123,3 +123,20 @@ check('screen: a triangle fills only its own pixels, and two halves of a square 
   eq(gaps, 0, 'no gaps');
   eq([s.px[0], s.px[13 * 20 + 13]], [0, 0], 'nothing outside');
 });
+
+check('land: raising buries what stands round the corner; lowering digs down, leaving stone but not trees or rubble', () => {
+  const t = flatLand(16, 3), at = (u, v) => v * t.n + u;
+  // the four tiles round corner (8, 8): (7,7) (8,7) (7,8) (8,8)
+  const dress = (x) => { x.f[at(7, 7)] = FEATURE.rock; x.f[at(8, 7)] = FEATURE.mine; x.f[at(7, 8)] = FEATURE.tree; x.f[at(8, 8)] = FEATURE.ruin; };
+  dress(t);
+  const up = reshape(t, 8, 8, 1).terrain;
+  eq([up.f[at(7, 7)], up.f[at(8, 7)], up.f[at(7, 8)], up.f[at(8, 8)]], [0, 0, 0, 0], 'raising buries all four');
+  const down = reshape(t, 8, 8, -1).terrain;
+  eq([down.f[at(7, 7)], down.f[at(8, 7)], down.f[at(7, 8)], down.f[at(8, 8)]], [FEATURE.rock, FEATURE.mine, 0, 0], 'digging keeps the boulder and the mine');
+  const shore = flatLand(16, 1);
+  shore.f[at(7, 7)] = FEATURE.rock;
+  let sunk = shore;
+  for (const [u, v] of [[7, 7], [8, 7], [8, 8], [7, 8]]) sunk = reshape(sunk, u, v, -1).terrain;
+  eq([isWater(sunk, 7, 7), sunk.f[at(7, 7)]], [true, 0], 'dug right down into the sea: washed away');
+  checkTerrain(sunk);
+});

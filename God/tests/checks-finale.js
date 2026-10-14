@@ -57,3 +57,38 @@ check('stars: three at par or better, two within half as long again, one for any
   const par = PAR_MINUTES[0] * 60;
   eq([starsFor(0, par - 1), starsFor(0, par), starsFor(0, par * 1.5), starsFor(0, par * 1.5 + 1)], [3, 3, 2, 1]);
 });
+
+check('seasons: spring grows faster, summer parches the lowlands, autumn brings manna, winter snows in the high land', () => {
+  const w = emptyWorld(1, 30);
+  w.seasons = true;
+  for (let v = 15; v <= 22; v++) for (let u = 15; u <= 22; u++) w.terrain = reshape(w.terrain, u, v, 1).terrain;
+  for (let k = 0; k < 1; k++) for (let v = 16; v <= 21; v++) for (let u = 16; u <= 21; u++) w.terrain = reshape(w.terrain, u, v, 1).terrain;
+  const low = addHouse(w, PLAYER, 5, 5, 1), high = addHouse(w, PLAYER, 18, 18, 1);
+  eq([tileCorners(w.terrain, 5, 5)[0], tileCorners(w.terrain, 18, 18)[0]], [1, 3], 'a low house and a high one');
+  const year = [];
+  for (const name of ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER']) {
+    w.tick = SEASONS.findIndex((x) => x.name === name) * SEASON_TICKS + 1;
+    low.pop = high.pop = 1; w.tribes[PLAYER].manna = 0;
+    stepHouses(w);
+    year.push([name, +(low.pop - 1).toFixed(4), +(high.pop - 1).toFixed(4), w.tribes[PLAYER].manna]);
+  }
+  const g = (h) => GROWTH[h.level - 1] * DT;
+  eq(year.map((y) => y[0]), ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER']);
+  eq(year[0][1], +(g(low) * 1.5).toFixed(4), 'spring: half as fast again');
+  eq(year[1][1], +(g(low) * 0.5).toFixed(4), 'summer: the low house parched');
+  eq(year[1][2], +(g(high)).toFixed(4), 'summer: the high house as usual');
+  eq(year[3][2], 0, 'winter: the high house snowed in');
+  const m = (h) => MANNA[h.level - 1] * DT;
+  assert(Math.abs(year[2][3] - 1.5 * (m(low) + m(high))) < 1e-9, `autumn: half as much manna again (${year[2][3]})`);
+  assert(Math.abs(year[3][3] - m(low)) < 1e-9, `winter: only the low house earns (${year[3][3]})`);
+});
+
+check('seasons: they turn every SEASON_TICKS, starting in spring, and a sandbox has none', () => {
+  const w = makeWorld(SEED, { ai: [false, false] });
+  eq(seasonOf(w).name, 'SPRING');
+  w.tick = SEASON_TICKS * 3 + 5;
+  eq(seasonOf(w).name, 'WINTER');
+  w.tick = SEASON_TICKS * 4;
+  eq(seasonOf(w).name, 'SPRING', 'a year goes round');
+  eq(seasonOf(emptyWorld()).name, 'NONE');
+});

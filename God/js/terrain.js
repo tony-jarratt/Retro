@@ -6,10 +6,13 @@
 // which is how a hill grows. The corners round the edge of the map stay at sea level, so the map is an island.
 
 // Things standing on a tile (t.f, one per tile, index v * n + u): nobody can settle there, and it is not flat ground
-// for a house, until the god clears it by moving any corner of the tile.
+// for a house, until the god clears it by moving a corner of the tile (raising buries anything; lowering leaves stone).
 // Swamps come from the power, mines are dug in boulders; ruins are what a razed house leaves, and a toppled stone lies
 // where it fell (a head for the good god, a broken arch for the dark god).
 const FEATURE = { none: 0, tree: 1, pine: 2, rock: 3, swamp: 4, mine: 5, ruin: 6, fallenHead: 7, fallenArch: 8 };
+
+// Stone that digging down leaves standing.
+const STONY = new Set([FEATURE.rock, FEATURE.mine, FEATURE.fallenHead, FEATURE.fallenArch]);
 
 function makeTerrain(n) {
   return { n, w: n + 1, h: new Int8Array((n + 1) * (n + 1)), f: new Uint8Array(n * n) };
@@ -73,9 +76,15 @@ function reshape(t, u, v, dir) {
       changed.push(nb); queue.push(nb);
     }
   }
-  for (const c of changed) { // whatever stood on the four tiles round a moved corner topples
+  // What stood on the four tiles round a moved corner. Raising buries everything; lowering digs down, so the stone
+  // stays (boulders, mines, fallen stones) while trees, rubble and bogs go. Anything left in the sea goes too.
+  for (const c of changed) {
     const cu = c % out.w, cv = (c - cu) / out.w;
-    for (const [tu, tv] of [[cu - 1, cv - 1], [cu, cv - 1], [cu - 1, cv], [cu, cv]]) if (tu >= 0 && tv >= 0 && tu < out.n && tv < out.n) out.f[tv * out.n + tu] = FEATURE.none;
+    for (const [tu, tv] of [[cu - 1, cv - 1], [cu, cv - 1], [cu - 1, cv], [cu, cv]]) {
+      if (tu < 0 || tv < 0 || tu >= out.n || tv >= out.n) continue;
+      const i = tv * out.n + tu, k = [out.h[tv * out.w + tu], out.h[tv * out.w + tu + 1], out.h[(tv + 1) * out.w + tu + 1], out.h[(tv + 1) * out.w + tu]];
+      if (dir === 1 || !STONY.has(out.f[i]) || k.every((h) => h === 0)) out.f[i] = FEATURE.none;
+    }
   }
   return { ok: true, terrain: out, changed };
 }

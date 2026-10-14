@@ -36,6 +36,7 @@ const app = {
   paused: false, stopped: false, lastTime: 0, spare: 0,
   music: true,        // M turns the background music off and on
   help: false,        // the help card is open (H); the game waits while it is
+  tip: null, tipsShown: new Set(), // the first land's tips: the one showing { text, until }, and those already shown
   fx: [],             // effects being drawn: splashes, dust, lava
 };
 
@@ -90,6 +91,7 @@ function startLand(i) {
 }
 function startGame(seed, land) {
   app.mode = 'play';
+  app.tip = null; app.tipsShown = new Set();
   app.world = makeWorld(seed, { manna: numberParam('manna', START_MANNA), land });
   app.world.pointer = app.mouse;
   app.fx = [];
@@ -287,6 +289,26 @@ function ambience(world, now) {
   if (shore >= 3 && Math.random() < 0.7) Sound.play('surf');
   if (land >= 25 && !fighting && Math.random() < 0.35) Sound.play('birds');
 }
+// The first land teaches as it goes: each tip once, the first time it matters, one at a time.
+const TIPS = [
+  { id: 'flatten', when: (w) => w.tick > 40, text: 'FLATTEN THE LAND ROUND YOUR HOUSE: CLICK RAISES, SHIFT-CLICK LOWERS. FLAT LAND GROWS BIGGER HOUSES.' },
+  { id: 'clear', when: (w) => w.tick > 30 * 20, text: 'TREES AND BOULDERS BLOCK BUILDING. RAISING LAND BURIES THEM. LOWERING DIGS: BOULDERS AND MINES STAY.' },
+  { id: 'reach', when: (w) => w.hover && !cornerInReach(w, PLAYER, w.hover.u, w.hover.v), text: 'YOU CAN ONLY TOUCH LAND NEAR YOUR HOUSES AND STONES. DIMMED LAND IS BEYOND YOUR REACH.' },
+  { id: 'stone', when: (w) => w.tick > 75 * 20 && !w.stones[PLAYER].length && w.tribes[PLAYER].manna >= STONE_COST, text: 'PRESS 5 AND CLICK NEAR YOUR VILLAGE TO RAISE A STONE. YOUR PEOPLE GATHER THERE.' },
+  { id: 'path', when: (w) => w.stones[PLAYER].length === 1 && w.walkers.some((x) => x.tribe === PLAYER && x.gathered && x.strength >= PILGRIM_MASS / 2), text: 'RAISE MORE STONES TO LAY A PATH. AT 20 YOUR PEOPLE WALK IT, AND FIGHT OR SETTLE AT ITS END.' },
+  { id: 'season', when: (w, events) => events.some((e) => e.type === 'season'), text: 'THE SEASONS TURN. SUMMER PARCHES THE LOWLANDS, WINTER SNOWS IN THE HIGH LAND. AUTUMN BRINGS MANNA.' },
+  { id: 'bridge', when: (w, events) => events.some((e) => e.type === 'bridge' && e.tribe === RIVAL), text: 'THE DARK GOD IS RAISING LAND TOWARDS YOU. SINK IT, OR MEET IT WITH YOUR PILGRIMS.' },
+];
+function tips(world, now) {
+  if (world.land !== 0) return;
+  for (const tip of TIPS) {
+    if (app.tipsShown.has(tip.id) || !tip.when(world, world.events)) continue;
+    if (app.tip && now < app.tip.until) return; // one at a time: this one waits its turn
+    app.tipsShown.add(tip.id);
+    app.tip = { text: tip.text, until: now + 9000 };
+    return;
+  }
+}
 // Now and then a sheep in view bleats.
 let lastBaa = 0;
 function bleat(world, now) {
@@ -329,19 +351,14 @@ function frame(now) {
     musicUpdate(app.music && !app.world.over); // quiet at the end, so the victory or defeat tune is heard
     makeEffects(app.world, now);
     if (title) app.world.events.length = 0; // the demo's battles make no sound
-    else { playEvents(app.world); bleat(app.world, now); ambience(app.world, now); }
-    renderGame(screen, app.world, now, app.fx, { hud: !title });
+    else { tips(app.world, now); playEvents(app.world); bleat(app.world, now); ambience(app.world, now); }
+    renderGame(screen, app.world, now, app.fx, { hud: !title, music: app.music });
     if (!title) recordResult(app.world);
     if (title) drawTitle(screen, app.land, app.reached, app.best, now);
-    else { // the land and the time so far, in the corner
-      const w = app.world, when = `${w.land === null ? '' : `LAND ${w.land + 1}   `}${clock(w.over ? w.over.seconds : w.tick * DT)}`;
-      text(screen, when, 4, LH - 10, C.grey);
-    }
     if (title && PLAYTEST) outlined(screen, 'PLAY-TEST MODE: ALL LANDS OPEN', 4, 4, C.red);
     if (app.paused && !title && !app.help) outlined(screen, 'PAUSED', LW / 2 - textWidth('PAUSED') / 2, LH / 2, C.snow);
+    if (!title && app.tip && now < app.tip.until && !app.help) drawTip(screen, app.tip.text);
     if (app.help) drawHelp(screen);
-    const tuneHint = `H HELP   M MUSIC ${app.music ? 'ON' : 'OFF'}`;
-    text(screen, tuneHint, LW - 4 - textWidth(tuneHint), LH - 10, C.grey);
     present(screen, presenter, ctx);
   } catch (err) { fail(err); return; }
   requestAnimationFrame(frame);

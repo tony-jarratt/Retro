@@ -83,3 +83,10 @@ const STONE_ART = [
     'eeeee.....eeeee'],
 ];
 const STONE_SPRITES = STONE_ART.map((rows, tribe) => tribeSprite(rows, tribe));
+
+// The trees by season: turning brown and orange in autumn, snow on their branches in winter.
+const AUTUMN_KEY = { ...SPRITE_KEY, L: C.gold, M: C.rockLit, G: C.rock };
+const WINTER_KEY = { ...SPRITE_KEY, L: C.snow, M: C.grey, G: C.grassDark };
+const AUTUMN_SPRITES = { [FEATURE.tree]: makeSprite(outlinedArt(FEATURE_ART[FEATURE.tree]), AUTUMN_KEY) };
+const WINTER_SPRITES = { [FEATURE.tree]: makeSprite(outlinedArt(FEATURE_ART[FEATURE.tree]), WINTER_KEY),
+  [FEATURE.pine]: makeSprite(outlinedArt(FEATURE_ART[FEATURE.pine]), WINTER_KEY) };

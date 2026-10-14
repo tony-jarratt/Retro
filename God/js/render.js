@@ -20,12 +20,15 @@ const LAND = { sand: [C.sand, C.sand, C.rockLit], grass: [C.grassLit, C.grass, C
 // The grid line drawn over a facet of each colour: a shade darker.
 const GRID = { [C.sand]: C.rockLit, [C.grassLit]: C.grass, [C.grass]: C.grassDark, [C.grassDark]: C.earth, [C.rockLit]: C.rock,
   [C.rock]: C.earth, [C.earth]: C.earth, [C.snow]: C.grey, [C.grey]: C.grey };
-function facetColour(heights, shade) {
+// The season paints the land: snow on the high land in winter, the lowest land parched in summer.
+const PARCHED = [C.sand, C.rockLit, C.rock];
+function facetColour(heights, shade, season = 'NONE') {
   const lo = Math.min(...heights), hi = Math.max(...heights);
   if (hi === 0) return C.sea;
   if (lo === 0) return LAND.sand[shade];
-  if (hi >= MAX_H) return LAND.snow[shade];
+  if (hi >= MAX_H || (season === 'WINTER' && lo >= HIGH_LAND)) return LAND.snow[shade];
   if (hi >= 5) return LAND.rock[shade];
+  if (season === 'SUMMER' && hi <= LOW_LAND) return PARCHED[shade];
   return LAND.grass[shade];
 }
 
@@ -33,6 +36,7 @@ function facetColour(heights, shade) {
 // so a hill in front hides whoever is behind it.
 function drawLand(s, world, ms) {
   const t = world.terrain, cam = world.cam, glintFrame = Math.floor(ms / 400), people = peopleByRow(world, ms), fields = fieldTiles(world);
+  const season = seasonOf(world).name;
   const reach = world.ai[PLAYER] ? null : reachMap(world, PLAYER); // dim what a human player cannot touch (not in the title demo)
   let row = 0;
   for (const { u, v } of tilesInView(cam)) {
@@ -41,7 +45,7 @@ function drawLand(s, world, ms) {
     const k = [[u, v], [u + 1, v], [u + 1, v + 1], [u, v + 1]].map(([a, b]) => [a, b, heightAt(t, a, b)]);
     const pts = k.map(([a, b, h]) => project(cam, a, b, h));
     const colours = TILE_SPLIT.map(([i, j, l]) => {
-      const c = facetColour([k[i][2], k[j][2], k[l][2]], facetShade(k[i], k[j], k[l]));
+      const c = facetColour([k[i][2], k[j][2], k[l][2]], facetShade(k[i], k[j], k[l]), season);
       fillTri(s, pts[i], pts[j], pts[l], c);
       return c;
     });
@@ -55,8 +59,9 @@ function drawLand(s, world, ms) {
     }
     if (fields.has(v * t.n + u)) { // a house's farmland: a field of crops with furrows across it
       const mid = project(cam, u + 0.5, v + 0.5, k[0][2]), f = pts.map((p) => [mid[0] + (p[0] - mid[0]) * 0.8, mid[1] + (p[1] - mid[1]) * 0.8]);
-      fillQuad(s, f[0], f[1], f[2], f[3], C.grassLit);
-      for (const d of [0.25, 0.5, 0.75]) line(s, lerp2(f[0], f[3], d), lerp2(f[1], f[2], d), C.sand);
+      const crop = { AUTUMN: [C.gold, C.rockLit], WINTER: [C.snow, C.grey], SUMMER: [C.sand, C.rockLit] }[season] || [C.grassLit, C.sand]; // golden at harvest
+      fillQuad(s, f[0], f[1], f[2], f[3], crop[0]);
+      for (const d of [0.25, 0.5, 0.75]) line(s, lerp2(f[0], f[3], d), lerp2(f[1], f[2], d), crop[1]);
     }
     if (reach && !reach[v * t.n + u]) { for (const [i, j, l] of TILE_SPLIT) veilTri(s, pts[i], pts[j], pts[l], C.black); } // beyond your reach
     if (k.every((c) => c[2] === 0)) { // foam where the sea meets the land, washing in and out
@@ -110,7 +115,8 @@ function peopleByRow(world, ms) {
   for (let b = cam.v; b < cam.v + VIEW_N; b++) for (let a = cam.u; a < cam.u + VIEW_N; a++) { // trees and rocks
     const f = featureAt(t, a, b);
     if (!f) continue;
-    const [x, y] = project(cam, a + 0.5, b + 0.5, groundAt(t, a + 0.5, b + 0.5)), sp = FEATURE_SPRITES[f];
+    const autumn = seasonOf(world).name === 'AUTUMN' && AUTUMN_SPRITES[f], snowy = seasonOf(world).name === 'WINTER' && WINTER_SPRITES[f];
+    const [x, y] = project(cam, a + 0.5, b + 0.5, groundAt(t, a + 0.5, b + 0.5)), sp = autumn || snowy || FEATURE_SPRITES[f];
     add(a, b, y, (s) => blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 3, (a * 7 + b * 3) % 2 === 1));
   }
   for (const h of world.houses) {
@@ -232,45 +238,101 @@ function drawBook(s, game) {
   for (let i = 0; i < 4; i++) line(s, q[i], q[(i + 1) % 4], C.gold);
 }
 
-// ---- the panel and the message line ----
-function drawPanel(s, game, hoverCost, beyond) {
-  const x = 170, manna = game.tribes[PLAYER].manna;
-  const houses = game.houses.filter((h) => h.tribe === PLAYER).length;
-  outlined(s, `MANNA ${Math.floor(manna)}`, x, 10, C.gold);
-  outlined(s, `PEOPLE ${population(game, PLAYER)}   HOUSES ${houses}`, x + 100, 10, C.snow);
-  fillRect(s, x, 21, 202, 7, C.earth);
-  fillRect(s, x + 1, 22, Math.min(200, Math.floor(manna)), 5, C.gold);
-  // the tug of war: your people against the dark god's
-  const mine = population(game, PLAYER), theirs = population(game, RIVAL), split = Math.round((200 * mine) / Math.max(1, mine + theirs));
-  fillRect(s, x, 30, 202, 7, C.black);
-  fillRect(s, x + 1, 31, split, 5, TRIBE_COLOURS[PLAYER].c);
-  fillRect(s, x + 1 + split, 31, 200 - split, 5, TRIBE_COLOURS[RIVAL].c);
-  fillRect(s, x + 100, 29, 1, 9, C.snow);
-  for (const [tribe, y, who] of [[PLAYER, 21, 'YOU'], [RIVAL, 31, 'DARK']]) { // each side's weapons and mines
-    const tr = game.tribes[tribe];
-    outlined(s, `${who} ${WEAPONS[tr.weapons]} ${tr.mines} ${tr.mines === 1 ? 'MINE' : 'MINES'}`, x + 208, y, TRIBE_COLOURS[tribe].c);
-  }
-  if (game.message) outlined(s, game.message, x, 42, C.gold);
-  else if (game.armed) {
-    const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE, SHIFT-CLICK TO TAKE DOWN', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
-    outlined(s, `${p.name} (${p.cost}): ${how}`, x, 42, C.red);
-  }
-  else if (beyond) outlined(s, 'BEYOND YOUR REACH: RAISE A STONE NEARER', x, 42, C.grey);
-  else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
-  for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
-    if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
-    const colour = !game.powers.has(slot.id) ? C.earth : manna >= POWER[slot.id].cost ? C.gold : C.grey; // dark: not earned in this land
-    outlined(s, slot.label, slot.x, slot.y, colour);
+// ---- the frame and the panel: carved stone round the view, with tablets for the readouts ----
+const PANEL_H = 78, STRIP_Y = LH - 12;   // the stone panel along the top; the strip along the bottom
+const COL_A = 156, COL_B = 332, COL_W = 168; // the two readout tablets
+// Stonework: dark earth laid in courses, with lighter mortar lines.
+function stonework(s, x, y, w, h) {
+  fillRect(s, x, y, w, h, C.earth);
+  for (let j = y + 7; j < y + h; j += 8) fillRect(s, x, j, w, 1, C.rock);
+  for (let j = y, row = 0; j < y + h; j += 8, row++) for (let i = x + (row % 2 ? 12 : 0); i < x + w; i += 24) fillRect(s, i, j, 1, Math.min(7, y + h - j), C.rock);
+}
+// A tablet: a black panel with a carved rim, lit along its top and left.
+function tablet(s, x, y, w, h) {
+  fillRect(s, x - 2, y - 2, w + 4, h + 4, C.black);
+  fillRect(s, x - 1, y - 1, w + 2, 1, C.rockLit); fillRect(s, x - 1, y - 1, 1, h + 2, C.rockLit);
+  fillRect(s, x - 1, y + h, w + 2, 1, C.rock); fillRect(s, x + w, y - 1, 1, h + 2, C.rock);
+  fillRect(s, x, y, w, h, C.black);
+}
+function drawFrame(s) {
+  stonework(s, 0, 0, LW, PANEL_H);
+  stonework(s, 0, PANEL_H, 6, STRIP_Y - PANEL_H);
+  stonework(s, LW - 6, PANEL_H, 6, STRIP_Y - PANEL_H);
+  stonework(s, 0, STRIP_Y, LW, LH - STRIP_Y);
+  fillRect(s, 6, PANEL_H, LW - 12, 1, C.black); fillRect(s, 6, STRIP_Y - 1, LW - 12, 1, C.black); // the view's edge
+  for (const [x, y] of [[6, PANEL_H], [LW - 7, PANEL_H], [6, STRIP_Y - 1], [LW - 7, STRIP_Y - 1]]) { // gold studs at its corners
+    fillRect(s, x - 2, y - 1, 5, 3, C.gold); fillRect(s, x - 1, y - 2, 3, 5, C.gold);
   }
 }
-// Where each power's name sits in the panel (also where a click picks it).
-function powerSlots() { // names only: the cost shows when a power is picked, and on the help card
-  let x = 170;
-  return POWERS.map((p) => {
-    const label = `${p.key} ${p.name}`, slot = { id: p.id, label, x, y: 56, w: textWidth(label), h: 7 };
-    x += slot.w + 12;
-    return slot;
-  });
+
+// Little pictures for the seasons, 5 x 5 drawn at 2x, keyed by letter.
+const SEASON_ICONS = {
+  SPRING: ['.p.p.', 'ppypp', '.ppp.', '..g..', '.gg..'],
+  SUMMER: ['y.y.y', '.yyy.', 'yyyyy', '.yyy.', 'y.y.y'],
+  AUTUMN: ['...oo', '..ooo', '.ooo.', 'ooo..', 'b....'],
+  WINTER: ['w.w.w', '.www.', 'ww.ww', '.www.', 'w.w.w'],
+};
+const ICON_KEY = { p: C.skin, y: C.gold, g: C.grass, o: C.rockLit, b: C.rock, w: C.snow };
+function drawIcon(s, rows, x, y) { rows.forEach((row, j) => { for (let i = 0; i < row.length; i++) if (row[i] !== '.') fillRect(s, x + i * 2, y + j * 2 - 1, 2, 2, ICON_KEY[row[i]]); }); }
+
+function drawPanel(s, game, hoverCost, beyond) {
+  const manna = game.tribes[PLAYER].manna, houses = game.houses.filter((h) => h.tribe === PLAYER).length;
+  // left tablet: manna, people, and the tug of war with the dark god
+  tablet(s, COL_A - 4, 6, COL_W, 42);
+  text(s, `MANNA ${Math.floor(manna)}`, COL_A, 9, C.gold);
+  fillRect(s, COL_A, 18, COL_W - 8, 5, C.earth);
+  fillRect(s, COL_A, 18, Math.min(COL_W - 8, Math.floor((manna * (COL_W - 8)) / 250)), 5, C.gold);
+  text(s, `PEOPLE ${population(game, PLAYER)}   HOUSES ${houses}`, COL_A, 28, C.snow);
+  const mine = population(game, PLAYER), theirs = population(game, RIVAL), bar = COL_W - 8, split = Math.round((bar * mine) / Math.max(1, mine + theirs));
+  fillRect(s, COL_A, 38, split, 5, TRIBE_COLOURS[PLAYER].c);
+  fillRect(s, COL_A + split, 38, bar - split, 5, TRIBE_COLOURS[RIVAL].c);
+  fillRect(s, COL_A + bar / 2, 36, 1, 9, C.snow);
+  // right tablet: the season and the time, the land, and each side's arms
+  tablet(s, COL_B - 4, 6, COL_W, 42);
+  const season = seasonOf(game), time = clock(game.over ? game.over.seconds : game.tick * DT);
+  if (game.seasons) { drawIcon(s, SEASON_ICONS[season.name], COL_B, 9); text(s, season.name, COL_B + 14, 9, C.snow); }
+  text(s, time, COL_B + COL_W - 8 - textWidth(time), 9, C.grey);
+  const land = game.land === null || game.land === undefined ? 'FREE PLAY' : `${game.land + 1}: ${LANDS[game.land].name}`;
+  text(s, land, COL_B, 19, C.gold);
+  for (const [tribe, y, who] of [[PLAYER, 29, 'YOU'], [RIVAL, 38, 'DARK']]) {
+    const tr = game.tribes[tribe];
+    text(s, `${who} ${WEAPONS[tr.weapons]} ${tr.mines} ${tr.mines === 1 ? 'MINE' : 'MINES'}`, COL_B, y, TRIBE_COLOURS[tribe].c);
+  }
+  // the message tablet: news, or what the cursor is about to do
+  tablet(s, COL_A - 4, 53, COL_B + COL_W - COL_A, 9);
+  if (game.message) text(s, game.message, COL_A, 54, C.gold);
+  else if (game.armed) {
+    const p = POWER[game.armed], how = { flood: 'CLICK ANYWHERE', stone: 'CLICK TO RAISE, SHIFT-CLICK TO TAKE DOWN', call: 'CLICK WHERE THE LAST BATTLE IS' }[p.id] || 'CLICK THE LAND';
+    text(s, `${p.name} (${p.cost}): ${how}`, COL_A, 54, C.red);
+  } else if (beyond) text(s, 'BEYOND YOUR REACH: RAISE A STONE NEARER', COL_A, 54, C.grey);
+  else if (hoverCost) text(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, COL_A, 54, C.snow);
+  // the powers, each on its own little tablet: gold when you can afford it, red-rimmed when ready to cast
+  for (const slot of powerSlots()) {
+    tablet(s, slot.x, slot.y, slot.w, slot.h);
+    if (slot.id === game.armed) { fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 1, C.red); fillRect(s, slot.x - 1, slot.y + slot.h, slot.w + 2, 1, C.red); }
+    const colour = !game.powers.has(slot.id) ? C.earth : manna >= POWER[slot.id].cost ? C.gold : C.grey; // dark: not earned in this land
+    text(s, slot.label, slot.x + Math.round((slot.w - textWidth(slot.label)) / 2), slot.y + 1, colour);
+  }
+}
+// Where each power's tablet sits in the panel (also where a click picks it).
+function powerSlots() {
+  const x0 = COL_A - 4, span = LW - 8 - x0, w = Math.floor(span / POWERS.length) - 3;
+  return POWERS.map((p, i) => ({ id: p.id, label: `${p.key} ${p.name}`, x: x0 + i * (w + 3), y: 66, w, h: 9 }));
+}
+// A tip from the first land, in a gold-edged box above the bottom strip.
+function drawTip(s, str) {
+  const lines = wrapText(str, 60), w = Math.max(...lines.map(textWidth)) + 16, h = lines.length * 10 + 8;
+  const x = Math.round(LW / 2 - w / 2), y = STRIP_Y - h - 6;
+  fillRect(s, x - 2, y - 2, w + 4, h + 4, C.gold);
+  fillRect(s, x, y, w, h, C.black);
+  lines.forEach((l, i) => text(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 5 + i * 10, C.snow));
+}
+// The strip along the bottom: the keys to remember.
+function drawStrip(s, music) {
+  const keys = `H HELP   P PAUSE   M MUSIC ${music ? 'ON' : 'OFF'}`;
+  text(s, keys, 10, STRIP_Y + 3, C.sand);
+  const name = 'OLD STONES';
+  text(s, name, LW - 10 - textWidth(name), STRIP_Y + 3, C.gold);
 }
 
 // A little star, gold when earned, dark when not.
@@ -409,7 +471,7 @@ function drawInspect(s, game) {
 // A tag of a few lines above the thing pointed at, in a box edged with `edge`; a third line is in gold.
 function drawTag(s, p, lines, edge) {
   const w = Math.max(...lines.map(textWidth)) + 8, h = lines.length * 9 + 5;
-  const x = Math.round(Math.max(2, Math.min(LW - w - 2, (p.x0 + p.x1) / 2 - w / 2))), y = Math.round(Math.max(70, p.y0 - h - 3));
+  const x = Math.round(Math.max(8, Math.min(LW - w - 8, (p.x0 + p.x1) / 2 - w / 2))), y = Math.round(Math.max(PANEL_H + 4, p.y0 - h - 3));
   fillRect(s, x - 1, y - 1, w + 2, h + 2, edge);
   fillRect(s, x, y, w, h, C.black);
   lines.forEach((l, i) => text(s, l, x + 4, y + 3 + i * 9, i === 2 ? C.gold : C.snow));
@@ -423,7 +485,8 @@ const HELP = [
   ["YOU ARE THE GOD OF THE BLUE PEOPLE.", "WIPE OUT THE DARK GOD'S PEOPLE TO WIN."],
   ['THE LAND', 'CLICK RAISES THE LAND, SHIFT-CLICK (OR RIGHT-CLICK) LOWERS IT. IT COSTS MANNA. YOUR PEOPLE SETTLE ON FLAT '
     + 'GROUND, AND THE MORE FLAT LAND A HOUSE HAS AROUND IT THE BIGGER IT GROWS: TENT, HUT, COTTAGE, HOUSE, CASTLE. BIG '
-    + 'HOUSES EARN MORE MANNA. TREES AND BOULDERS BLOCK BUILDING. RAISING OR LOWERING THE LAND CLEARS THEM.'],
+    + 'HOUSES EARN MORE MANNA. TREES AND BOULDERS BLOCK BUILDING. RAISING THE LAND BURIES THEM. LOWERING IT DIGS DOWN: '
+    + 'TREES GO, BUT BOULDERS AND MINES STAY.'],
   ['MINES', 'A HUT OR BIGGER WITH A BOULDER IN ITS LAND DIGS A MINE. MORE MINES, BETTER WEAPONS.'],
   ['POWERS', 'PRESS THE KEY, THEN CLICK THE LAND. 1 SWAMP 30, 2 QUAKE 60, 3 VOLCANO 120, 4 FLOOD 250, 5 STONE 20, '
     + '6 CALL 500. THE CALL OF THE STONES EMPTIES EVERY HOUSE ON BOTH SIDES AND SENDS EVERYONE TO ONE PLACE FOR A LAST '
@@ -500,9 +563,11 @@ function renderGame(s, game, ms, fx = [], opts = {}) {
   const thing = pickedThing(game);
   if (!thing || game.armed) drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed, game.hoverTile);
   game.cam = real;
-  if (!game.armed) drawInspect(s, game);
+  drawFrame(s);
   drawBook(s, game);
   drawPanel(s, game, game.hover ? hoverCosts(game, game.hover) : null, game.hover && !cornerInReach(game, PLAYER, game.hover.u, game.hover.v));
+  drawStrip(s, opts.music !== false);
+  if (!game.armed) drawInspect(s, game);
   drawEnd(s, game);
 }
 // What raising and lowering the corner would cost ('-' when it can't be done).
