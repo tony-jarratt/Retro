@@ -66,6 +66,9 @@ const SOUNDS = {
   mine: (s) => { s.tone(900, 0.05, 'square', 0.04); s.tone(700, 0.05, 'square', 0.04, 0.12); s.tone(900, 0.05, 'square', 0.04, 0.24); },
   armed: (s) => [330, 440, 554, 659].forEach((f, i) => s.tone(f, 0.18, 'square', 0.05, i * 0.1)),
   baa: (s) => { for (let i = 0; i < 5; i++) s.tone(420 - i * 12, 0.07, 'sawtooth', 0.03, i * 0.065, 390 - i * 12); }, // a wobbly bleat
+  chime: (s) => { s.tone(196, 0.9, 'sine', 0.08); s.tone(294, 0.9, 'sine', 0.05, 0.02); s.tone(392, 0.7, 'triangle', 0.03, 0.04); }, // a stone raised
+  horn: (s) => { s.tone(147, 0.5, 'sawtooth', 0.05, 0, 165); s.tone(220, 0.7, 'sawtooth', 0.04, 0.35, 233); },          // pilgrims set out
+  crash: (s) => { s.noise(0.6, 0.14, 'lowpass', 500); s.tone(90, 0.5, 'square', 0.05, 0, 45); },                       // a stone falls
   rumble: (s) => s.noise(0.5, 0.06, 'lowpass', 250),
   sink: (s) => { s.tone(300, 0.4, 'sine', 0.06, 0, 80); s.noise(0.3, 0.05, 'lowpass', 300); },
   swamp: (s) => { for (let i = 0; i < 4; i++) s.tone(160 + i * 30, 0.12, 'sine', 0.05, i * 0.08, 90); },

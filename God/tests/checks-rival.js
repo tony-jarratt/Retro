@@ -1,6 +1,6 @@
 'use strict';
 
-// The rival: fights, attacks on houses, the dark god's land-shaping, its bridge across the sea, marching, the end.
+// The rival: fights, attacks on houses, the dark god's land-shaping, its bridge across the sea and ley line, the end.
 
 // A random source that returns the values it is given (for rng.next()), and complains if it runs out.
 function fakeRng(values) {
@@ -45,8 +45,6 @@ check('rival: a walker senses the other tribe nearby, and heads for it', () => {
   eq(nearestFoe(w, a), { u: 12, v: 12 });
   const far = addWalker(w, PLAYER, 2.5, 20.5, 3);
   eq(nearestFoe(w, far), null, 'too far to sense');
-  w.tribes[PLAYER].marching = true; far.strength = MARCH_STRENGTH;
-  eq(nearestFoe(w, far), { u: 12, v: 12 }, 'a marching band senses it from anywhere');
 });
 
 check('rival: the dark god only makes moves it can pay for, and gains flat ground by them', () => {
@@ -55,20 +53,24 @@ check('rival: the dark god only makes moves it can pay for, and gains flat groun
   let moves = 0;
   for (let i = 0; i < 200; i++) {
     const before = own(), r = aiThink(w, RIVAL);
-    if (r && !r.bridge && !r.power) { moves++; assert(own() > before, `move ${moves} gained ground (${before} -> ${own()})`); }
+    if (r && !r.bridge && !r.power && !r.stone) { moves++; assert(own() > before, `move ${moves} gained ground (${before} -> ${own()})`); }
     checkTerrain(w.terrain); checkWorld(w);
     for (let k = 0; k < AI_THINK_TICKS; k++) stepWorld(w);
   }
   assert(moves > 0, 'it did something');
 });
 
-check('rival: with manna to spare after the grace period, the dark god raises a bridge to the other land', () => {
+check('rival: with manna to spare after the grace period, the dark god bridges to your land and lays its ley line to you', () => {
   const w = makeWorld(SEED, { ai: [false, false] });
   const pair = nearestPair(w, RIVAL);
   eq(landPath(w.terrain, pair[0], pair[1]), false, 'apart to begin with');
   w.tick = AI_GRACE_TICKS;
-  for (let i = 0; i < 200 && !w.tribes[RIVAL].marching; i++) { w.tribes[RIVAL].manna = 500; aiThink(w, RIVAL); }
-  eq(w.tribes[RIVAL].marching, true, 'the land joins and its bands march');
+  for (let i = 0; i < 200 && !w.tribes[RIVAL].joined; i++) { w.tribes[RIVAL].manna = 500; aiThink(w, RIVAL); }
+  eq(w.tribes[RIVAL].joined, true, 'the land joins');
+  for (let i = 0; i < 5; i++) { w.tribes[RIVAL].manna = 500; aiThink(w, RIVAL); }
+  const line = w.stones[RIVAL], end = line[line.length - 1];
+  assert(line.length >= 2, `a ley line: hearth and more (${line.length} stones)`);
+  assert(w.houses.some((h) => h.tribe === PLAYER && gap(h, end) <= SCENT), 'its end stone is by your houses');
   checkTerrain(w.terrain);
 });
 

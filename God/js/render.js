@@ -95,7 +95,7 @@ function groundAt(t, x, y) {
   return nw * (1 - fx) * (1 - fy) + ne * fx * (1 - fy) + se * fx * fy + sw * (1 - fx) * fy;
 }
 // Every tree, rock, house, sheep and walker in view, as draw calls grouped by the diagonal row of tiles they stand on.
-// Each house, walker and sheep drawn also leaves its box on screen in world.picks, so the mouse can point at it.
+// Each house, stone, walker and sheep drawn also leaves its box on screen in world.picks, so the mouse can point at it.
 function peopleByRow(world, ms) {
   const t = world.terrain, cam = world.cam, rows = new Map();
   world.picks = [];
@@ -117,6 +117,11 @@ function peopleByRow(world, ms) {
     const sp = SPRITES[h.tribe].house[h.level - 1];
     world.picks.push({ house: h, x0: x - sp.w / 2, x1: x + sp.w / 2, y0: y - sp.h + 3, y1: y + 3, y });
   }
+  world.stones.forEach((line, tribe) => line.forEach((st, index) => {
+    const [x, y] = project(cam, st.u + 0.5, st.v + 0.5, groundAt(t, st.u + 0.5, st.v + 0.5)), sp = STONE_SPRITES[tribe];
+    add(st.u, st.v, y, (s) => blit(s, sp, x - Math.floor(sp.w / 2), y - sp.h + 3));
+    world.picks.push({ stone: st, tribe, index, x0: x - sp.w / 2, x1: x + sp.w / 2, y0: y - sp.h + 3, y1: y + 3, y });
+  }));
   for (const sh of world.sheep) {
     const [x, y] = project(cam, sh.x, sh.y, groundAt(t, sh.x, sh.y));
     const left = (sh.tx - sh.x) - (sh.ty - sh.y) < 0, sp = SHEEP_SPRITES[sh.graze > 0 ? 2 : Math.floor((world.tick + sh.id) / 8) % 2];
@@ -158,7 +163,11 @@ function drawWalker(s, world, w, x, y) {
     const bx = Math.round(x) + (flip ? -4 : 4), by = Math.round(y) - sp.h + 3;
     line(s, [bx, by], [bx, by + 4], [C.sand, C.grey, C.snow][arms - 1]);
   }
-  if (w.strength >= 10) fillRect(s, Math.round(x) - 1, Math.round(y) - sp.h - 2, 3, 3, C.gold); // a strong band carries a standard
+  if (w.pilgrim) { // pilgrims carry a pennant in their god's colour
+    const px = Math.round(x) + (flip ? 3 : -3), top = Math.round(y) - sp.h - 6;
+    line(s, [px, top], [px, Math.round(y) - 2], C.black);
+    fillRect(s, px + (flip ? -4 : 1), top, 4, 3, TRIBE_COLOURS[w.tribe].c);
+  } else if (w.strength >= 10) fillRect(s, Math.round(x) - 1, Math.round(y) - sp.h - 2, 3, 3, C.gold); // a strong band carries a standard
 }
 
 // The cut faces along the front two edges of the view, like a slice of cake: earth above the sea, water below.
@@ -177,9 +186,14 @@ function drawSkirt(s, t, cam) {
   }
 }
 
-function drawCursor(s, t, cam, corner, ms, armed) {
+function drawCursor(s, t, cam, corner, ms, armed, hoverTile) {
   if (!corner) return;
   const [x, y] = cornerPoint(t, cam, corner.u, corner.v), c = Math.floor(ms / 250) % 2 ? (armed ? C.red : C.gold) : C.snow;
+  if (armed === 'stone' && hoverTile) { // the tile the stone would stand on
+    const q = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([a, b]) => cornerPoint(t, cam, hoverTile.u + a, hoverTile.v + b));
+    for (let i = 0; i < 4; i++) line(s, q[i], q[(i + 1) % 4], c);
+    return;
+  }
   const r = armed ? POWER[armed].reach : 0;
   if (r) { // the square of land the power will touch, drawn on the ground
     const at = (a, b) => { const cu = Math.max(0, Math.min(t.n, a)), cv = Math.max(0, Math.min(t.n, b)); return project(cam, cu, cv, heightAt(t, cu, cv)); };
@@ -235,7 +249,8 @@ function drawPanel(s, game, hoverCost) {
     outlined(s, `${who} ${WEAPONS[tr.weapons]} ${tr.mines} ${tr.mines === 1 ? 'MINE' : 'MINES'}`, x + 208, y, TRIBE_COLOURS[tribe].c);
   }
   if (game.message) outlined(s, game.message, x, 42, C.gold);
-  else if (game.armed) outlined(s, game.armed === 'flood' ? 'FLOOD: CLICK ANYWHERE. ESC CANCELS' : `${POWER[game.armed].name}: CLICK THE LAND. ESC CANCELS`, x, 42, C.red);
+  else if (game.armed) outlined(s, game.armed === 'flood' ? 'FLOOD: CLICK ANYWHERE. ESC CANCELS' : game.armed === 'stone' ? 'STONE: CLICK TO RAISE, SHIFT-CLICK ONE TO TAKE DOWN'
+    : `${POWER[game.armed].name}: CLICK THE LAND. ESC CANCELS`, x, 42, C.red);
   else if (hoverCost) outlined(s, `RAISE ${hoverCost.raise}   LOWER ${hoverCost.lower}`, x, 42, C.snow);
   for (const slot of powerSlots()) { // the powers: gold when you can afford one, boxed when it is ready to cast
     if (slot.id === game.armed) { fillRect(s, slot.x - 2, slot.y - 2, slot.w + 4, 11, C.red); fillRect(s, slot.x - 1, slot.y - 1, slot.w + 2, 9, C.black); }
@@ -244,10 +259,10 @@ function drawPanel(s, game, hoverCost) {
 }
 // Where each power's name sits in the panel (also where a click picks it).
 function powerSlots() {
-  let x = 170;
+  let x = 156;
   return POWERS.map((p) => {
     const label = `${p.key} ${p.name} ${p.cost}`, slot = { id: p.id, label, x, y: 56, w: textWidth(label), h: 7 };
-    x += slot.w + 12;
+    x += slot.w + 8;
     return slot;
   });
 }
@@ -264,6 +279,29 @@ function drawEnd(s, game) {
   lines.forEach((l, i) => outlined(s, l, Math.round(LW / 2 - textWidth(l) / 2), y + 26 + i * 11, C.snow));
   const keys = 'ENTER TITLE SCREEN    R SAME LAND';
   outlined(s, keys, Math.round(LW / 2 - textWidth(keys) / 2), y + 62, C.grey);
+}
+
+// ---- ley lines: a dotted line in each god's colour from each stone to the next, and the gathering at each hearth ----
+function drawLeyLines(s, game, ms) {
+  const t = game.terrain, cam = game.cam;
+  const at = (st) => project(cam, st.u + 0.5, st.v + 0.5, groundAt(t, st.u + 0.5, st.v + 0.5));
+  game.stones.forEach((line, tribe) => {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const [x0, y0] = at(line[i]), [x1, y1] = at(line[i + 1]), n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 5);
+      for (let k = 0; k <= n; k++) { // beads of light running along the line, each with a dark rim so it shows on any ground
+        if ((k + Math.floor(ms / 250)) % 3 === 0) continue;
+        const bx = Math.round(x0 + ((x1 - x0) * k) / n) - 1, by = Math.round(y0 + ((y1 - y0) * k) / n) - 1;
+        fillRect(s, bx - 1, by - 1, 4, 4, C.black);
+        fillRect(s, bx, by, 2, 2, TRIBE_COLOURS[tribe].c);
+      }
+    }
+    if (!line.length) return;
+    const g = game.walkers.find((w) => w.tribe === tribe && w.gathered), count = `${g ? g.strength : 0}/${PILGRIM_MASS}`;
+    const [x, y] = at(line[0]), sp = STONE_SPRITES[tribe];
+    if (line[0].u >= cam.u && line[0].v >= cam.v && line[0].u < cam.u + VIEW_N && line[0].v < cam.v + VIEW_N) {
+      outlined(s, count, Math.round(x - textWidth(count) / 2), Math.round(y - sp.h - 8), TRIBE_COLOURS[tribe].c);
+    }
+  });
 }
 
 // ---- short-lived effects (made from the world's events by main.js): { kind, u, v, h, born } ----
@@ -318,10 +356,17 @@ function drawInspect(s, game) {
   const p = pickedThing(game);
   if (!p) return;
   if (p.sheep) return drawTag(s, p, [p.sheep.graze > 0 ? 'A SHEEP. IT IS GRAZING.' : 'A SHEEP. IT IS GOING SOMEWHERE.'], C.snow);
+  if (p.stone) {
+    const line = game.stones[p.tribe], who = p.tribe === PLAYER ? 'YOUR' : 'DARK';
+    const g = game.walkers.find((w) => w.tribe === p.tribe && w.gathered);
+    const lines = p.index === 0 ? [`${who} HEARTH STONE`, `${g ? g.strength : 0}/${PILGRIM_MASS} GATHERED`, line.length < 2 ? 'NO PATH YET: RAISE ANOTHER' : `THEN ON TO ${line.length - 1} MORE`]
+      : p.index === line.length - 1 ? [`${who} END STONE`, 'PILGRIMS FIGHT OR SETTLE HERE'] : [`${who} WAYSTONE ${p.index} OF ${line.length - 1}`];
+    return drawTag(s, p, lines, TRIBE_COLOURS[p.tribe].c);
+  }
   const thing = p.house || p.walker, tribe = thing.tribe, tr = game.tribes[tribe];
   const lines = [];
   if (p.house) lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${LEVEL_NAMES[thing.level - 1]} ${Math.floor(thing.pop)}/${CAP[thing.level - 1]}`);
-  else lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} BAND OF ${thing.strength}`);
+  else lines.push(`${tribe === PLAYER ? 'YOUR' : 'DARK'} ${thing.pilgrim ? 'PILGRIMS' : thing.gathered ? 'GATHERING' : 'BAND'} OF ${thing.strength}`);
   lines.push(`${WEAPONS[tr.weapons]}${tr.weapons ? ` X${WEAPON_FACTOR[tr.weapons]}` : ''}`);
   if (tribe !== PLAYER) {
     const at = p.house ? { x: thing.u + 0.5, y: thing.v + 0.5 } : thing;
@@ -348,13 +393,15 @@ const TITLE_LINES = [
   'BOULDERS BY YOUR HOUSES BECOME MINES: BETTER ARMS.',
   'CLICK RAISES, SHIFT-CLICK LOWERS. 1-4 CAST POWERS.',
   'SWIPE, ARROWS OR THE MAP BOOK TO LOOK ABOUT.',
+  'RAISE STONES (5): YOUR PEOPLE GATHER AT THE FIRST,',
+  'THEN WALK THE LINE AND FIGHT OR SETTLE AT ITS END.',
   "WIPE OUT THE DARK GOD'S PEOPLE TO WIN.",
 ];
 // Where each difficulty's name sits on the title card (also where a click picks it).
 function difficultySlots() {
   const gap = 18, labels = DIFFICULTIES.map((d, i) => `${i + 1} ${d.name}`);
   let x = Math.round(LW / 2 - (labels.reduce((n, l) => n + textWidth(l), 0) + gap * (labels.length - 1)) / 2);
-  return labels.map((label, i) => { const slot = { i, label, x, y: 286, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
+  return labels.map((label, i) => { const slot = { i, label, x, y: 276, w: textWidth(label), h: 7 }; x += slot.w + gap; return slot; });
 }
 function drawTitle(s, difficulty, ms) {
   const title = 'OLD STONES', scale = 5, tw = title.length * 6 * scale - scale, tx = Math.round(LW / 2 - tw / 2);
@@ -363,7 +410,7 @@ function drawTitle(s, difficulty, ms) {
   bigText(s, title, tx, 18, C.gold, scale);
   const sub = 'A GOD GAME';
   outlined(s, sub, Math.round(LW / 2 - textWidth(sub) / 2), 62, C.snow);
-  const w = 328, h = 120, x = Math.round(LW / 2 - w / 2), y = 196;
+  const w = 328, h = 140, x = Math.round(LW / 2 - w / 2), y = 180;
   fillRect(s, x - 2, y - 2, w + 4, h + 4, C.earth);
   fillRect(s, x, y, w, h, C.black);
   TITLE_LINES.forEach((l, i) => text(s, l, x + 10, y + 8 + i * 11, i === TITLE_LINES.length - 1 ? C.gold : C.snow));
@@ -384,10 +431,11 @@ function renderGame(s, game, ms, fx = [], opts = {}) {
   if (game.shake > 0) game.cam = { ...real, dx: Math.round(Math.sin(ms / 23) * 3), dy: Math.round(Math.cos(ms / 31) * 2) }; // the earth shakes
   drawLand(s, game, ms);
   drawSkirt(s, game.terrain, game.cam);
+  drawLeyLines(s, game, ms);
   drawEffects(s, game, fx, ms);
   if (opts.hud === false) { game.cam = real; return; }
   const thing = pickedThing(game);
-  if (!thing || game.armed) drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed);
+  if (!thing || game.armed) drawCursor(s, game.terrain, game.cam, game.hover, ms, game.armed, game.hoverTile);
   game.cam = real;
   if (!game.armed) drawInspect(s, game);
   drawBook(s, game);

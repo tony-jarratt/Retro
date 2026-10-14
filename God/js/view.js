@@ -40,11 +40,16 @@ function inTriangle(p, [a, b, c]) {
 
 // The corner the mouse is over: find the front-most tile drawn under the point (so a hill hides what is behind it),
 // then the nearest of that tile's corners. Null if the point is not on the land view.
-function pickCorner(t, cam, x, y) {
+// The front-most tile drawn under a point, or null.
+function pickTile(t, cam, x, y) {
   let hit = null;
   for (const { u, v } of tilesInView(cam)) {
     if (tileTriangles(t, cam, u, v).some((tri) => inTriangle([x, y], tri))) hit = { u, v };
   }
+  return hit;
+}
+function pickCorner(t, cam, x, y) {
+  const hit = pickTile(t, cam, x, y);
   if (!hit) return null;
   let best = null, bestD = Infinity;
   for (const [du, dv] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {

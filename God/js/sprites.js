@@ -69,3 +69,14 @@ const SHEEP_ART = [
   ['..wwww....', '.wwwwww...', 'wwwwwwwk..', 'wwwwwwgkk.', '.wwgggggkk', '.k.k..k.k.', '.k.k..k.k.'],
 ];
 const SHEEP_SPRITES = SHEEP_ART.map((rows) => makeSprite(outlinedArt(rows), SPRITE_KEY));
+
+// Ley stones: an Easter Island head for the good god, a Stonehenge arch (one trilithon) for the dark god. The c in each
+// is its god's colour: the head's topknot, the glow in the arch.
+const STONE_ART = [
+  ['..ccccc..', '.ggggggg.', 'gkkgggkke', 'gggggggee', 'ggggwggee', 'ggggwggee', 'gggggggee', '.gkkkkge.', '.gggggge.',
+    '.gggggee.', '.gggggee.', '..gggee..', '..gggee..', '.eeeeeee.'],
+  ['.ggggggggggggg.', 'gggggggggggggge', 'eeeeeeeeeeeeeee', '.gge.......gge.', '.gge..ccc..gge.', '.gge.ccccc.gge.',
+    '.gge.ccccc.gge.', '.gge..ccc..gge.', '.gge.......gge.', '.gge.......gge.', '.gge.......gge.', '.gge.......gge.',
+    'eeeee.....eeeee'],
+];
+const STONE_SPRITES = STONE_ART.map((rows, tribe) => tribeSprite(rows, tribe));

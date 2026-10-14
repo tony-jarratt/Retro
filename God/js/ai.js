@@ -3,7 +3,8 @@
 // The dark god. Every AI_THINK_TICKS it looks at the corners round a few of its houses and tries raising and
 // lowering each on a copy of the land, with the same costs and manna as the player, and makes the move that gains its
 // houses the most flat ground for the manna (or saves up). Once it has world.rules.bridgeManna saved, after the grace period,
-// it raises land across the sea towards the player; when the land joins, its strong bands march (see nearestFoe).
+// it raises a hearth stone and land across the sea towards the player; when the land joins, it lays its ley line
+// to the player's houses, and its gatherings walk it (aiStones, stones.js).
 // Richer still, it casts a swamp or an earthquake on the player's biggest house (aiPower).
 
 const AI_HOUSES_PER_THINK = 6;  // how many of its houses it looks round each time (picked at random)
@@ -60,7 +61,10 @@ function bridgeStep(world, tribe, from, to) {
     if (!isWater(t, u, v)) continue;
     for (const [du, dv] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
       const r = reshape(t, u + du, v + dv, 1);
-      if (r.ok && costOf(r) <= world.tribes[tribe].manna) return shapeLand(world, u + du, v + dv, 1, tribe).ok;
+      if (r.ok && costOf(r) <= world.tribes[tribe].manna) {
+        world.tribes[tribe].bridgeAt = { u, v }; // the newest stretch of the bridge: where a waystone will go
+        return shapeLand(world, u + du, v + dv, 1, tribe).ok;
+      }
     }
     return false; // the next gap cannot be filled (the map's edge, or no manna): wait
   }
@@ -81,13 +85,43 @@ function aiPower(world, tribe) {
   return true;
 }
 
+// A dry tile with no house or stone on it, at or near (u, v), or null.
+function freeTileNear(world, u, v) {
+  const t = world.terrain;
+  for (let r = 0; r <= 3; r++) for (let b = v - r; b <= v + r; b++) for (let a = u - r; a <= u + r; a++) {
+    if (a >= 0 && b >= 0 && a < t.n && b < t.n && !isWater(t, a, b) && !houseAt(world, a, b) && !stoneAt(world, a, b)) return { u: a, v: b };
+  }
+  return null;
+}
+// The dark god's ley line, one stone a turn: after the grace period, a hearth by its biggest house; once its land joins
+// the rival's, a waystone on the bridge it built and an end stone by the rival's nearest house. An end stone left with
+// no rival house near it is taken down, to be raised again where the rival is. Returns true if it did something.
+function aiStones(world, tribe, pair, joined) {
+  const me = world.tribes[tribe], line = world.stones[tribe];
+  if (world.tick < world.rules.grace || me.manna < STONE_COST) return false;
+  const raise = (spot) => spot && castPower(world, tribe, 'stone', spot.u, spot.v).ok;
+  if (!line.length) {
+    if (me.manna < world.rules.bridgeManna) return false; // it waits until it is rich
+    const big = world.houses.filter((h) => h.tribe === tribe).sort((a, b) => b.level - a.level || b.pop - a.pop)[0];
+    return raise(freeTileNear(world, big.u + 1, big.v + 1));
+  }
+  if (!joined || !pair) return false;
+  const rivals = world.houses.filter((h) => h.tribe !== tribe), end = line[line.length - 1];
+  if (line.length >= 2 && !rivals.some((h) => gap(h, end) <= SCENT)) return lowerStone(world, tribe, end.u, end.v).ok;
+  if (line.length === 1 && me.bridgeAt) { const way = freeTileNear(world, me.bridgeAt.u, me.bridgeAt.v); me.bridgeAt = null; if (raise(way)) return true; }
+  if (line.length >= 2 && rivals.some((h) => gap(h, end) <= SCENT)) return false; // the line is laid
+  return raise(freeTileNear(world, pair[1].u + 1, pair[1].v));
+}
+
 function aiThink(world, tribe) {
   const mine = world.houses.filter((h) => h.tribe === tribe);
   if (!mine.length) return null;
   const me = world.tribes[tribe], pair = nearestPair(world, tribe);
   if (aiPower(world, tribe)) return { power: true };
-  me.marching = !!pair && landPath(world.terrain, pair[0], pair[1]);
-  if (pair && !me.marching && world.tick >= world.rules.grace && me.manna >= world.rules.bridgeManna) {
+  const joined = !!pair && landPath(world.terrain, pair[0], pair[1]);
+  me.joined = joined; // (for the checks)
+  if (aiStones(world, tribe, pair, joined)) return { stone: true };
+  if (pair && !joined && world.tick >= world.rules.grace && me.manna >= world.rules.bridgeManna) {
     let raised = 0;
     while (raised < AI_BRIDGE_STEPS && bridgeStep(world, tribe, pair[0], pair[1])) raised++;
     if (raised) {

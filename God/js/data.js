@@ -28,6 +28,14 @@ const START_PEOPLE = 3;                       // in the first house; two walkers
 const SCENT = 5;                 // a walker can sense the other tribe this many squares away, and heads for it
 const FIGHT_RANGE = 0.6;         // rival walkers this close (in tiles) fight
 
+// ---- ley stones: the gods' way of gathering their people and sending them somewhere ----
+// A tribe's stones, in the order they were raised, make its ley line. Walkers near the first (the hearth) gather
+// there; at PILGRIM_MASS the gathering sets off along the line, and at the last stone fights or settles.
+const STONE_COST = 20;
+const MAX_STONES = 6;
+const GATHER_RADIUS = 5;         // walkers this near the hearth (counting diagonal steps) answer its pull
+const PILGRIM_MASS = 20;         // a gathering this strong sets off down the ley line
+
 // ---- sheep (a nod to Powermonger): they graze, wander, and drown like anyone else ----
 const SHEEP_START = 7;           // on each island at the start
 const SHEEP_MAX = 16;            // a lamb turns up now and then while there are fewer than this
@@ -48,7 +56,6 @@ const AI_REACH = 2;              // the corners it considers: this far round eac
 const AI_BRIDGE_MANNA = 120;     // with this much manna saved it builds land across the sea towards you...
 const AI_GRACE_TICKS = 3 * 60 * 20; // ...but not in the first 3 minutes
 const AI_BRIDGE_STEPS = 3;       // corners it raises each time it works on the bridge
-const MARCH_STRENGTH = 10;       // once the land joins, its bands this strong march on your nearest house
 const AI_POWER_MANNA = 160;      // after the grace period, with this much saved, it casts a swamp or earthquake on you...
 const AI_POWER_GAP = 40 * 20;    // ...at most every 40 s
 

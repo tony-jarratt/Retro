@@ -4,7 +4,7 @@
 //   index.html?seed=N        that map for every game (otherwise each game is a new land)
 //   index.html?still&scene=title  the title screen
 //   index.html?manna=N       start with more manna (for trying things out)
-//   index.html?still&cam=u,v&mx=..&my=..&shape=u,v,dir;u,v,dir&cast=power,u,v;...&armed=power&ticks=N
+//   index.html?still&cam=u,v&mx=..&my=..&shape=u,v,dir;u,v,dir&cast=power,u,v;...&stones=u,v;...&armed=power&ticks=N
 //                            draws one frame and stops (for screenshots); mx, my are low-res screen pixels;
 //                            &ms=.. the clock for animations, &fxage=.. how far into an effect to catch it
 
@@ -72,6 +72,7 @@ function toLowRes(e) {
 function updateHover() {
   const w = app.world;
   w.hover = app.mouse && app.mode === 'play' ? pickCorner(w.terrain, w.cam, app.mouse[0], app.mouse[1]) : null;
+  w.hoverTile = app.mouse && app.mode === 'play' ? pickTile(w.terrain, w.cam, app.mouse[0], app.mouse[1]) : null; // for stones
 }
 function shapeAtHover(now) {
   const w = app.world;
@@ -103,11 +104,14 @@ function powerClick([x, y]) {
   if (slot) arm(slot.id);
   return !!slot;
 }
+const STONE_REFUSALS = { 'no-manna': 'NOT ENOUGH MANNA', sea: 'A STONE WILL NOT STAND IN THE SEA', taken: 'SOMETHING STANDS THERE ALREADY',
+  'too-many': `NO MORE THAN ${MAX_STONES} STONES`, 'not-yours': 'THAT IS NOT ONE OF YOUR STONES' };
 function castArmed() {
-  const w = app.world, id = w.armed;
-  if (!w.hover && id !== 'flood') return;
-  const r = castPower(w, PLAYER, id, w.hover ? w.hover.u : 0, w.hover ? w.hover.v : 0);
-  if (!r.ok) { say(w, r.reason === 'no-manna' ? 'NOT ENOUGH MANNA' : `NO ROOM FOR A ${POWER[id].name} THERE`); Sound.play('buzz'); return; }
+  const w = app.world, id = w.armed, at = id === 'stone' ? w.hoverTile : w.hover;
+  if (!at && id !== 'flood') return;
+  const r = castPower(w, PLAYER, id, at ? at.u : 0, at ? at.v : 0);
+  if (!r.ok) { say(w, id === 'stone' ? STONE_REFUSALS[r.reason] : r.reason === 'no-manna' ? 'NOT ENOUGH MANNA' : `NO ROOM FOR A ${POWER[id].name} THERE`); Sound.play('buzz'); return; }
+  if (id === 'stone') return; // stay armed, to lay out a line of stones
   w.armed = null;
   updateHover();
 }
@@ -129,7 +133,11 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0 && !lower && bookClick(app.mouse)) return;
   if (e.button === 0 && powerClick(app.mouse)) return;
   if (app.world.armed) { // a power is ready: a click on the land casts it, any other button puts it away
-    if (e.button === 0 && !lower) castArmed(); else app.world.armed = null;
+    if (e.button === 0 && !lower) castArmed();
+    else if (app.world.armed === 'stone' && app.world.hoverTile) { // take one of your stones down
+      const r = lowerStone(app.world, PLAYER, app.world.hoverTile.u, app.world.hoverTile.v);
+      if (!r.ok) { say(app.world, STONE_REFUSALS[r.reason]); Sound.play('buzz'); }
+    } else app.world.armed = null;
     return;
   }
   if (e.button !== 0 && e.button !== 2) return;
@@ -189,8 +197,9 @@ function scroll(now) {
 
 // The sounds for what has happened since the last frame (the player's people only, one of each kind).
 const EVENT_SOUNDS = { settle: 'settle', grew: 'grew', drown: 'drown', broken: 'broken', fight: 'fight', razed: 'fight', repelled: 'fight',
-  bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', baa: 'baa', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
-const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood', 'baa']);
+  bridge: 'rumble', win: 'win', lose: 'lose', sink: 'sink', mine: 'mine', armed: 'armed', baa: 'baa',
+  stone: 'chime', pilgrims: 'horn', topple: 'crash', lowered: 'crash', swamp: 'swamp', quake: 'quake', volcano: 'volcano', flood: 'flood' };
+const EVERYONE_HEARS = new Set(['bridge', 'swamp', 'quake', 'volcano', 'flood', 'baa', 'stone', 'pilgrims', 'topple']);
 // Effects to draw for what has happened: splashes, dust where people fight, a volcano's glowing crater.
 function makeEffects(world, now) {
   const t = world.terrain, at = (u, v) => Math.min(...tileCorners(t, Math.min(t.n - 1, u), Math.min(t.n - 1, v)));
@@ -198,7 +207,7 @@ function makeEffects(world, now) {
     if (e.type === 'drown' || (e.type === 'baa' && e.drowned)) app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: 0, born: now });
     else if (e.type === 'baa' && e.sank) app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
     else if (e.type === 'sink') app.fx.push({ kind: 'splash', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
-    else if (e.type === 'fight' || e.type === 'razed' || e.type === 'repelled') app.fx.push({ kind: 'dust', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
+    else if (e.type === 'fight' || e.type === 'razed' || e.type === 'repelled' || e.type === 'topple') app.fx.push({ kind: 'dust', u: e.u + 0.5, v: e.v + 0.5, h: at(e.u, e.v), born: now });
     else if (e.type === 'volcano') app.fx.push({ kind: 'lava', u: e.u, v: e.v, h: heightAt(t, e.u, e.v), born: now });
     else if (e.type === 'quake') for (let i = 0; i < 8; i++) {
       const u = e.u + Math.floor(Math.random() * 7) - 3, v = e.v + Math.floor(Math.random() * 7) - 3;
@@ -218,6 +227,8 @@ function playEvents(world) {
   const mine = world.events.filter((e) => (e.tribe === PLAYER || e.loser === PLAYER || EVERYONE_HEARS.has(e.type)) && EVENT_SOUNDS[e.type]);
   for (const k of new Set(mine.map((e) => EVENT_SOUNDS[e.type]))) Sound.play(k);
   if (world.events.some((e) => e.type === 'razed' && e.loser === PLAYER)) say(world, 'YOUR PEOPLE ARE UNDER ATTACK');
+  for (const e of world.events) if (e.type === 'pilgrims') say(world, e.tribe === PLAYER ? `YOUR PILGRIMS SET OUT, ${e.strength} STRONG` : `THE DARK GOD'S PILGRIMS SET OUT, ${e.strength} STRONG`);
+  for (const e of world.events) if (e.type === 'topple') say(world, e.tribe === PLAYER ? 'ONE OF YOUR STONES HAS FALLEN' : 'A DARK STONE HAS FALLEN');
   for (const e of world.events) if (e.type === 'armed') say(world, e.tribe === PLAYER ? `YOUR PEOPLE NOW FIGHT WITH ${WEAPONS[e.weapons]}` : `THE DARK GOD'S PEOPLE NOW HAVE ${WEAPONS[e.weapons]}`);
   world.events.length = 0;
 }
@@ -276,6 +287,10 @@ function stillGame() {
   for (const spell of (params.get('cast') || '').split(';').filter(Boolean)) { // cast=quake,20,22;flood
     const [id, u, v] = spell.split(','), r = castPower(w, PLAYER, id, Number(u || 0), Number(v || 0));
     if (!r.ok) console.warn(`still: casting ${spell} was refused (${r.reason})`);
+  }
+  for (const spot of (params.get('stones') || '').split(';').filter(Boolean)) { // stones=u,v;u,v (yours, in order)
+    const [u, v] = spot.split(',').map(Number), r = castPower(w, PLAYER, 'stone', u, v);
+    if (!r.ok) console.warn(`still: a stone at (${u}, ${v}) was refused (${r.reason})`);
   }
   if (params.has('armed')) w.armed = params.get('armed');
   for (let i = 0; i < numberParam('ticks', 0); i++) stepWorld(w);

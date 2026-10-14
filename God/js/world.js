@@ -16,8 +16,8 @@ function makeWorld(seed, opts = {}) {
     difficulty, rules,      // how hard the dark god plays (DIFFICULTIES in data.js)
     seed, terrain, tick: 0, rng: new Rng(seed ^ 0x5eed), over: null, // over: { winner } once a tribe is wiped out
     shake: 0,             // ticks of the screen shaking after an earthquake or volcano
-    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), marching: false, bridging: false, lastPower: 0, mines: 0, weapons: 0 })),
-    houses: [], walkers: [], sheep: [], nextId: 1,
+    tribes: [0, 1].map((i) => ({ side: i === PLAYER ? 'good' : 'evil', manna: opts.manna ?? (i === PLAYER ? START_MANNA : rules.rivalManna), bridging: false, bridgeAt: null, lastPower: 0, mines: 0, weapons: 0 })),
+    houses: [], walkers: [], sheep: [], stones: [[], []], nextId: 1,
     events: [],           // what happened since the screen last looked: { type, tribe, u, v, ... }
     cam: { u: 0, v: 0 },
     hover: null,          // the corner under the mouse
@@ -109,16 +109,17 @@ function addHouse(world, tribe, u, v, pop) {
   return h;
 }
 function addWalker(world, tribe, x, y, strength, left = null) { // `left`: the id of the house they set out from
-  const w = { id: world.nextId++, tribe, x, y, strength, tu: Math.floor(x), tv: Math.floor(y), from: null, age: 0, left };
+  const w = { id: world.nextId++, tribe, x, y, strength, tu: Math.floor(x), tv: Math.floor(y), from: null, age: 0, left,
+    gathered: false, pilgrim: 0, arrived: false }; // at its god's hearth stone; walking to stone `pilgrim`; done (stones.js)
   world.walkers.push(w);
   return w;
 }
 const houseAt = (world, u, v) => world.houses.find((h) => h.u === u && h.v === v) || null;
 const gap = (a, b) => Math.max(Math.abs(a.u - b.u), Math.abs(a.v - b.v));
 
-// Somewhere a walker could settle: flat, clear of trees and rocks, and no house within HOUSE_GAP - 1 squares.
+// Somewhere a walker could settle: flat, clear of trees and rocks, no stone, and no house within HOUSE_GAP - 1 squares.
 function canSettle(world, u, v) {
-  return isFlat(world.terrain, u, v) && isClear(world.terrain, u, v) && !world.houses.some((h) => gap(h, { u, v }) < HOUSE_GAP);
+  return isFlat(world.terrain, u, v) && isClear(world.terrain, u, v) && !stoneAt(world, u, v) && !world.houses.some((h) => gap(h, { u, v }) < HOUSE_GAP);
 }
 
 // The flat ground a house has to itself: the tiles in the 5 x 5 around it that are flat at its height and clear, have no other
@@ -142,9 +143,10 @@ function houseLevel(world, house) {
 }
 
 // Where a walker heads next: a neighbouring tile that is not sea, the flatter its surroundings the better, never
-// straight back where it came from unless there is nowhere else.
+// straight back where it came from unless there is nowhere else. A stone calling it (stonePull) outweighs the rest.
 function nextTile(world, w) {
-  const t = world.terrain, u0 = w.tu, v0 = w.tv, options = [], foe = nearestFoe(world, w);
+  const t = world.terrain, u0 = w.tu, v0 = w.tv, options = [], foe = nearestFoe(world, w), pull = stonePull(world, w);
+  const road = pull ? landSteps(t, pull.target) : null, onRoad = road && road[v0 * t.n + u0] >= 0; // the way over land to the stone
   for (let dv = -1; dv <= 1; dv++) for (let du = -1; du <= 1; du++) {
     const u = u0 + du, v = v0 + dv;
     if ((!du && !dv) || u < 0 || v < 0 || u >= t.n || v >= t.n || isWater(t, u, v)) continue;
@@ -153,7 +155,10 @@ function nextTile(world, w) {
     const back = w.from && w.from.u === u && w.from.v === v, h = houseAt(world, u, v);
     const room = h && h.tribe === w.tribe && h.id !== w.left && h.pop < CAP[h.level - 1] - 1;
     const closer = foe && gap(foe, { u, v }) < gap(foe, { u: u0, v: v0 }) ? 8 : 0; // the other tribe is near: go for it
-    options.push({ u, v, score: flat + (canSettle(world, u, v) || room ? 6 : 0) + closer + world.rng.next() * 3 - (back ? 20 : 0) });
+    const drawn = !pull ? 0 : onRoad ? pull.weight * (road[v0 * t.n + u0] - road[v * t.n + u]) // a stone calls: along the way over land,
+      : pull.weight * (Math.hypot(pull.target.u - u0, pull.target.v - v0) - Math.hypot(pull.target.u - u, pull.target.v - v)); // or straight at it
+    const home = pull ? 0 : (canSettle(world, u, v) || room ? 6 : 0); // answering a stone, they don't look for a home
+    options.push({ u, v, score: flat + home + closer + drawn + world.rng.next() * 3 - (back ? 20 : 0) });
   }
   if (!options.length) return null; // an islet of one tile: stay put
   options.sort((a, b) => b.score - a.score);
@@ -161,10 +166,9 @@ function nextTile(world, w) {
 }
 
 // The nearest rival house or walker within SCENT squares of a walker, as a tile { u, v }, or null.
-// A marching band (strong enough, its god's land joined to the rival's) senses the other tribe from anywhere.
 function nearestFoe(world, w) {
-  const here = { u: w.tu, v: w.tv }, marching = world.tribes[w.tribe].marching && w.strength >= MARCH_STRENGTH;
-  let best = null, bestD = marching ? Infinity : SCENT + 1;
+  const here = { u: w.tu, v: w.tv };
+  let best = null, bestD = SCENT + 1;
   for (const h of world.houses) if (h.tribe !== w.tribe && gap(h, here) < bestD) { best = { u: h.u, v: h.v }; bestD = gap(h, here); }
   for (const o of world.walkers) {
     const at = { u: Math.floor(o.x), v: Math.floor(o.y) };
@@ -251,7 +255,8 @@ function attackHouse(world, w, h) {
 }
 
 function stepWalker(world, w) {
-  w.age += DT;
+  if (w.gathered) return; // waiting at the hearth stone for the rest
+  if (!w.pilgrim) w.age += DT; // pilgrims are kept going by faith
   if (w.age >= WEAKEN_S) { // wandering wears them down
     w.age -= WEAKEN_S;
     w.strength -= Math.max(1, Math.floor(w.strength / 10));
@@ -262,6 +267,17 @@ function stepWalker(world, w) {
   w.x = cx; w.y = cy;
   const home = houseAt(world, w.tu, w.tv);
   if (home && home.tribe !== w.tribe && !attackHouse(world, w, home)) return;
+  const line = world.stones[w.tribe];
+  if (w.pilgrim && line[w.pilgrim] && gap(line[w.pilgrim], { u: w.tu, v: w.tv }) <= 1) { // reached its stone: on to the next
+    w.pilgrim = w.pilgrim + 1 < line.length ? w.pilgrim + 1 : 0; // or, at the last, they are home
+    if (!w.pilgrim) { w.arrived = true; event(world, 'arrived', { tribe: w.tribe, u: w.tu, v: w.tv }); }
+  }
+  if (!w.pilgrim && !w.arrived && line[0] && w.tu === line[0].u && w.tv === line[0].v) { w.gathered = true; return; } // at the hearth: gather
+  if (w.pilgrim || stonePull(world, w)) { // on the way to a stone: no settling or moving in on the road
+    const next = nextTile(world, w);
+    if (next) { w.from = { u: w.tu, v: w.tv }; w.tu = next.u; w.tv = next.v; }
+    return;
+  }
   if (home && home.tribe === w.tribe && home.id !== w.left && home.pop < CAP[home.level - 1] - 1) { // one of ours with room: move in
     const room = Math.floor(CAP[home.level - 1] - home.pop), joining = Math.min(room, w.strength);
     home.pop += joining; w.strength -= joining;
@@ -286,6 +302,9 @@ function mergeWalkers(world) {
       const b = world.walkers[j];
       if (b.tribe === a.tribe && Math.floor(b.x) === Math.floor(a.x) && Math.floor(b.y) === Math.floor(a.y)) {
         a.strength += b.strength;
+        a.gathered = a.gathered || b.gathered; // joining a gathering, or a band of pilgrims, makes you one of them
+        a.pilgrim = Math.max(a.pilgrim, b.pilgrim);
+        if (a.pilgrim) a.gathered = false;
         world.walkers.splice(j, 1);
       }
     }
@@ -369,6 +388,7 @@ function stepWorld(world) {
   mergeWalkers(world);
   walkerFights(world);
   checkFooting(world);
+  stepStones(world);
   stepHouses(world);
   stepMines(world);
   stepSheep(world);

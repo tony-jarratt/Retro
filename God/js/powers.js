@@ -1,10 +1,12 @@
 'use strict';
 
-// The gods' powers, bought with manna. Each is cast at a corner of the land (the flood covers the whole world).
+// The gods' powers, bought with manna. Each is cast at a corner of the land (the flood covers the whole world; a stone
+// goes on a tile).
 //   Swamp      bogs on up to SWAMP_TILES flat, clear squares round the corner; the first walker into each one sinks
 //   Earthquake shakes the land within QUAKE_REACH squares into random lumps
 //   Volcano    throws up a peak to full height and strews boulders down its sides
 //   Flood      the sea rises a step everywhere: every corner above sea level drops by one
+//   Stone      a ley stone at the end of the god's line (stones.js); quakes and volcanoes topple stones
 // castPower returns { ok: true } or { ok: false, reason }, and charges only for a power that was cast.
 
 const POWERS = [
@@ -12,19 +14,21 @@ const POWERS = [
   { id: 'quake', name: 'QUAKE', key: '2', cost: 60, reach: 3 },
   { id: 'volcano', name: 'VOLCANO', key: '3', cost: 120, reach: 3 },
   { id: 'flood', name: 'FLOOD', key: '4', cost: 250, reach: 0 },
+  { id: 'stone', name: 'STONE', key: '5', cost: STONE_COST, reach: 0 }, // a ley stone on the tile (see stones.js)
 ];
 const POWER = Object.fromEntries(POWERS.map((p) => [p.id, p]));
 const SWAMP_TILES = 8;
 const QUAKE_SHOCKS = 30;    // random raises and lowers in an earthquake
 const ROCK_CHANCE = 0.45;   // the chance of a boulder on each square of a volcano's slopes
 
-const POWER_WORDS = { swamp: 'SPREADS A SWAMP', quake: 'SHAKES THE EARTH', volcano: 'RAISES A VOLCANO', flood: 'FLOODS THE WORLD' };
+const POWER_WORDS = { swamp: 'SPREADS A SWAMP', quake: 'SHAKES THE EARTH', volcano: 'RAISES A VOLCANO', flood: 'FLOODS THE WORLD', stone: 'RAISES A STONE' };
 
 function castPower(world, tribe, id, u, v) {
   const p = POWER[id];
   if (!p) throw new RulesError('no-power', `there is no power "${id}"`);
   if (world.tribes[tribe].manna < p.cost) return { ok: false, reason: 'no-manna' };
-  const done = id === 'swamp' ? swamp(world, u, v) : id === 'quake' ? quake(world, u, v) : id === 'volcano' ? volcano(world, u, v) : flood(world);
+  const done = id === 'swamp' ? swamp(world, u, v) : id === 'quake' ? quake(world, u, v) : id === 'volcano' ? volcano(world, u, v)
+    : id === 'stone' ? raiseStone(world, tribe, u, v) : flood(world);
   if (!done.ok) return done;
   world.tribes[tribe].manna -= p.cost;
   checkFooting(world);
@@ -61,6 +65,7 @@ function quake(world, u, v) {
   if (!moved) return { ok: false, reason: 'no-room' };
   world.terrain = t;
   world.shake = 20;
+  toppleStonesAt(world, tilesNear(t, u, v, r));
   return { ok: true };
 }
 
@@ -75,6 +80,7 @@ function volcano(world, u, v) {
   }
   world.terrain = t;
   world.shake = 30;
+  toppleStonesAt(world, tilesNear(t, u, v, POWER.volcano.reach));
   return { ok: true };
 }
 

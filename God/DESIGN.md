@@ -51,7 +51,8 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
   - **The dark god's land-shaping:** every 1.5 s it tries each corner round a few of its houses, both up and
     down, on a copy of the land, and makes the move that gains the most flat ground per manna.
   - **The bridge:** after 3 minutes, with 120 manna saved, it raises land across the sea towards your nearest
-    house. Once the land joins, its bands of 10 or more march on you from anywhere.
+    house. Once the land joins, its bands of 10 or more marched on you from anywhere; that hidden march has been
+    replaced by ley stones (below).
   - **Breaking your houses was tried and dropped:** the people walk out at full strength and resettle, so it
     helped you.
   - **Winning and losing:** the population tug-of-war bar shows the balance. A tribe with no houses and no
@@ -110,6 +111,25 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
   or two. The sea and swamps take them (with a last bleat and a splash). A lamb appears every 25 s while there
   are fewer than 16. They bleat now and then when in view, and hovering shows "A SHEEP. IT IS GRAZING." They are
   purely for charm and play no part in the rules.
+- **Ley stones: built** (the owner's idea, refined together). This is how a god gathers its people and sends them
+  somewhere without ever ordering them about.
+  - **Raising:** power 5, STONE, costs 20 manna. Each click raises a stone at the end of your ley line, so the
+    line is the order the stones were raised. Up to 6 stones. Shift-click takes one of yours down.
+  - **The hearth:** your walkers within 5 squares of your first stone are drawn to it and merge into one waiting
+    gathering. While gathering they don't settle and don't wear down. So a hearth near your villages turns their
+    growth into an army; the trade-off is meant.
+  - **Pilgrims:** at 20 strong (*tbd*) the gathering sets off along the line, carrying pennants. It finds its
+    way over land by shortest path, so it uses any bridge, and waits at the shore if there's none. At the last
+    stone it fights a foe within 5 squares, or settles a new village.
+  - **Toppling:** a stone topples when a rival walker reaches it, when a quake or volcano covers it, or when the
+    sea does. The line closes up behind it. If the hearth falls, its gathering scatters.
+  - **The dark god** lays the same kind of line instead of the old hidden march. After the grace period it
+    raises a hearth by its biggest house, bridges the strait, then places a waystone on its bridge and an end
+    stone by your nearest house. It moves the end stone if your houses there are gone.
+  - **The look:** your stones are Easter Island heads with a blue topknot; the dark god's are single Stonehenge
+    arches with a red glow. The ley lines are beads of light in each god's colour, and each hearth shows its
+    count, for example 12/20.
+  - **Sounds:** a chime when a stone is raised, a horn when pilgrims set out, and a crash when a stone falls.
 - **Known gaps:** both gods pile up unused manna later on, and you have no power to send your own people (a
   rally) yet.
 
@@ -131,4 +151,4 @@ grow, while a rival god does the same. Not on the arcade menu until the prototyp
 | House spacing | 3 (`HOUSE_GAP`) |
 | Homeless walkers | lose a tenth every 6 s (`WEAKEN_S`) |
 | Dark god bridge | after 3 min, with 120 manna, 3 corners a turn |
-| Marching | bands of 10+ once the land joins |
+| Ley stones | 20 manna each, up to 6; hearth pull 5 squares; pilgrims set out at 20 |
