@@ -173,8 +173,10 @@ const FONT = Object.fromEntries(Object.entries(GLYPHS).map(([ch, s]) => {
   return [ch, smooth2x(c)];
 }));
 const warnedGlyphs = new Set();
+const TEXT_SIZE = 0.9; // all lettering is drawn a little under the font's full 5 x 7 size
 function text(str, x, y, scale = 1, advance = 6 * scale) {
   g.fillStyle = '#fff';
+  const w = fine(5 * scale * TEXT_SIZE), h = fine(7 * scale * TEXT_SIZE);
   for (const raw of str) {
     const ch = raw.toUpperCase();
     let glyph = FONT[ch];
@@ -182,11 +184,11 @@ function text(str, x, y, scale = 1, advance = 6 * scale) {
       if (!warnedGlyphs.has(ch)) { warnedGlyphs.add(ch); console.warn(`No glyph for "${ch}" (in "${str}"); drawing ? instead`); }
       glyph = FONT['?'];
     }
-    g.drawImage(glyph, x, y, 5 * scale, 7 * scale);
-    x += advance;
+    g.drawImage(glyph, fine(x), fine(y), w, h);
+    x += advance * TEXT_SIZE;
   }
 }
-const textWidth = (str, scale = 1) => str.length * 6 * scale - scale;
+const textWidth = (str, scale = 1) => (str.length * 6 * scale - scale) * TEXT_SIZE;
 function centred(str, y, scale = 1, cx = SW / 2) { text(str, Math.round(cx - textWidth(str, scale) / 2), y, scale); }
 function wrap(str, width) {
   const out = [];
@@ -688,7 +690,7 @@ function drawPanel(game, t) {
   if (low && app.tick % 20 < 10) { const bx = Math.round(48 - f * 34); line([bx - 2, 175 + f * 4], [bx - 5, 185]); line([bx + 2, 175 + f * 4], [bx + 5, 185]); }
   for (let i = 0; i < game.lives; i++) blit(SPR.life, 71 + i * 10, 173); // lives left, above the clock
   const clock = formatTime(game.time);
-  text(clock, Math.round(91 - (clock.length * 10 - 1) / 2), 175, 2, 10);
+  text(clock, Math.round(91 - (clock.length * 10 - 1) * TEXT_SIZE / 2), 175, 2, 10);
   text('CARRY', 137, 165);
   for (let i = 0; i < CARRY_MAX; i++) {
     const x = 124 + i * 20;
@@ -792,7 +794,7 @@ function startGame() {
 function snapHero(game) { placeHero(game); }
 
 function say(str, frames = 230) {
-  const lines = wrap(str, 42), pages = [];
+  const lines = wrap(str, 46), pages = [];
   for (let i = 0; i < lines.length; i += 2) pages.push(lines.slice(i, i + 2));
   app.caption = { pages, age: 0, ttl: Math.max(frames, pages.length * 170) };
 }
