@@ -14,6 +14,13 @@ The name is Hexfire. It has not been checked for existing marks yet (milestone 7
 - To-hit is d20 (it was d10 until 2026-10-07). Jump jets are a later version. Version 1 is a single encounter against a fixed enemy squad per difficulty; the campaign comes later.
 - **UX principle:** easy, not simulationist. Preview everything before committing; automate what a tabletop player would do by hand.
 
+## Where it could go next (the owner, 2026-10-25; all to be decided)
+First: **play-test the story for balance** (`index.html?playtest` opens every mission). Then, in no fixed order:
+- **Cut scenes in story mode**: short drawn scenes between missions (the dropship lifting off, the crawler leaving the canyon, the doors), beyond the text briefings and debriefs.
+- **Player v player**: two people on one screen (hot seat), each building a squad in the bay. The turn structure already alternates the sides.
+- **An XCOM-style layer**: a roster of pilots and mechs that carries between battles (damage, losses, promotions, buying and repairing). The story deliberately has none of this, so it would be its own mode.
+- Also raised: **pilot traits** (a small edge per named pilot), and balancing free play's enemy forces and heavies.
+
 ## Status
 Milestones 1 to 3 are written: the rules engine, data, squad code and tests, the hex map renderer, and a **playable 3 v 3** against the computer (sequential turns, see Turn structure for the history). Open `index.html` to play (Hexfire is its own folder now, `Games/Hexfire`; it is not in the Retro arcade). The game opens on the **mech bay** (M4 steps 1 and 2, written 2026-10-07, see Mech bay below); the default squad (`DEFAULT_SQUADS` in `main.js`) is a heavy Warden, a Jackal and a Skitter at normal. `?difficulty=easy|hard` previews the other enemy squads and `?code=<squad code>` plays any squad (see Test hooks). It is not part of the Retro arcade any more. The two throwaway fire-sequence mockups are still in `mockups/`.
 
