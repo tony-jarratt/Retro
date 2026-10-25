@@ -9,6 +9,9 @@
 //   exit          get to the exit: when every living mech of a side is inside its side's exit hexes at once, that side wins (the slowest mech sets the pace)
 //   raid          (story only) destroy every target (the gun towers, ids in `targets`), then the runner (one named mech of the player's) has to
 //                 stand in the hangar. If the runner is destroyed the player has lost; at the round limit too
+//   core          (story only, the finale) destroy every target (`targets`: the memory banks). One of the player's mechs (`holder`) starts in the
+//                 gate, the only way into the hall, and holds it. The round limit loses
+//   hunt          (story only) destroy the marked enemy mech (`mark`); the rest do not matter. The round limit loses
 //   heist         (story only) capture the flag one way: the player picks up the crate (`flag`, the same rules: a carrier cannot run, a destroyed
 //                 carrier drops it) and carries it to its extraction hexes (`bases.player`); the enemy cannot pick it up. The round limit loses
 //   defend        (story only) hold out until the end of round `rounds` with `protect` (one of the player's units, the dropship) still standing.
@@ -48,6 +51,14 @@ OBJECTIVES.raid = { // a story goal
   id: 'raid', name: 'RAID', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
   blurb: 'Destroy the gun towers, then get the runner into the hangar. Lose the runner and you have lost.',
 };
+OBJECTIVES.core = { // a story goal: the finale
+  id: 'core', name: 'THE CORE', ready: true, roundLimit: 12, sizes: ['small', 'large'], story: true,
+  blurb: 'Destroy the three memory banks. One of you holds the doors.',
+};
+OBJECTIVES.hunt = { // a story goal
+  id: 'hunt', name: 'HUNT', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
+  blurb: 'Destroy the marked mech. Nothing else matters.',
+};
 OBJECTIVES.heist = { // a story goal
   id: 'heist', name: 'HEIST', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
   blurb: 'Take the crate and carry it to the extraction point. A carrier cannot run, and a destroyed carrier drops it.',
@@ -80,6 +91,10 @@ function setupObjective(state, scenario, goalId) {
     o.target = HILL_TARGET;
   } else if (goalId === 'exit' || goalId === 'escape') {
     o.exits = scenario.exits;
+  } else if (goalId === 'core') {
+    o.targets = scenario.targets.slice(); o.gate = scenario.gate; o.holder = scenario.holder;
+  } else if (goalId === 'hunt') {
+    o.mark = scenario.mark; o.home = scenario.markHome;
   } else if (goalId === 'defend') {
     o.protect = scenario.protect; o.rounds = scenario.rounds;
   } else if (goalId === 'escort') {
@@ -131,6 +146,8 @@ function objectiveAfterMove(state, mech, path, events) {
 function objectiveSync(state, events) {
   const o = state.objective;
   if (o && o.id === 'raid' && !o.result) { raidCheck(state, events); return; }
+  if (o && o.id === 'core' && !o.result) { if (targetsLeft(state) === 0) o.result = { winner: 'player', code: 'core' }; return; }
+  if (o && o.id === 'hunt' && !o.result) { if (!mechById(state, o.mark).alive) o.result = { winner: 'player', code: 'hunt' }; return; }
   if (o && o.id === 'defend' && !o.result) { if (!mechById(state, o.protect).alive) o.result = { winner: 'enemy', code: 'defend-lost' }; return; }
   if (o && o.id === 'escort' && !o.result) { if (!mechById(state, o.escort).alive) o.result = { winner: 'enemy', code: 'escort-lost' }; return; } // the last tower may fall with the runner already inside, or the runner may die
   if (!o || (o.id !== 'flag' && o.id !== 'heist') || !o.flag.carrier) return;
@@ -161,6 +178,8 @@ function objectiveAfterRound(state, events) {
     const hp = sideHealth(state, 'player'), he = sideHealth(state, 'enemy');
     if (o.id === 'raid') o.result = { winner: 'enemy', code: 'raid-late' };
     else if (o.id === 'heist') o.result = { winner: 'enemy', code: 'heist-late' };
+    else if (o.id === 'hunt') o.result = { winner: 'enemy', code: 'hunt-late' };
+    else if (o.id === 'core') o.result = { winner: 'enemy', code: 'core-late' };
     else if (o.id === 'escort') o.result = { winner: 'enemy', code: 'escort-late' };
     else if (o.id === 'escape') o.result = { winner: 'enemy', code: 'escape-late' }; // the squad did not all get out in time
     else if (o.id === 'hill' && o.score.player !== o.score.enemy) o.result = { winner: o.score.player > o.score.enemy ? 'player' : 'enemy', code: 'time-points' };
@@ -219,6 +238,10 @@ function reasonText(state, code, winner) {
     case 'flag': return you ? 'You carried the flag back to your base' : 'The enemy carried the flag back to their base';
     case 'exit': return you ? 'Your whole squad reached the exit' : 'The enemy squad reached their exit';
     case 'escape': return 'Your whole squad got out';
+    case 'core': return 'The memory banks are dark';
+    case 'core-late': return `Time ran out after round ${o.roundLimit}: the banks are still running`;
+    case 'hunt': return `${mechById(state, o.mark).name} is down`;
+    case 'hunt-late': return `Time ran out after round ${o.roundLimit}: ${mechById(state, o.mark).name} is still standing`;
     case 'heist': return 'You got the crate out';
     case 'heist-late': return `Time ran out after round ${o.roundLimit}: the crate never got out`;
     case 'defend': return `You held out for ${o.rounds} rounds: the dropship is fuelled`;
@@ -248,6 +271,8 @@ function objectiveStatus(state) {
   if (o.id === 'defend') lines.push(`REFUELLING: ROUND ${state.round} OF ${o.rounds}`);
   if (o.id === 'escort') lines.push(`CRAWLER: ${crawlerToGo(state)} HEXES TO GO`);
   if (o.id === 'raid') lines.push(targetsLeft(state) ? `TOWERS STANDING ${targetsLeft(state)} OF ${o.targets.length}` : `TOWERS DOWN: ${runnerName(state)} TO THE HANGAR`);
+  if (o.id === 'core') { const h = mechById(state, o.holder); lines.push(`BANKS STANDING ${targetsLeft(state)} OF ${o.targets.length}   THE DOORS: ${h.pilot || h.id}${h.alive ? '' : ' (FALLEN)'}`); }
+  if (o.id === 'hunt') { const m = mechById(state, o.mark); lines.push(`TARGET: ${m.name} ${m.alive ? `ARMOUR ${m.hp} / ${m.maxHp}` : 'DOWN'}`); }
   if (o.id === 'heist') lines.push(o.flag.carrier ? `CRATE: ${callSignOf(state, o.flag.carrier)} CARRIES IT` : 'CRATE: ON THE GROUND');
   if (o.id === 'flag') lines.push(o.flag.carrier ? `FLAG: ${o.flag.carrier} CARRIES IT` : o.flag.pos ? 'FLAG: ON THE GROUND' : 'FLAG: LOST');
   return { name: def.name, lines };

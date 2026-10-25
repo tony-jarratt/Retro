@@ -22,7 +22,12 @@ function makeMap(name, rows) {
     }
   });
   const charges = {}; // repair bays: hex key -> repairs left (see REPAIR_CHARGES)
-  rows.forEach((row, r) => { for (let c = 0; c < cols; c++) if (TERRAIN[row[c]].repair) charges[hexKey(c, r)] = REPAIR_CHARGES; });
+  rows.forEach((row, r) => { // repair bays and ammo caches: hex key -> uses left
+    for (let c = 0; c < cols; c++) {
+      if (TERRAIN[row[c]].repair) charges[hexKey(c, r)] = REPAIR_CHARGES;
+      if (TERRAIN[row[c]].resupply) charges[hexKey(c, r)] = RESUPPLY_CHARGES;
+    }
+  });
   return { name, cols, rows: rows.length, tiles: rows.slice(), charges };
 }
 

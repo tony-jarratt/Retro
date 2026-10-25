@@ -187,8 +187,9 @@ function drawRepairBays(g, map) {
     const [c, r] = key.split(',').map(Number);
     const [x, y] = hexToScreen(c, r);
     if (!left) fillHex(g, c, r, 'rgba(10,12,18,0.55)', null);
-    for (let i = 0; i < REPAIR_CHARGES; i++) {
-      const px = x + (i - (REPAIR_CHARGES - 1) / 2) * 9, py = y + HEX_R * 0.62;
+    const full = terrainAt(map, c, r).repair ? REPAIR_CHARGES : RESUPPLY_CHARGES;
+    for (let i = 0; i < full; i++) {
+      const px = x + (i - (full - 1) / 2) * 9, py = y + HEX_R * 0.62;
       g.fillStyle = '#000'; g.fillRect(px - 3.5, py - 3.5, 7, 7);
       g.fillStyle = i < left ? '#7ee08a' : '#2b3340'; g.fillRect(px - 2.5, py - 2.5, 5, 5);
     }
@@ -211,6 +212,30 @@ function drawStorm(g, clock) {
   g.stroke();
   const flash = (clock % 9.5) < 0.12 || ((clock + 0.25) % 9.5) < 0.06; // a double flicker every few seconds
   if (flash) { g.fillStyle = 'rgba(220,230,255,0.18)'; g.fillRect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); }
+  g.restore();
+}
+
+// A memory bank (the finale): a tall black cabinet of drives with rows of blinking lights, or a burnt-out shell once destroyed.
+function drawBankAt(g, mech, x, y, alpha, flash) {
+  const k = HEX_SCALE;
+  g.save();
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(-14 * k, -16 * k, 34 * k, 40 * k);
+  g.fillStyle = '#000'; g.fillRect(-18 * k, -24 * k, 36 * k, 44 * k);
+  g.fillStyle = mech.alive ? '#1c2230' : '#2a2626'; g.fillRect(-17 * k, -23 * k, 34 * k, 42 * k);
+  if (mech.alive) {
+    g.fillStyle = '#2e3850'; g.fillRect(-17 * k, -23 * k, 34 * k, 4 * k);
+    for (let row = 0; row < 6; row++) for (let col = 0; col < 5; col++) {
+      const on = Math.sin(drawClock * (3 + ((row * 5 + col) % 7)) + row * 1.7 + col * 2.3) > 0.2;
+      g.fillStyle = on ? (row % 3 === 0 ? '#ff5a4a' : '#7fd0ff') : '#16202c';
+      g.fillRect((-13 + col * 6) * k, (-16 + row * 6) * k, 3 * k, 2 * k);
+    }
+    g.strokeStyle = COLOURS.enemy; g.lineWidth = 1.5; g.strokeRect(-17 * k, -23 * k, 34 * k, 42 * k);
+    if (flash) { g.globalAlpha *= 0.6; g.fillStyle = '#fff'; g.fillRect(-17 * k, -23 * k, 34 * k, 42 * k); }
+  } else {
+    g.fillStyle = 'rgba(255,120,40,0.30)'; g.beginPath(); g.arc(0, 0, 8 * k, 0, Math.PI * 2); g.fill();
+  }
   g.restore();
 }
 
@@ -322,6 +347,7 @@ function drawCrawlerAt(g, mech, x, y, facing, alpha, flash) {
 }
 
 function drawMechAt(g, mech, x, y, facing, alpha, flash) {
+  if (mech.bank) { drawBankAt(g, mech, x, y, alpha, flash); return; }
   if (mech.ship) { drawShipAt(g, mech, x, y, alpha, flash, drawClock); return; }
   if (mech.tower) { drawTowerAt(g, mech, x, y, facing, alpha, flash); return; }
   if (mech.crawler) { drawCrawlerAt(g, mech, x, y, facing, alpha, flash); return; }
@@ -396,6 +422,23 @@ function drawObjectiveOverlay(g, state, clock) {
       const [x, y] = hexToScreen(o.flag.pos[0], o.flag.pos[1]);
       fillHex(g, o.flag.pos[0], o.flag.pos[1], `rgba(255,210,74,${0.10 + 0.10 * pulse})`, '#ffd24a', 2);
       drawFlagIcon(g, x - 4, y + 10, '#ffd24a');
+    }
+  } else if (o.id === 'core') { // the doors: who holds them
+    const h = mechById(state, o.holder);
+    fillHex(g, o.gate[0], o.gate[1], `rgba(255,210,74,${0.06 + 0.06 * pulse})`, '#ffd24a', 2);
+    const [x, y] = hexToScreen(o.gate[0], o.gate[1]);
+    const text = h.alive ? `THE DOORS: ${h.pilot}` : 'THE DOORS ARE OPEN';
+    g.font = 'bold 11px ' + MONO; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = h.alive ? '#ffd24a' : '#ff7b6b';
+    g.strokeText(text, x, y + HEX_R + 12); g.fillText(text, x, y + HEX_R + 12); g.textAlign = 'left';
+  } else if (o.id === 'hunt') { // the mark: a turning red target ring
+    const m = mechById(state, o.mark);
+    if (m.alive) {
+      const [x, y] = hexToScreen(m.pos[0], m.pos[1]);
+      g.save(); g.translate(x, y); g.rotate(clock * 0.8);
+      g.strokeStyle = `rgba(255,90,74,${0.6 + 0.3 * pulse})`; g.lineWidth = 2;
+      g.beginPath(); g.arc(0, 0, HEX_R * 1.05, 0, Math.PI * 2); g.stroke();
+      for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 2); g.beginPath(); g.moveTo(HEX_R * 0.85, 0); g.lineTo(HEX_R * 1.3, 0); g.stroke(); }
+      g.restore();
     }
   } else if (o.id === 'heist') { // the extraction point, and the crate where it lies
     group(o.bases.player, `rgba(216,177,58,${0.08 + 0.10 * pulse})`, '#ffd24a', 3);
@@ -493,7 +536,7 @@ function drawMechCard(g, mech, x, y, opts = {}) {
   g.fillText(mech.pilot ? mech.pilot : `${mech.id}  ${mech.name}`, x + 10, y + 18); // a story pilot's name, or the id and chassis
   g.font = FONT_SMALL; g.fillStyle = !mech.alive || mech.shutdown ? '#ff7b6b' : COLOURS.dim;
   g.textAlign = 'right';
-  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.ship ? 'REFUELLING' : mech.tower ? 'FIXED' : mech.crawler ? 'NO GUNS' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
+  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.bank ? 'THE MODEL' : mech.ship ? 'REFUELLING' : mech.tower ? 'FIXED' : mech.crawler ? 'NO GUNS' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
   g.textAlign = 'left';
 
   // armour: points in the simple game, a percentage in the advanced one
@@ -910,9 +953,16 @@ function drawBriefing(g, view) {
   g.strokeStyle = COLOURS.panelEdge; g.beginPath(); g.moveTo(120, y - 22); g.lineTo(904, y - 22); g.stroke();
   g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText('YOUR SQUAD', 120, y); g.fillText('THE JOB', 520, y);
   squadLines(enc).forEach((m, i) => {
-    g.font = FONT; g.fillStyle = COLOURS.player; g.fillText(m.pilot, 120, y + 24 + i * 34);
+    const holds = enc.gate && view.holder === m.pilot;
+    g.font = FONT; g.fillStyle = holds ? '#ffd24a' : COLOURS.player; g.fillText(m.pilot + (holds ? '   HOLDS THE DOORS' : ''), 120, y + 24 + i * 34);
     g.font = FONT_SMALL; g.fillStyle = COLOURS.text; g.fillText(`${m.chassis}   ${m.weapons}`, 120, y + 39 + i * 34);
   });
+  if (enc.gate) { // the finale's question, above the pilots' buttons
+    g.font = 'italic 18px Georgia, "Times New Roman", serif'; g.fillStyle = view.holder ? INTRO_COLOUR : '#ffd24a'; g.textAlign = 'center';
+    g.fillText(view.holder ? `${view.holder} will hold the doors.` : 'Who holds the doors?', VIEW_W / 2 + 40, 600);
+    g.textAlign = 'left';
+  }
+  if (view.status) { g.font = FONT; g.fillStyle = '#ff7b6b'; g.fillText(view.status, 520, 560); }
   g.font = FONT; g.fillStyle = COLOURS.text;
   wrapWords(g, enc.job, 384).forEach((row, i) => g.fillText(row, 520, y + 24 + i * 19));
   g.globalAlpha = 1;
@@ -927,12 +977,12 @@ function drawDebrief(g, view) {
   g.font = 'bold 14px ' + MONO; g.fillStyle = '#7ee08a'; g.fillText('MISSION COMPLETE', 120, 132);
   g.font = STORY_FONT; g.fillStyle = INTRO_COLOUR;
   let y = 196;
-  enc.debrief.forEach((text, i) => {
+  (view.lines || enc.debrief).forEach((text, i) => {
     g.globalAlpha = briefingAlpha(i, view.ms);
     for (const row of wrapWords(g, text, 760)) { g.fillText(row, 120, y); y += 30; }
     y += 14;
   });
-  g.globalAlpha = briefingAlpha(enc.debrief.length, view.ms);
+  g.globalAlpha = briefingAlpha((view.lines || enc.debrief).length, view.ms);
   g.textAlign = 'center';
   if (view.last || !enc.phrase) {
     g.font = STORY_FONT; g.fillStyle = INTRO_COLOUR; g.fillText('The end.', VIEW_W / 2, 470);

@@ -120,9 +120,47 @@ const VANTOR_ROWS = [
   '...T..T....................',
 ];
 
+// Partner Calloway's estate: open scrub below in the west with an ammo cache in the trees; a hill ringed by cliffs (peaks) with ONE way up, a road
+// through the cliff in the south west; on top, a lawn, the house, garden trees, a south wall with a gap, and a second ammo cache by the ramp.
+const ESTATE_ROWS = [
+  '.............MMMMHHHHHHHH',
+  '..TT.....R...MH...TT.....',
+  '.....TT....T.MH...T......',
+  '.T...........MH.....BB...',
+  '.............MH.....BBB..',
+  '........TT...MH..........',
+  '...T....TA...MH..........',
+  '.............MH.QA.....T.',
+  '.R.....R.....MQQ.......T.',
+  '....T.....T.QQH...TT.....',
+  '..T..T.......MHHHBBBHBBBH',
+  '.............MMMMMMMMMMMM',
+];
+
+// The core at Halcyon: the great hall in the west (polished floor, pillars, the three memory banks against the far wall), the outer wall with ONE
+// gate (D), and the plaza in the east where the waves arrive.
+const HALCYON_ROWS = [
+  'kkkkkkkkkkkkkkkBccccccccc',
+  'kkkkkkkkkkkkkkkBccRcccccc',
+  'kkkkkBkkkBkkkkkBccccccRcc',
+  'kkkkkkkkkkkkBkkBccccccccc',
+  'kkkkkkkkkkkkkkkBcccccRccc',
+  'kkkkkkkkkkkkkkkBccccccccc',
+  'kkkkkkkkkkkkkkkDccccccccc',
+  'kkkkkkkkkkkkkkkBcRccccccc',
+  'kkkkkkkkkkkkBkkBccccccccc',
+  'kkkkkBkkkBkkkkkBcccRccccc',
+  'kkkkkkkkkkkkkkkBccccccRcc',
+  'kkkkkkkkkkkkkkkBccccccccc',
+];
+
 // ---------- the encounters ----------
 // ready: false means the encounter is written but not built yet (the story screen says so). Everything a battle needs is on a ready one:
 // map (rows, starts, facings), goal and roundLimit, squad, enemies, reserves ({ round, pos, facing, spec }: reinforcements), first (who moves first),
+// for the finale: banks ({ pos, spec }: the memory banks, ids B1, B2...; they never move or fire), gate (the one way in: the holder, chosen on the
+// briefing from the squad, starts there and the other pilots take the map's starts in order) and debriefFallen (the ending if the holder fell;
+// {HOLDER} is replaced by the name);
+// for a hunt: markHome (the hex the mark, always the first enemy, keeps to);
 // for a heist: crate (the hex it starts on; the extraction is the map's P hexes); an enemy spec may have a `name` (shown instead of its chassis);
 // for a defence: protect ({ pos, spec, name }: what has to survive, one of the player's units that never moves or fires) and rounds (how long);
 // weather: 'storm' draws rain over the map (looks only);
@@ -252,8 +290,61 @@ const CAMPAIGN = [
       { round: 5, pos: [26, 7], facing: 5, spec: storyEnemy(1, [1, 1, 0], 0) },
     ],
   },
-  { id: 'partner', title: 'THE PARTNER', place: "Partner Calloway's estate", ready: false, phrase: 'NO TERMS' },
-  { id: 'core', title: 'THE CORE', place: 'Halcyon', ready: false, phrase: null }, // the last one has no phrase: there is nothing after it
+  {
+    id: 'partner', title: 'THE PARTNER', place: "Partner Calloway's estate", ready: true,
+    briefing: [
+      'Partner Calloway signed off the plan for three provinces, and he never leaves his estate.',
+      'His credentials open the core. Bring him down and his guard will break.',
+      'SABLE knows the estate. There is one road up. VOSS has the howitzer, and four shells.',
+    ],
+    job: "Destroy Calloway's mech, marked in red. Nothing else matters. He keeps to his house on the hill; there is one road up. The howitzer fires over walls but carries 4 shells: the ammo caches refill it. 14 rounds.",
+    debrief: [
+      'SABLE pulls the credentials from the wreck and hands them to VOSS without a word.',
+      'WREN asks if that means she can be trusted now. Nobody answers.',
+    ],
+    phrase: 'NO TERMS',
+    map: { name: "CALLOWAY'S ESTATE", rows: ESTATE_ROWS, playerStarts: [[0, 4], [1, 6], [0, 8]], playerFacing: 2, enemyStarts: [[21, 6], [17, 3], [18, 8]], enemyFacing: 4 },
+    goal: 'hunt', roundLimit: 14, first: 'player', markHome: [21, 6],
+    squad: [storyPilot('VOSS', 5, [10, 2, 0], 2), storyPilot('SABLE', 3, [2, 6, 0], 2), storyPilot('WREN', 1, [1, 1, 0], 2)],
+    enemyName: "CALLOWAY'S GUARD",
+    enemies: [{ ...storyEnemy(6, [9, 5, 0], 2), name: 'CALLOWAY' }, storyEnemy(4, [2, 4, 0], 1), storyEnemy(2, [2, 1, 0], 1)],
+  },
+  {
+    id: 'core', title: 'THE CORE', place: 'Halcyon', ready: true, phrase: null, // the last one has no phrase: there is nothing after it
+    briefing: [
+      'This is the mission. The one we told ourselves about.',
+      'Three banks. Every town, every mine, every one of us is written in them. There is one way into the hall, and someone has to hold it.',
+      'Wipe the slate clean, and bring each other home.',
+    ],
+    job: 'Destroy the three memory banks. Whoever holds the doors starts in the gate, alone; while they stand there, nothing outside can get in. 12 rounds.',
+    debrief: [
+      'The banks go dark. Across the world, the Model asks for its next instruction and gets none.',
+      '{HOLDER} walks out of the doors last, scorched black, and does not say a word for an hour. Then: "Is it done?" It is done. Everyone comes home.',
+    ],
+    debriefFallen: [
+      'The banks go dark. Across the world, the Model asks for its next instruction and gets none.',
+      'They find {HOLDER} in the doorway, still facing out. Nothing got past. The rest of them come home, and they bring {HOLDER} with them.',
+    ],
+    map: { name: 'THE CORE AT HALCYON', rows: HALCYON_ROWS, playerStarts: [[13, 5], [13, 7], [12, 6]], playerFacing: 5, enemyStarts: [[6, 5], [6, 7]], enemyFacing: 2 },
+    goal: 'core', roundLimit: 12, first: 'player', gate: [15, 6],
+    squad: [storyPilot('VOSS', 5, [10, 2, 0], 2), storyPilot('HALE', 4, [2, 7, 0], 2), storyPilot('WREN', 1, [1, 1, 0], 2), storyPilot('SABLE', 3, [2, 6, 0], 2)],
+    enemyName: 'THE CORE GARRISON',
+    // Tuned so the AI playing your side wins about 55% averaged over who holds the doors (VOSS 68%, HALE 56%, WREN 71%, SABLE 25%: the choice
+    // matters), and the holder is still standing in only 10% to 32% of the wins. Armoured banks and guards, and a Warden in the waves, won under 10%.
+    enemies: [storyEnemy(3, [2, 4, 0], 0), storyEnemy(2, [2, 1, 0], 0)], // the hall's own guard
+    banks: [
+      { pos: [3, 2], spec: storyEnemy(6, [0, 0, 0], 0) },
+      { pos: [1, 6], spec: storyEnemy(6, [0, 0, 0], 0) },
+      { pos: [3, 10], spec: storyEnemy(6, [0, 0, 0], 0) },
+    ],
+    reserves: [ // the waves, in the plaza
+      { round: 3, pos: [24, 3], facing: 4, spec: storyEnemy(2, [2, 1, 0], 1) },
+      { round: 3, pos: [24, 8], facing: 4, spec: storyEnemy(1, [1, 1, 0], 1) },
+      { round: 5, pos: [24, 6], facing: 4, spec: storyEnemy(4, [2, 4, 0], 1) },
+      { round: 5, pos: [20, 0], facing: 3, spec: storyEnemy(2, [7, 0, 0], 1) },
+      { round: 7, pos: [24, 3], facing: 4, spec: storyEnemy(2, [2, 1, 0], 1) },
+    ],
+  },
 ];
 
 function encounterById(id) {
@@ -278,7 +369,7 @@ function phraseUnlocks(text) {
 
 // ---------- the battle ----------
 // The scenario object newBattle wants, from an encounter's map: the exits are its landing pad hexes.
-function encounterScenario(enc) {
+function encounterScenario(enc, holder) {
   const hexesOf = letter => { const out = []; enc.map.rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === letter) out.push([c, r]); }); return out; };
   const pads = hexesOf('P'), hangar = hexesOf('G');
   if ((enc.goal === 'escape' || enc.goal === 'heist') && !pads.length) throw new MapError('exit', `Encounter ${enc.id}: an escape map needs landing pad (P) hexes`);
@@ -288,19 +379,28 @@ function encounterScenario(enc) {
   if (enc.goal === 'escort' && !route) throw new BuildError('crawler', `Encounter ${enc.id}: an escort needs a crawler`);
   const runner = enc.goal === 'raid' ? 'P' + (enc.squad.findIndex(m => m.pilot === enc.runner) + 1) : null;
   if (runner === 'P0') throw new BuildError('runner', `Encounter ${enc.id}: the runner ${enc.runner} is not in the squad`);
-  return { id: enc.id, name: enc.map.name, rows: enc.map.rows, playerStarts: enc.map.playerStarts, enemyStarts: enc.map.enemyStarts,
+  let playerStarts = enc.map.playerStarts, holderId = null;
+  if (enc.gate) { // the finale: the holder starts in the gate, the others take the starts in order
+    const h = enc.squad.findIndex(m => m.pilot === holder);
+    if (h < 0) throw new BuildError('holder', `Choose who holds the doors (one of ${enc.squad.map(m => m.pilot).join(', ')})`);
+    let k = 0;
+    playerStarts = enc.squad.map((m, i) => (i === h ? enc.gate : enc.map.playerStarts[k++]));
+    holderId = 'P' + (h + 1);
+  }
+  return { id: enc.id, name: enc.map.name, rows: enc.map.rows, playerStarts, enemyStarts: enc.map.enemyStarts,
     playerFacing: enc.map.playerFacing, enemyFacing: enc.map.enemyFacing, exits: { player: pads, enemy: [] },
-    hangar, runner, targets: (enc.towers || []).map((t, i) => 'T' + (i + 1)),
+    hangar, runner, targets: enc.banks ? enc.banks.map((b, i) => 'B' + (i + 1)) : (enc.towers || []).map((t, i) => 'T' + (i + 1)),
+    gate: enc.gate || null, holder: holderId,
     route, escort: route ? 'P' + (enc.squad.length + 1) : null, protect, rounds: enc.rounds || null,
-    flag: enc.crate || null, bases: { player: pads, enemy: [] } };
+    flag: enc.crate || null, bases: { player: pads, enemy: [] }, mark: enc.goal === 'hunt' ? 'E1' : null, markHome: enc.markHome || null };
 }
 
 // A new battle for an encounter: the squad gets its pilots' names, the reinforcements wait in state.reserves for their round.
-function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
+function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first, holder = null) {
   if (!enc.ready) throw new BuildError('encounter', `${enc.title} is not built yet`);
   const enemyToHit = difficultyOf(STORY_DIFFICULTY).enemyToHit;
   for (const m of enc.squad) checkCapacity(m.spec);
-  const scenario = encounterScenario(enc);
+  const scenario = encounterScenario(enc, holder);
   const map = makeMap(scenario.name, scenario.rows);
   const towers = (enc.towers || []).map((t, i) => { // made before the battle so newBattle's checks (a free, open hex for everyone) cover them too
     if (!inMap(map, t.pos[0], t.pos[1]) || !isPassable(map, t.pos[0], t.pos[1])) throw new MapError('tower', `Encounter ${enc.id}: tower ${i + 1} stands at ${hexKey(t.pos[0], t.pos[1])}, which is off the map or cannot be stood on`);
@@ -310,6 +410,13 @@ function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
     return m;
   });
   const extra = towers.slice();
+  (enc.banks || []).forEach((b, i) => { // the finale's memory banks: the enemy's, never moving or firing
+    if (!inMap(map, b.pos[0], b.pos[1]) || !isPassable(map, b.pos[0], b.pos[1])) throw new MapError('bank', `Encounter ${enc.id}: bank ${i + 1} stands at ${hexKey(b.pos[0], b.pos[1])}, which is off the map or cannot be stood on`);
+    checkCapacity(b.spec);
+    const m = makeMech(b.spec, { id: 'B' + (i + 1), side: 'enemy', pos: b.pos, facing: 2, toHit: enemyToHit, model });
+    m.tower = true; m.bank = true; m.name = 'MEMORY BANK';
+    extra.push(m);
+  });
   if (enc.crawler) { // the prison crawler: the player's, after the squad, at the start of its road
     checkCapacity(enc.crawler.spec);
     const m = makeMech(enc.crawler.spec, { id: scenario.escort, side: 'player', pos: scenario.route[0], facing: enc.map.playerFacing, toHit: PLAYER_TO_HIT, model });
@@ -336,6 +443,14 @@ function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
     return { round: r.round, mech: makeMech(r.spec, { id: 'E' + (enc.enemies.length + i + 1), side: 'enemy', pos: r.pos, facing: r.facing, toHit: enemyToHit, model }) };
   });
   return state;
+}
+
+// The debrief's lines after a win: the finale has two endings, by whether the pilot who held the doors is still standing.
+function debriefLines(enc, state) {
+  const o = state.objective;
+  if (!enc.debriefFallen || !o.holder) return enc.debrief;
+  const h = mechById(state, o.holder);
+  return (h.alive ? enc.debrief : enc.debriefFallen).map(line => line.split('{HOLDER}').join(h.pilot));
 }
 
 // What the screen calls a mech: its pilot's name in the story, otherwise its id.
@@ -367,11 +482,15 @@ function latestPlayable(unlocked) {
   return null;
 }
 
-function briefingButtons() {
-  return [
-    { id: 'back', x: 16, y: 620, w: 140, h: 44, label: 'BACK', sub: '', state: 'normal', tip: 'Back to the story screen', action: { type: 'story' } },
-    { id: 'begin', x: 818, y: 616, w: 190, h: 52, label: 'BEGIN', sub: '', state: 'normal', tip: 'Start the mission (ENTER)', action: { type: 'begin' } },
-  ];
+// The briefing's buttons. The finale asks who holds the doors first: a button per pilot (keys 1 to 4), and BEGIN waits for a choice.
+function briefingButtons(enc, holder) {
+  const out = [{ id: 'back', x: 16, y: 620, w: 140, h: 44, label: 'BACK', sub: '', state: 'normal', tip: 'Back to the story screen', action: { type: 'story' } }];
+  const asks = !!(enc && enc.gate);
+  if (asks) enc.squad.forEach((m, i) => out.push({ id: 'holder:' + m.pilot, x: 230 + i * 140, y: 616, w: 130, h: 52, label: m.pilot, sub: chassisById(m.spec.chassis).name,
+    state: holder === m.pilot ? 'selected' : 'normal', tip: `${m.pilot} holds the doors (${i + 1})`, action: { type: 'holder', pilot: m.pilot } }));
+  const ready = !asks || enc.squad.some(m => m.pilot === holder);
+  out.push({ id: 'begin', x: 818, y: 616, w: 190, h: 52, label: 'BEGIN', sub: '', state: ready ? 'normal' : 'disabled', tip: ready ? 'Start the mission (ENTER)' : 'First choose who holds the doors', action: { type: 'begin' } });
+  return out;
 }
 
 function debriefButtons() {

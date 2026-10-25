@@ -154,8 +154,8 @@ check('menu: every win condition can be chosen, and one that is not ready would 
 });
 
 check('menu: the cards sit on the screen and none overlap', () => {
-  const all = [...titleButtons(0), ...selectButtons(newMenuSelection('basin', 'annihilation')), ...storyButtons(1), ...briefingButtons(), ...debriefButtons()];
-  const sets = [titleButtons(0), selectButtons(newMenuSelection('basin', 'annihilation')), storyButtons(1), briefingButtons(), debriefButtons()];
+  const all = [...titleButtons(0), ...selectButtons(newMenuSelection('basin', 'annihilation')), ...storyButtons(1), ...briefingButtons(encounterById('core'), 'VOSS'), ...debriefButtons()];
+  const sets = [titleButtons(0), selectButtons(newMenuSelection('basin', 'annihilation')), storyButtons(1), briefingButtons(encounterById('core'), 'VOSS'), debriefButtons()];
   for (const b of all) assert(b.x >= 0 && b.y >= 0 && b.x + b.w <= 1024 && b.y + b.h <= 688, `${b.id} is off the screen`);
   for (const buttons of sets) for (let i = 0; i < buttons.length; i++) for (let j = i + 1; j < buttons.length; j++) {
     const a = buttons[i], b = buttons[j];

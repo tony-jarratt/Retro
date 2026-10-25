@@ -259,6 +259,9 @@ const TERRAIN = {
   's': { name: 'shale',     cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the canyon floor: clear ground
   'Q': { name: 'road',      cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the prison crawler's road (the escort goal follows it)
   'W': { name: 'repair bay', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, repair: true }, // see REPAIR_ARMOUR
+  'k': { name: 'hall floor', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },  // the core's great hall: clear ground
+  'D': { name: 'great doors', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 }, // the one way into the hall (clear: whoever stands in it blocks it)
+  'A': { name: 'ammo cache', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, resupply: true }, // see RESUPPLY_CHARGES
 };
 
 // Repair bays (terrain with `repair`): a mech that stood still on one for the round (it may fire) is repaired at the end of the round: up to
@@ -266,6 +269,9 @@ const TERRAIN = {
 // one of the bay's REPAIR_CHARGES; a mech with nothing to repair uses none. Armour is only repaired in the armour-pool game.
 const REPAIR_ARMOUR = 5;
 const REPAIR_CHARGES = 3;
+// Ammo caches (terrain with `resupply`): the same deal for ammunition. A mech that stood still on one has every weapon that uses ammo filled back
+// up to what it carries at the start. RESUPPLY_CHARGES a cache; a mech with nothing to fill uses none.
+const RESUPPLY_CHARGES = 2;
 
 // The prison crawler (story, the escort goal): it drives this many hexes along its road in its side's move step, stopping short of anything on it.
 const CRAWLER_SPEED = 3;

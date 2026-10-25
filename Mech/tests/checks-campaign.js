@@ -10,7 +10,7 @@ check('story: every encounter has a title, a place and its own phrase (all but t
     if (i < CAMPAIGN.length - 1) { assert(e.phrase, `${e.id} has no phrase`); assert(!phrases.has(normalisePhrase(e.phrase)), `${e.id} repeats a phrase`); phrases.add(normalisePhrase(e.phrase)); }
     if (!e.ready) return;
     assert(e.briefing.length && e.debrief.length && e.job, `${e.id} needs a briefing, a job and a debrief`);
-    eq(e.squad.length, e.map.playerStarts.length, `${e.id}: a start for every pilot`);
+    eq(e.squad.length, e.map.playerStarts.length + (e.gate ? 1 : 0), `${e.id}: a start for every pilot (the finale's holder starts in the gate)`);
     for (const m of e.squad) { assert(m.pilot, `${e.id}: a squad member has no pilot`); checkCapacity(m.spec); }
   });
   eq(CAMPAIGN[0].ready, true, 'the first encounter is built');
@@ -18,10 +18,11 @@ check('story: every encounter has a title, a place and its own phrase (all but t
 
 check('story: a built encounter\'s starts are on open ground, every start can reach its goal hexes (pad or hangar) and every enemy, and the reinforcements can reach the squad', () => {
   for (const e of CAMPAIGN.filter(x => x.ready)) {
-    const s = encounterBattle(e, 'pool');
+    const s = encounterBattle(e, 'pool', e.first, e.gate ? e.squad[0].pilot : null);
     for (const m of s.mechs) assert(isPassable(s.map, m.pos[0], m.pos[1]), `${e.id}: ${m.id} starts on ${hexKey(m.pos[0], m.pos[1])}, which cannot be stood on`);
     const o = s.objective;
-    const goal = o.id === 'escape' ? o.exits.player : o.id === 'raid' ? o.hangar : o.id === 'escort' ? [o.route[o.route.length - 1]] : o.id === 'heist' ? [o.flag.pos]
+    const goal = o.id === 'escape' ? o.exits.player : o.id === 'raid' ? o.hangar : o.id === 'escort' ? [o.route[o.route.length - 1]] : o.id === 'heist' ? [o.flag.pos] : o.id === 'hunt' ? neighbours(s.map, ...o.home).map(n => [n.c, n.r])
+      : o.id === 'core' ? neighbours(s.map, ...mechById(s, 'B2').pos).map(n => [n.c, n.r])
       : neighbours(s.map, ...mechById(s, o.protect).pos).map(n => [n.c, n.r]); // defend: get beside the dropship
     assert(goal.length >= (s.objective.id === 'escape' ? e.squad.length : 1), `${e.id}: the goal needs room`);
     for (const m of s.mechs.filter(x => x.side === 'player' && !x.crawler && !x.tower)) {
@@ -44,7 +45,7 @@ check('story: the battle names the pilots, keeps the reinforcements off the map,
   eq(s.mechs.length, 5, 'three of ours and two of theirs on the map');
   eq(s.reserves.map(r => [r.round, r.mech.id]), [[4, 'E3'], [4, 'E4']]);
   eq([s.objective.id, s.objective.roundLimit, s.first], ['escape', 10, 'player']);
-  throwsKind(BuildError, 'encounter', () => encounterBattle(CAMPAIGN.find(e => !e.ready), 'pool'));
+  throwsKind(BuildError, 'encounter', () => encounterBattle({ ...CAMPAIGN[0], ready: false }, 'pool'));
   throwsKind(BuildError, 'encounter', () => encounterById('nowhere'));
 });
 
@@ -57,15 +58,18 @@ check('story: an access phrase ignores case, spaces and dashes, opens the missio
 });
 
 check('story: the story screen shows a locked mission as a number only, an open unbuilt one greyed, and ENTER plays the latest built one', () => {
-  const unbuilt = CAMPAIGN.findIndex(e => !e.ready); // the first mission not built yet; open it and the one after stays locked
-  const b = storyButtons(unbuilt + 1);
-  const one = b[0], open = b[unbuilt], locked = b[unbuilt + 1];
-  eq([one.state, one.label], ['normal', 'BREAKOUT']);
-  eq([open.state, open.label], ['disabled', CAMPAIGN[unbuilt].title]);
-  assert(open.tip.includes('not built'));
-  eq([locked.state, locked.label], ['disabled', '? ? ?']);
-  eq(latestPlayable(unbuilt + 1).id, CAMPAIGN[unbuilt - 1].id, 'the open one is not built, so ENTER plays the one before');
+  const one = storyButtons(1);
+  eq([one[0].state, one[0].label], ['normal', 'BREAKOUT']);
+  eq([one[1].state, one[1].label, one[1].sub], ['disabled', '? ? ?', 'locked'], 'only the first is open at the start');
   eq(latestPlayable(1).id, 'breakout');
+  const all = storyButtons(CAMPAIGN.length).filter(b => b.id.startsWith('mission:'));
+  all.forEach((b, i) => {
+    eq(b.label, CAMPAIGN[i].title);
+    eq(b.state, CAMPAIGN[i].ready ? 'normal' : 'disabled', b.id);
+    if (!CAMPAIGN[i].ready) assert(b.tip.includes('not built'), b.id);
+  });
+  const lastBuilt = CAMPAIGN.filter(e => e.ready).pop();
+  eq(latestPlayable(CAMPAIGN.length).id, lastBuilt.id, 'ENTER plays the latest built one');
 });
 
 check('escape: the whole living squad on the pad wins; the enemy on the pad does nothing; at the round limit the player has lost', () => {
@@ -379,6 +383,118 @@ check('story: an AI playing the lab wins often but not always (tuned for about 5
     runFight(s, new Rng(seed), 40);
     assert(s.over, `seed ${seed} never finished`);
     if (s.winner === 'player') won += 1;
+  }
+  assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
+});
+
+check('ammo cache: standing still on one fills every ammo weapon back to its start and uses a charge; nothing to fill uses none; the AI goes to one when a weapon runs dry', () => {
+  const rows = Array.from({ length: 9 }, (_, r) => (r === 4 ? '.....A........' : '..............'));
+  const s = makeState(makeMap('cache', rows), [
+    tm('P1', 'player', { chassis: 5, armour: 2, sinks: 0, weapons: [10, 4, 0] }, [5, 4], { model: 'pool' }), tm('E1', 'enemy', jackal([4, 0, 0], 2), [12, 4], { model: 'pool' }),
+  ]);
+  eq(s.map.charges, { '5,4': RESUPPLY_CHARGES });
+  const p = mechById(s, 'P1');
+  p.weapons[0].ammo = 0; p.weapons[1].ammo = 3;
+  const events = endRound(s, fakeRng([], []));
+  eq([p.weapons[0].ammo, p.weapons[1].ammo], [weaponById(10).ammo, weaponById(4).ammo]);
+  eq(events.filter(e => e.type === 'resupply'), [{ type: 'resupply', mechId: 'P1', weaponIds: [10, 4], charges: RESUPPLY_CHARGES - 1 }]);
+  endRound(s, fakeRng([], []));
+  eq(s.map.charges['5,4'], RESUPPLY_CHARGES - 1, 'full: no charge used');
+  p.hp -= 10; endRound(s, fakeRng([], []));
+  eq(s.map.charges['5,4'], RESUPPLY_CHARGES - 1, 'a cache does not repair armour');
+  const e1 = mechById(s, 'E1');
+  p.pos = [1, 1]; e1.pos = [9, 4]; e1.weapons[0].ammo = 0;
+  eq(aiMoveFor(s, 'E1').intent, 'E1 GOES TO RELOAD');
+});
+
+check('hunt: the mark keeps to its house; destroying it wins at once, even with its guard standing; the round limit loses', () => {
+  const s = encounterBattle(encounterById('partner'), 'pool');
+  const o = s.objective, mark = mechById(s, o.mark);
+  eq([o.id, mark.id, mark.name, o.home], ['hunt', 'E1', 'CALLOWAY', [21, 6]]);
+  eq(aiMoveFor(s, 'E1').plan.mode, 'stand', 'he is at home');
+  mark.pos = [16, 3];
+  eq(aiMoveFor(s, 'E1').intent, 'E1 KEEPS TO THE HOUSE');
+  assert(objectiveStatus(s).lines.some(l => l.startsWith('TARGET: CALLOWAY ARMOUR')));
+  mark.alive = false;
+  objectiveSync(s, []);
+  assert(finishIfOver(s));
+  eq([s.winner, s.reason], ['player', 'CALLOWAY is down']);
+  const t = encounterBattle(encounterById('partner'), 'pool');
+  t.mechs.filter(m => m.side === 'enemy').forEach(m => { m.alive = false; });
+  objectiveSync(t, []);
+  assert(finishIfOver(t));
+  eq(t.reason, 'CALLOWAY is down', 'falling with his guard, it is still his story');
+  const u = encounterBattle(encounterById('partner'), 'pool');
+  u.round = u.objective.roundLimit;
+  endRound(u, fakeRng([], []));
+  eq([u.winner, u.reason], ['enemy', `Time ran out after round ${u.objective.roundLimit}: CALLOWAY is still standing`]);
+});
+
+check('story: an AI playing the partner wins often but not always (tuned for about 52%)', () => {
+  let won = 0;
+  const n = 60;
+  for (let seed = 1; seed <= n; seed++) {
+    const s = encounterBattle(encounterById('partner'), 'pool');
+    runFight(s, new Rng(seed), 40);
+    assert(s.over, `seed ${seed} never finished`);
+    if (s.winner === 'player') won += 1;
+  }
+  assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
+});
+
+check('finale: BEGIN waits until someone is chosen to hold the doors; the holder starts in the gate, the others in the hall', () => {
+  const e = encounterById('core');
+  const none = briefingButtons(e, null);
+  eq(none.filter(b => b.id.startsWith('holder:')).map(b => b.label), ['VOSS', 'HALE', 'WREN', 'SABLE']);
+  eq(none.find(b => b.id === 'begin').state, 'disabled');
+  throwsKind(BuildError, 'holder', () => encounterBattle(e, 'pool'));
+  const chosen = briefingButtons(e, 'WREN');
+  eq([chosen.find(b => b.id === 'begin').state, chosen.find(b => b.id === 'holder:WREN').state], ['normal', 'selected']);
+  eq(briefingButtons(encounterById('breakout'), null).map(b => b.id), ['back', 'begin'], 'no question before the other missions');
+  const s = encounterBattle(e, 'pool', 'player', 'WREN');
+  const wren = s.mechs.find(m => m.pilot === 'WREN');
+  eq([s.objective.holder, wren.id, wren.pos], [wren.id, 'P3', [15, 6]]);
+  eq(s.mechs.filter(m => m.side === 'player' && m.id !== wren.id).map(m => m.pos), [[13, 5], [13, 7], [12, 6]]);
+  eq(s.mechs.filter(m => m.bank).map(m => [m.id, m.name]), [['B1', 'MEMORY BANK'], ['B2', 'MEMORY BANK'], ['B3', 'MEMORY BANK']]);
+});
+
+check('finale: nothing outside can get into the hall past the holder; once the holder falls the way is open', () => {
+  const s = encounterBattle(encounterById('core'), 'pool', 'player', 'VOSS');
+  const outside = makeMech({ chassis: 1, armour: 0, sinks: 0, weapons: [1, 0, 0] }, { id: 'E9', side: 'enemy', pos: [20, 6], facing: 4, toHit: 5, model: 'pool' });
+  s.mechs.push(outside);
+  const inside = hex => hex[0] < 15;
+  const reach = () => [...reachableHexes(s.map, outside.pos, 999, occupiedKeys(s, 'E9')).values()];
+  assert(!reach().some(n => inside([n.c, n.r])), 'with VOSS in the gate there is no way in');
+  mechById(s, s.objective.holder).alive = false;
+  assert(reach().some(n => inside([n.c, n.r])), 'with the gate empty they pour in');
+});
+
+check('finale: the banks dark wins; the debrief tells it one way if the holder stood and another if the holder fell', () => {
+  const e = encounterById('core');
+  const s = encounterBattle(e, 'pool', 'player', 'HALE');
+  s.mechs.filter(m => m.bank).forEach(m => { m.alive = false; });
+  objectiveSync(s, []);
+  assert(finishIfOver(s));
+  eq([s.winner, s.reason], ['player', 'The memory banks are dark']);
+  const stood = debriefLines(e, s);
+  assert(stood[1].startsWith('HALE walks out of the doors last'), stood[1]);
+  mechById(s, s.objective.holder).alive = false;
+  const fell = debriefLines(e, s);
+  assert(fell[1].startsWith('They find HALE in the doorway') && !fell.join(' ').includes('{HOLDER}'), fell[1]);
+  eq(debriefLines(encounterById('breakout'), encounterBattle(encounterById('breakout'), 'pool')), encounterById('breakout').debrief);
+  const u = encounterBattle(e, 'pool', 'player', 'HALE');
+  u.round = u.objective.roundLimit;
+  endRound(u, fakeRng([], []));
+  eq([u.winner, u.reason], ['enemy', `Time ran out after round ${u.objective.roundLimit}: the banks are still running`]);
+});
+
+check('story: an AI playing the finale wins often but not always, averaged over who holds the doors (tuned for about 55%)', () => {
+  let won = 0, n = 0;
+  for (const holder of ['VOSS', 'HALE', 'WREN', 'SABLE']) for (let seed = 1; seed <= 15; seed++) {
+    const s = encounterBattle(encounterById('core'), 'pool', 'player', holder);
+    runFight(s, new Rng(seed), 40);
+    assert(s.over, `${holder} seed ${seed} never finished`);
+    n += 1; if (s.winner === 'player') won += 1;
   }
   assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
 });

@@ -227,7 +227,8 @@ function finishIfOver(state) {
   if (winner !== null && !state.over) {
     const eliminated = mechsLeft(state, 'player') === 0 || mechsLeft(state, 'enemy') === 0;
     state.winner = winner; state.over = true;
-    state.reason = reasonText(state, eliminated ? 'annihilated' : state.objective.result.code, winner);
+    const goal = state.objective && state.objective.result; // when the goal and a wipe-out end it together, the goal's own reason is told
+    state.reason = reasonText(state, goal && goal.winner === winner ? goal.code : eliminated ? 'annihilated' : goal.code, winner);
   }
   return state.over;
 }
@@ -733,18 +734,42 @@ function endRound(state, rng) {
 
 // Repair bays: each living mech that stood still on a bay with charges left gets armour back and its first knocked-out weapon back online,
 // if it needs either; that uses a charge. Events: { type: 'repair', mechId, armour, weaponId (or null), charges (left) }.
+// What a service point (a repair bay or an ammo cache) at `pos` would do for the mech now, or null if there is none there, it is used up, or the
+// mech needs nothing it gives: { kind: 'repair', armour, weapon (a knocked-out weapon slot, or null) } or { kind: 'resupply', slots (weapons to fill) }.
+function serviceFor(state, mech, pos) {
+  const key = hexKey(pos[0], pos[1]);
+  if (!(state.map.charges || {})[key]) return null;
+  const terrain = terrainAt(state.map, pos[0], pos[1]);
+  if (terrain.repair) {
+    const armour = mech.model === 'pool' ? Math.min(REPAIR_ARMOUR, mech.maxHp - mech.hp) : 0;
+    const broken = mech.weapons.find(w => w.id !== 0 && w.off);
+    return armour || broken ? { kind: 'repair', armour, weapon: broken || null } : null;
+  }
+  if (terrain.resupply) {
+    const slots = mech.weapons.filter(w => w.id !== 0 && w.ammo !== null && w.ammo < weaponById(w.id).ammo && !(mech.destroyed && mech.destroyed[w.loc]));
+    return slots.length ? { kind: 'resupply', slots } : null;
+  }
+  throw new RulesError('service', `Hex ${key} has charges but is neither a repair bay nor an ammo cache`);
+}
+
+// Service points: each living mech that stood still on a repair bay or an ammo cache with uses left gets what it needs from it, which uses one.
+// Events: { type: 'repair', mechId, armour, weaponId (or null), charges (left) } and { type: 'resupply', mechId, weaponIds, charges }.
 function repairAtBays(state, events) {
   const charges = state.map.charges || {};
   for (const mech of livingMechs(state)) {
+    if (mech.moved !== 'stand') continue;
+    const help = serviceFor(state, mech, mech.pos);
+    if (!help) continue; // nothing here, or nothing it needs: the charge is kept
     const key = hexKey(mech.pos[0], mech.pos[1]);
-    if (!charges[key] || mech.moved !== 'stand') continue;
-    const armour = mech.model === 'pool' ? Math.min(REPAIR_ARMOUR, mech.maxHp - mech.hp) : 0;
-    const broken = mech.weapons.find(w => w.id !== 0 && w.off);
-    if (!armour && !broken) continue; // nothing to repair: the charge is kept
-    mech.hp += armour;
-    if (broken) broken.off = false;
     charges[key] -= 1;
-    events.push({ type: 'repair', mechId: mech.id, armour, weaponId: broken ? broken.id : null, charges: charges[key] });
+    if (help.kind === 'repair') {
+      mech.hp += help.armour;
+      if (help.weapon) help.weapon.off = false;
+      events.push({ type: 'repair', mechId: mech.id, armour: help.armour, weaponId: help.weapon ? help.weapon.id : null, charges: charges[key] });
+    } else {
+      for (const w of help.slots) w.ammo = weaponById(w.id).ammo;
+      events.push({ type: 'resupply', mechId: mech.id, weaponIds: help.slots.map(w => w.id), charges: charges[key] });
+    }
   }
 }
 

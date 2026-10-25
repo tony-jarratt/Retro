@@ -1,6 +1,6 @@
 # Hexfire: the campaign (draft 2, 2026-10-25)
 
-**Built:** encounters 1 to 5 (Breakout, The Depot, The Column, Dead Ground, The Lab) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 6 and 7 are text only.
+**Built:** all seven encounters are playable from STORY (2026-10-25), with the story screen, briefings, debriefs and access phrases. The text below is the plan they were built from; the code (`js/campaign.js`) has the final words.
 
 **Something to fight over in every mission** (the owner, 2026-10-25: these "add strategy within a mission"). Each mission gets one contested map feature:
 - 1 Breakout: the pad (and the gates the reinforcements come through).
@@ -8,6 +8,8 @@
 - 3 The Column: the road itself (anything on it stops the crawler) and a repair bay on the ledge.
 - 4 Dead Ground: the dropship (their lights go straight for it) and the water (a lot of cooling; their team runs hot).
 - 5 The Lab: the crate (its carrier is slowed and hunted) and the compound's two gates, with a repair bay inside the west one.
+- 6 The Partner: one road up the hill, and two ammo caches (the howitzer only carries 4 shells).
+- 7 The Core: the gate. Whoever holds it keeps the waves out, and takes their fire.
 - **Decided (2026-10-25): the sacrifice belongs to the finale**, where it is most emotional: one pilot holds the way in while the others go on, and the player chooses who.
 - Ideas for the rest: a **resupply crate** for a mission that leans on missiles or the howitzer (6, The Partner, is the natural one); a **sacrifice**: one mech has to hold a tile to keep a route open while the others go on (the finale, "who stays behind", or Dead Ground); field repair caches in the marsh. Implementation notes are in DESIGN.md, Story campaign.
 

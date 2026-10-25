@@ -115,7 +115,7 @@ function hashHex(c, r, k) {
   return v - Math.floor(v);
 }
 
-const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c', s: '#6e6470', Q: '#7f735f', f: '#8a8c84', r: '#4d5a3a' };
+const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c', A: '#4a3f2a', k: '#2c3140', D: '#3a3f4c', s: '#6e6470', Q: '#7f735f', f: '#8a8c84', r: '#4d5a3a' };
 const CONTAINER_COLOURS = ['#a8432f', '#2f6e8f', '#c08a2a', '#3f7a4f', '#7a4f8f', '#8f8a80']; // painted freight containers
 
 // Draws one hex of terrain centred on (x, y). `size` is the hex radius in pixels; the scatter was designed for a
@@ -205,6 +205,20 @@ function drawTerrainHex(g, hexPath, kind, c, r, x, y, size) {
   } else if (kind === 'Q') { // the road: packed dirt with two wheel ruts
     g.strokeStyle = 'rgba(60,50,38,0.45)'; g.lineWidth = 2;
     for (const off of [-6, 6]) { g.beginPath(); g.moveTo(x - size * 0.8, y + off * k); g.lineTo(x + size * 0.8, y + off * k); g.stroke(); }
+  } else if (kind === 'k') { // the hall floor: polished tiles with a faint gleam
+    g.strokeStyle = 'rgba(127,208,255,0.10)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x - size * 0.5, y); g.lineTo(x + size * 0.5, y); g.moveTo(x, y - size * 0.6); g.lineTo(x, y + size * 0.6); g.stroke();
+  } else if (kind === 'D') { // the great doors: two heavy leaves standing open
+    g.fillStyle = '#1b1f28'; g.fillRect(x - 4 * k, y - size * 0.75, 8 * k, size * 1.5);
+    g.fillStyle = '#6b7383'; g.fillRect(x - 16 * k, y - size * 0.75, 6 * k, size * 1.5); g.fillRect(x + 10 * k, y - size * 0.75, 6 * k, size * 1.5);
+    g.fillStyle = '#c9a227'; for (let i = 0; i < 4; i++) { g.fillRect(x - 16 * k, y - 18 * k + i * 11 * k, 6 * k, 3 * k); g.fillRect(x + 10 * k, y - 18 * k + i * 11 * k, 6 * k, 3 * k); }
+  } else if (kind === 'A') { // an ammo cache: a stack of olive shell crates under a lit ring
+    g.strokeStyle = '#7ee08a'; g.lineWidth = 2; hexPath(g, x, y, size * 0.72); g.stroke();
+    for (const [dx, dy] of [[-8, 2], [6, 2], [-1, -8]]) {
+      g.fillStyle = '#000'; g.fillRect(x + (dx - 7) * k, y + (dy - 5) * k, 14 * k, 10 * k);
+      g.fillStyle = '#6b6a3a'; g.fillRect(x + (dx - 6) * k, y + (dy - 4) * k, 12 * k, 8 * k);
+      g.fillStyle = '#c9a227'; g.fillRect(x + (dx - 6) * k, y + (dy - 1) * k, 12 * k, 2 * k);
+    }
   } else if (kind === 'W') { // a repair bay: a green-lit plate with a wrench on it
     g.strokeStyle = '#7ee08a'; g.lineWidth = 2; hexPath(g, x, y, size * 0.72); g.stroke();
     g.save(); g.translate(x, y - 2 * k); g.rotate(-Math.PI / 4);

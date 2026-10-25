@@ -86,6 +86,14 @@ function aiGoalFor(state, mech) {
     if (inGroup(o.zone, mech.pos)) return { hexes: [mech.pos], run: false, why: 'holds the hill', intent: `${mech.id} HOLDS THE HILL`, hold: 0 };
     return { hexes: o.zone, run: true, why: 'goes for the hill', intent: `${mech.id} GOES FOR THE HILL`, hold: 0 };
   }
+  if (o.id === 'core') { // the finale: the holder holds the gate (when the AI plays the player's side, in the tests); everyone else fights
+    if (mech.side !== 'player' || mech.id !== o.holder) return null;
+    return { hexes: [o.gate], run: false, why: 'holds the doors', intent: `${mech.id} HOLDS THE DOORS`, hold: 0 };
+  }
+  if (o.id === 'hunt') { // the marked mech keeps to its home ground (its guard comes out to fight); the player's side (the tests) just fights
+    if (mech.id !== o.mark) return null;
+    return { hexes: [o.home], run: false, why: 'keeps to the house', intent: `${mech.id} KEEPS TO THE HOUSE`, hold: 2 };
+  }
   if (o.id === 'heist' && mech.side === 'enemy') return null; // a heist: the enemy cannot pick the crate up, so it hunts (the carrier first, see aiMoveFor)
   if (o.id === 'flag' || o.id === 'heist') {
     if (mech.carrying) return { hexes: o.bases[mech.side], run: false, why: 'carries the flag home', intent: `${mech.id} CARRIES THE FLAG HOME`, hold: 0 };
@@ -109,16 +117,19 @@ function aiGoalFor(state, mech) {
 
 // A repair bay as a goal (see repairAtBays): a mech already on a bay with charges stays while it has anything to fix; a badly damaged one
 // (under AI_REPAIR_BELOW of its armour, or a weapon knocked out) heads for the nearest bay with charges within AI_REPAIR_RANGE. Otherwise null.
+// Ammo caches likewise: a mech with an ammo weapon run dry heads for a cache with uses left in reach.
 function aiRepairGoal(state, mech) {
   const charges = state.map.charges || {};
+  const here = serviceFor(state, mech, mech.pos);
+  if (here) return { hexes: [mech.pos], run: false, why: here.kind === 'repair' ? 'repairs on the bay' : 'reloads at the cache', intent: here.kind === 'repair' ? `${mech.id} REPAIRS` : `${mech.id} RELOADS`, hold: 0 };
   const broken = mech.weapons.some(w => w.id !== 0 && w.off);
-  const hurt = mech.model === 'pool' && mech.hp < mech.maxHp;
-  const here = charges[hexKey(mech.pos[0], mech.pos[1])];
-  if (here > 0 && (hurt || broken)) return { hexes: [mech.pos], run: false, why: 'repairs on the bay', intent: `${mech.id} REPAIRS`, hold: 0 };
-  if (!broken && !(mech.model === 'pool' && mech.hp < mech.maxHp * AI_REPAIR_BELOW)) return null;
-  const bays = Object.keys(charges).filter(k => charges[k] > 0).map(k => k.split(',').map(Number)).filter(([c, r]) => hexDist(mech.pos[0], mech.pos[1], c, r) <= AI_REPAIR_RANGE);
-  if (!bays.length) return null;
-  return { hexes: bays, run: false, why: 'goes to a repair bay', intent: `${mech.id} GOES TO REPAIR`, hold: 0 };
+  const badly = mech.model === 'pool' && mech.hp < mech.maxHp * AI_REPAIR_BELOW;
+  const dry = mech.weapons.some(w => w.id !== 0 && w.ammo === 0);
+  const points = Object.keys(charges).filter(k => charges[k] > 0).map(k => k.split(',').map(Number)).filter(([c, r]) => hexDist(mech.pos[0], mech.pos[1], c, r) <= AI_REPAIR_RANGE);
+  const bays = points.filter(([c, r]) => terrainAt(state.map, c, r).repair), caches = points.filter(([c, r]) => terrainAt(state.map, c, r).resupply);
+  if ((broken || badly) && bays.length) return { hexes: bays, run: false, why: 'goes to a repair bay', intent: `${mech.id} GOES TO REPAIR`, hold: 0 };
+  if (dry && caches.length) return { hexes: caches, run: false, why: 'goes to an ammo cache', intent: `${mech.id} GOES TO RELOAD`, hold: 0 };
+  return null;
 }
 
 // Moves toward a goal along the cheapest route across the whole map, as far as one move allows (a run if it should run and can). Returns
@@ -273,6 +284,10 @@ function aiPlanFire(state, side) {
       }
       const carrier = livingMechs(state, otherSide(mech.side)).find(e => e.carrying); // the enemy with the flag is the target that matters
       if (!weapon.smoke && carrier && validTargets(state, mech.id, slot).some(s => s.targetId === carrier.id)) aim = { targetId: carrier.id, reason: 'shoots the flag carrier' };
+      const mark = state.objective && state.objective.id === 'hunt' && mech.side === 'player' ? state.objective.mark : null; // the player's side (the tests) shoots the mark first
+      if (!weapon.smoke && mark && validTargets(state, mech.id, slot).some(s => s.targetId === mark)) aim = { targetId: mark, reason: 'shoots the mark' };
+      const bank = state.objective && state.objective.id === 'core' && mech.side === 'player' ? validTargets(state, mech.id, slot).find(s => state.objective.targets.includes(s.targetId)) : null;
+      if (!weapon.smoke && bank) aim = { targetId: bank.targetId, reason: 'shoots a memory bank' }; // and the finale's banks
       const ship = aiIsRaider(state, mech) ? state.objective.protect : null; // a raider shoots the dropship when it can
       if (!weapon.smoke && ship && validTargets(state, mech.id, slot).some(s => s.targetId === ship)) aim = { targetId: ship, reason: 'raids the dropship' };
       if (weapon.splash && aim.targetId !== null) { // the howitzer's splash hurts friends too: hold it if more friends than enemies stand beside the target
