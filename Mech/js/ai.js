@@ -139,6 +139,7 @@ function aiMoveFor(state, mechId) {
   const stand = reason => ({ plan: { mechId, mode: 'stand', path: [] }, note: `${mech.id} stands still: ${reason}` });
   const enemies = livingMechs(state, otherSide(mech.side));
   if (!enemies.length) return stand('no enemies left');
+  if (mech.crawler) return crawlerMove(state, mech); // the prison crawler (story) only ever drives along its road
   if (mech.shutdown) return stand('shut down');
   if (walkAllowance(mech) === 0) return stand('cannot move');
   if (mech.heat >= AI_STAND_HEAT) return stand(`cooling down at heat ${mech.heat}`);
@@ -236,7 +237,7 @@ function aiPlanFire(state, side) {
   for (const mech of livingMechs(state, side)) {
     const slots = eligibleWeapons(state, mech.id);
     // a mech that can do no more damage with a weapon blows itself up when that takes more enemies than friends with it
-    if (!mech.shutdown && !canEverFire(mech)) {
+    if (!mech.shutdown && !canEverFire(mech) && !mech.tower && !mech.crawler) { // (a gun tower or the prison crawler never blows itself up)
       const around = neighbours(state.map, mech.pos[0], mech.pos[1]);
       const next = state.mechs.filter(m => m.alive && m.id !== mech.id && around.some(n => n.c === m.pos[0] && n.r === m.pos[1]));
       const foes = next.filter(m => m.side !== mech.side).length, friends = next.length - foes;

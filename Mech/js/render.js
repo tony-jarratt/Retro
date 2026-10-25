@@ -217,8 +217,32 @@ function drawTowerAt(g, mech, x, y, facing, alpha, flash) {
   g.restore();
 }
 
+// The prison crawler (story): a long tracked transport with barred windows, pointing the way it drives; a burnt-out hull once destroyed.
+function drawCrawlerAt(g, mech, x, y, facing, alpha, flash) {
+  const k = HEX_SCALE;
+  g.save();
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(4 * k, 6 * k, 30 * k, 18 * k, 0, 0, Math.PI * 2); g.fill();
+  g.rotate(facing * Math.PI / 3 - Math.PI / 2); // drawn pointing along +x; direction 0 is up
+  g.fillStyle = '#1e2024'; g.fillRect(-30 * k, -17 * k, 60 * k, 8 * k); g.fillRect(-30 * k, 9 * k, 60 * k, 8 * k); // the tracks
+  g.fillStyle = mech.alive ? '#8a7d5c' : '#3a352c'; g.fillRect(-26 * k, -11 * k, 52 * k, 22 * k);                  // the hull
+  if (mech.alive) {
+    g.fillStyle = '#5e553f'; g.fillRect(16 * k, -11 * k, 10 * k, 22 * k);                                            // the cab
+    g.fillStyle = '#ffd24a'; g.fillRect(24 * k, -8 * k, 2 * k, 4 * k); g.fillRect(24 * k, 4 * k, 2 * k, 4 * k);     // headlights
+    g.fillStyle = '#1b1d22';
+    for (let i = 0; i < 4; i++) g.fillRect(-22 * k + i * 9 * k, -7 * k, 6 * k, 14 * k);                            // windows
+    g.fillStyle = '#9aa0a8';
+    for (let i = 0; i < 4; i++) for (let b = 0; b < 2; b++) g.fillRect(-21 * k + i * 9 * k + b * 3 * k, -7 * k, 1 * k, 14 * k); // bars
+    g.strokeStyle = COLOURS.player; g.lineWidth = 2; g.strokeRect(-26 * k, -11 * k, 52 * k, 22 * k);
+    if (flash) { g.globalAlpha *= 0.6; g.fillStyle = '#fff'; g.fillRect(-26 * k, -11 * k, 52 * k, 22 * k); }
+  }
+  g.restore();
+}
+
 function drawMechAt(g, mech, x, y, facing, alpha, flash) {
   if (mech.tower) { drawTowerAt(g, mech, x, y, facing, alpha, flash); return; }
+  if (mech.crawler) { drawCrawlerAt(g, mech, x, y, facing, alpha, flash); return; }
   g.save();
   g.globalAlpha = alpha === undefined ? 1 : alpha;
   g.translate(x, y);
@@ -362,7 +386,7 @@ function drawMechCard(g, mech, x, y, opts = {}) {
   g.fillText(mech.pilot ? mech.pilot : `${mech.id}  ${mech.name}`, x + 10, y + 18); // a story pilot's name, or the id and chassis
   g.font = FONT_SMALL; g.fillStyle = !mech.alive || mech.shutdown ? '#ff7b6b' : COLOURS.dim;
   g.textAlign = 'right';
-  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.tower ? 'FIXED' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
+  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.tower ? 'FIXED' : mech.crawler ? 'NO GUNS' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
   g.textAlign = 'left';
 
   // armour: points in the simple game, a percentage in the advanced one

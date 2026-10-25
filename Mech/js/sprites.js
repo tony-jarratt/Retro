@@ -115,7 +115,7 @@ function hashHex(c, r, k) {
   return v - Math.floor(v);
 }
 
-const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c' };
+const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c', s: '#6e6470', Q: '#7f735f' };
 const CONTAINER_COLOURS = ['#a8432f', '#2f6e8f', '#c08a2a', '#3f7a4f', '#7a4f8f', '#8f8a80']; // painted freight containers
 
 // Draws one hex of terrain centred on (x, y). `size` is the hex radius in pixels; the scatter was designed for a
@@ -186,6 +186,15 @@ function drawTerrainHex(g, hexPath, kind, c, r, x, y, size) {
     g.fillStyle = '#c9a227';
     for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(x + i * 10 * k - 4 * k, y - size); g.lineTo(x + i * 10 * k + 4 * k, y - size); g.lineTo(x + i * 10 * k + 4 * k - size, y + size); g.lineTo(x + i * 10 * k - 4 * k - size, y + size); g.closePath(); g.globalAlpha = 0.18; g.fill(); }
     g.restore();
+  } else if (kind === 's') { // shale: thin layered flakes
+    g.strokeStyle = 'rgba(30,24,36,0.35)'; g.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const sx = x + (hashHex(c, r, 50 + i) - 0.5) * 30 * k, sy = y + (hashHex(c, r, 53 + i) - 0.5) * 26 * k;
+      g.beginPath(); g.moveTo(sx - 6 * k, sy); g.lineTo(sx + 6 * k, sy - 2 * k); g.stroke();
+    }
+  } else if (kind === 'Q') { // the road: packed dirt with two wheel ruts
+    g.strokeStyle = 'rgba(60,50,38,0.45)'; g.lineWidth = 2;
+    for (const off of [-6, 6]) { g.beginPath(); g.moveTo(x - size * 0.8, y + off * k); g.lineTo(x + size * 0.8, y + off * k); g.stroke(); }
   } else if (kind === 'W') { // a repair bay: a green-lit plate with a wrench on it
     g.strokeStyle = '#7ee08a'; g.lineWidth = 2; hexPath(g, x, y, size * 0.72); g.stroke();
     g.save(); g.translate(x, y - 2 * k); g.rotate(-Math.PI / 4);

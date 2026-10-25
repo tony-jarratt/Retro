@@ -9,6 +9,8 @@
 //   exit          get to the exit: when every living mech of a side is inside its side's exit hexes at once, that side wins (the slowest mech sets the pace)
 //   raid          (story only) destroy every target (the gun towers, ids in `targets`), then the runner (one named mech of the player's) has to
 //                 stand in the hangar. If the runner is destroyed the player has lost; at the round limit too
+//   escort        (story only) the prison crawler (`escort`, one of the player's units, no guns) drives itself along `route` (a list of road hexes)
+//                 and has to reach its end. It destroyed, or the round limit, and the player has lost
 //   escape        (story only) the player's whole living squad has to reach its exit before the round limit; the enemy only hunts. At the limit the
 //                 player has lost (the dropship has gone), whatever the armour
 // Every goal but annihilation has a round limit; at the limit the battle is decided on points (hill), then armour left, else a draw.
@@ -42,6 +44,10 @@ OBJECTIVES.raid = { // a story goal
   id: 'raid', name: 'RAID', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
   blurb: 'Destroy the gun towers, then get the runner into the hangar. Lose the runner and you have lost.',
 };
+OBJECTIVES.escort = { // a story goal
+  id: 'escort', name: 'ESCORT', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
+  blurb: 'Keep the prison crawler alive until it reaches the end of the road. Anything on the road stops it.',
+};
 const OBJECTIVE_IDS = Object.keys(OBJECTIVES).filter(id => !OBJECTIVES[id].story); // the free play goals
 // Which map sizes a goal can be played on (`sizes` above): the small maps are only big enough for a straight fight; the flag, the hill and the exit
 // need room, so they are large-map goals. The menu and the address enforce it; the rules and the tests can still run any goal on any map.
@@ -62,6 +68,8 @@ function setupObjective(state, scenario, goalId) {
     o.target = HILL_TARGET;
   } else if (goalId === 'exit' || goalId === 'escape') {
     o.exits = scenario.exits;
+  } else if (goalId === 'escort') {
+    o.escort = scenario.escort; o.route = scenario.route;
   } else if (goalId === 'raid') {
     o.targets = scenario.targets.slice(); o.hangar = scenario.hangar; o.runner = scenario.runner;
   }
@@ -84,6 +92,10 @@ function objectiveAfterMove(state, mech, path, events) {
   const o = state.objective;
   if (!o || o.result || !path.length) return;
   if (o.id === 'raid') { raidCheck(state, events); return; }
+  if (o.id === 'escort') {
+    if (mech.id === o.escort && sameHex(mech.pos, o.route[o.route.length - 1])) { o.result = { winner: 'player', code: 'escort' }; events.push({ type: 'crawler-out', mechId: mech.id }); }
+    return;
+  }
   if (o.id === 'flag') {
     const f = o.flag;
     if (!f.carrier && f.pos && path.some(h => h[0] === f.pos[0] && h[1] === f.pos[1])) {
@@ -104,7 +116,8 @@ function objectiveAfterMove(state, mech, path, events) {
 // Called after damage may have destroyed the flag carrier: the flag drops where the carrier stood.
 function objectiveSync(state, events) {
   const o = state.objective;
-  if (o && o.id === 'raid' && !o.result) { raidCheck(state, events); return; } // the last tower may fall with the runner already inside, or the runner may die
+  if (o && o.id === 'raid' && !o.result) { raidCheck(state, events); return; }
+  if (o && o.id === 'escort' && !o.result) { if (!mechById(state, o.escort).alive) o.result = { winner: 'enemy', code: 'escort-lost' }; return; } // the last tower may fall with the runner already inside, or the runner may die
   if (!o || o.id !== 'flag' || !o.flag.carrier) return;
   const carrier = mechById(state, o.flag.carrier);
   if (carrier.alive) return;
@@ -131,6 +144,7 @@ function objectiveAfterRound(state, events) {
   if (o.roundLimit && state.round >= o.roundLimit) {
     const hp = sideHealth(state, 'player'), he = sideHealth(state, 'enemy');
     if (o.id === 'raid') o.result = { winner: 'enemy', code: 'raid-late' };
+    else if (o.id === 'escort') o.result = { winner: 'enemy', code: 'escort-late' };
     else if (o.id === 'escape') o.result = { winner: 'enemy', code: 'escape-late' }; // the squad did not all get out in time
     else if (o.id === 'hill' && o.score.player !== o.score.enemy) o.result = { winner: o.score.player > o.score.enemy ? 'player' : 'enemy', code: 'time-points' };
     else if (hp !== he) o.result = { winner: hp > he ? 'player' : 'enemy', code: 'time-armour' };
@@ -149,6 +163,31 @@ function sideHealth(state, side) {
 }
 
 // ---------- telling the player ----------
+// How far along its road the crawler is: its index in the route (it never leaves the road).
+function crawlerIndex(state) {
+  const o = state.objective, m = mechById(state, o.escort);
+  const i = o.route.findIndex(h => sameHex(h, m.pos));
+  if (i < 0) throw new RulesError('crawler', `The crawler ${m.id} is at ${hexKey(m.pos[0], m.pos[1])}, which is not on its road`);
+  return i;
+}
+function crawlerToGo(state) { return state.objective.route.length - 1 - crawlerIndex(state); }
+
+// The crawler's move: up to CRAWLER_SPEED hexes on along its road, stopping short of the first hex anyone stands on. Returns { plan, note, intent }:
+// intent names what blocks it (for the log), or null.
+function crawlerMove(state, mech) {
+  const o = state.objective, route = o.route;
+  const taken = occupiedKeys(state, mech.id);
+  const i = crawlerIndex(state), path = [];
+  let blocker = null;
+  for (let k = i + 1; k < route.length && path.length < walkAllowance(mech); k++) {
+    if (taken.has(hexKey(route[k][0], route[k][1]))) { blocker = livingMechs(state).find(m => sameHex(m.pos, route[k])); break; }
+    path.push(route[k]);
+  }
+  const intent = blocker ? `${mech.id} BLOCKED BY ${blocker.id}` : null;
+  if (!path.length) return { plan: { mechId: mech.id, mode: 'stand', path: [] }, note: `${mech.id} waits: ${blocker ? blocker.id + ' is on the road' : 'at the end of the road'}`, intent };
+  return { plan: { mechId: mech.id, mode: 'walk', path }, note: `${mech.id} drives ${path.length} hexes along the road`, intent };
+}
+
 function runnerName(state) { const m = mechById(state, state.objective.runner); return m.pilot || m.id; }
 
 // Why the battle ended, in words, from the player's side.
@@ -161,6 +200,9 @@ function reasonText(state, code, winner) {
     case 'flag': return you ? 'You carried the flag back to your base' : 'The enemy carried the flag back to their base';
     case 'exit': return you ? 'Your whole squad reached the exit' : 'The enemy squad reached their exit';
     case 'escape': return 'Your whole squad got out';
+    case 'escort': return 'The crawler made it out of the canyon';
+    case 'escort-lost': return 'The crawler was destroyed';
+    case 'escort-late': return `Time ran out after round ${o.roundLimit}: the crawler is still in the canyon`;
     case 'raid': return `The towers are down and ${runnerName(state)} is in the hangar`;
     case 'raid-runner': return `${runnerName(state)} was destroyed: nobody else can start the heavy`;
     case 'raid-late': return `Time ran out after round ${o.roundLimit}: the garrison held the depot`;
@@ -180,6 +222,7 @@ function objectiveStatus(state) {
   const lines = [];
   if (o.roundLimit) lines.push(`ROUND ${state.round} OF ${o.roundLimit}`);
   if (o.id === 'hill') lines.push(`HILL  YOU ${o.score.player}  ENEMY ${o.score.enemy}  (FIRST TO ${o.target})`);
+  if (o.id === 'escort') lines.push(`CRAWLER: ${crawlerToGo(state)} HEXES TO GO`);
   if (o.id === 'raid') lines.push(targetsLeft(state) ? `TOWERS STANDING ${targetsLeft(state)} OF ${o.targets.length}` : `TOWERS DOWN: ${runnerName(state)} TO THE HANGAR`);
   if (o.id === 'flag') lines.push(o.flag.carrier ? `FLAG: ${o.flag.carrier} CARRIES IT` : o.flag.pos ? 'FLAG: ON THE GROUND' : 'FLAG: LOST');
   return { name: def.name, lines };

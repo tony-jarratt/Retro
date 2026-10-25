@@ -1,6 +1,12 @@
 # Hexfire: the campaign (draft 2, 2026-10-25)
 
-**Built:** encounters 1 (Breakout) and 2 (The Depot) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 3 to 7 are text only. Implementation notes are in DESIGN.md, Story campaign.
+**Built:** encounters 1 to 3 (Breakout, The Depot, The Column) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 4 to 7 are text only.
+
+**Something to fight over in every mission** (the owner, 2026-10-25: these "add strategy within a mission"). Each mission gets one contested map feature:
+- 1 Breakout: the pad (and the gates the reinforcements come through).
+- 2 The Depot: repair bays (3 charges, stand still to repair; the enemy uses them too).
+- 3 The Column: the road itself (anything on it stops the crawler) and a repair bay on the ledge.
+- Ideas for the rest: a **resupply crate** for a mission that leans on missiles or the howitzer (6, The Partner, is the natural one); a **sacrifice**: one mech has to hold a tile to keep a route open while the others go on (the finale, "who stays behind", or Dead Ground); field repair caches in the marsh. Implementation notes are in DESIGN.md, Story campaign.
 
 A fixed, linear story in seven encounters. No mech bay (free play is the sandbox), no damage carried over, no saving:
 winning an encounter shows an **access phrase** that unlocks the next one from the STORY screen. Each encounter has its
@@ -57,12 +63,12 @@ commanders are **partners**. Use the jargon sparingly: one phrase in a briefing 
 
 ## 3. THE COLUMN
 **Map:** a canyon road; a slow prison crawler on the road, high ground on both sides.
-**Goal:** escort: get the crawler to the far end of the canyon. It cannot fight. **Enemy:** the column's escort.
-**Squad:** VOSS Warden, WREN Skitter, OKAFOR Jackal.
+**Goal:** escort: the crawler drives itself 3 hexes a round along the road and has to reach the east end by round 14; anything on the road stops it. It cannot fight. **Enemy:** the column's escort (two Jackals), and their reserve (a Ranger and a Skitter) comes up the canyon on round 3. A repair bay on the north ledge.
+**Squad:** VOSS Warden (Bolt, Rattler), WREN Skitter, OKAFOR Jackal.
 
 > Three hundred Republic soldiers are being moved through the Shale canyon. The order calls it a redeployment of surplus labour.
-> We cannot carry them. We can open the doors and walk them out.
-> Keep the crawler moving. If it stops, it does not start again.
+> We have stopped the column and opened the doors. Now we walk them out.
+> Keep the crawler moving. Anything on the road stops it, theirs or ours.
 
 *Debrief:* Among the prisoners, a colonel named HALE asks for a mech and a map. "You want to hurt them? I know where they keep the Model."
 **Access phrase: OPEN DOORS**

@@ -254,6 +254,8 @@ const TERRAIN = {
   'P': { name: 'landing pad', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
   'd': { name: 'moon dust', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the depot's moon: clear ground
   'G': { name: 'hangar',    cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the raid's goal hexes
+  's': { name: 'shale',     cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the canyon floor: clear ground
+  'Q': { name: 'road',      cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the prison crawler's road (the escort goal follows it)
   'W': { name: 'repair bay', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, repair: true }, // see REPAIR_ARMOUR
 };
 
@@ -262,6 +264,9 @@ const TERRAIN = {
 // one of the bay's REPAIR_CHARGES; a mech with nothing to repair uses none. Armour is only repaired in the armour-pool game.
 const REPAIR_ARMOUR = 5;
 const REPAIR_CHARGES = 3;
+
+// The prison crawler (story, the escort goal): it drives this many hexes along its road in its side's move step, stopping short of anything on it.
+const CRAWLER_SPEED = 3;
 
 // Self-destruct: a mech may blow itself up in the fire phase instead of firing. Every mech in the six hexes around it,
 // friend or foe, takes this much damage (a hit like any other, so a location is rolled in the advanced game); the

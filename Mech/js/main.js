@@ -345,6 +345,7 @@ function logObjectiveEvents(events) {
     else if (e.type === 'flag-captured') logLine(`${e.mechId} CAPTURES THE FLAG`);
     else if (e.type === 'exit-reached') logLine(`${e.mechId} REACHES THE EXIT`);
     else if (e.type === 'hangar') logLine(`${e.mechId} IS IN THE HANGAR`);
+    else if (e.type === 'crawler-out') logLine(`${e.mechId} IS OUT OF THE CANYON`);
     else if (e.type === 'score') logLine(`${sideName(e.side)} HOLD THE HILL: ${e.points}`);
   }
 }
@@ -402,7 +403,7 @@ function nextMover() {
   const mech = mechById(state, id);
   game.active = id;
   focusOn([mech.pos], true); // the mech whose turn it is comes into view (and a hand-scroll is over)
-  if (step.side === 'player') {
+  if (step.side === 'player' && !mech.crawler) { // (the prison crawler drives itself: it moves like the computer's mechs, below)
     if (mech.shutdown || walkAllowance(mech) === 0) {
       logLine(`${id} cannot move: stays put`);
       moveMech(state, { mechId: id, mode: 'stand', path: [] });

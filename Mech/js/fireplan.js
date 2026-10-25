@@ -18,7 +18,7 @@
 
 function newFirePlanner(state, side) {
   const items = [], skipped = [];
-  const mechIds = livingMechs(state, side).map(m => m.id);
+  const mechIds = livingMechs(state, side).filter(m => !m.crawler).map(m => m.id); // the prison crawler (story) has no guns and is never asked
   for (const id of mechIds) {
     const mech = mechById(state, id);
     // a mech with no weapon that can fire gets one question of its own, so it can still choose to self-destruct

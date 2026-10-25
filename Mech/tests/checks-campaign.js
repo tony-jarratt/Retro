@@ -20,9 +20,9 @@ check('story: a built encounter\'s starts are on open ground, every start can re
   for (const e of CAMPAIGN.filter(x => x.ready)) {
     const s = encounterBattle(e, 'pool');
     for (const m of s.mechs) assert(isPassable(s.map, m.pos[0], m.pos[1]), `${e.id}: ${m.id} starts on ${hexKey(m.pos[0], m.pos[1])}, which cannot be stood on`);
-    const goal = s.objective.id === 'escape' ? s.objective.exits.player : s.objective.hangar;
+    const goal = s.objective.id === 'escape' ? s.objective.exits.player : s.objective.id === 'raid' ? s.objective.hangar : [s.objective.route[s.objective.route.length - 1]];
     assert(goal.length >= (s.objective.id === 'escape' ? e.squad.length : 1), `${e.id}: the goal needs room`);
-    for (const m of s.mechs.filter(x => x.side === 'player')) {
+    for (const m of s.mechs.filter(x => x.side === 'player' && !x.crawler)) {
       const reach = reachableHexes(s.map, m.pos, 999, new Set());
       assert(goal.some(([c, r]) => reach.has(hexKey(c, r))), `${e.id}: ${m.id} cannot reach the goal`);
       for (const t of s.mechs.filter(x => x.side === 'enemy')) assert([0, 1, 2, 3, 4, 5].some(d => reach.has(hexKey(...neighbour(t.pos[0], t.pos[1], d)))), `${e.id}: ${m.id} cannot get next to ${t.id}`);
@@ -42,7 +42,7 @@ check('story: the battle names the pilots, keeps the reinforcements off the map,
   eq(s.mechs.length, 5, 'three of ours and two of theirs on the map');
   eq(s.reserves.map(r => [r.round, r.mech.id]), [[4, 'E3'], [4, 'E4']]);
   eq([s.objective.id, s.objective.roundLimit, s.first], ['escape', 10, 'player']);
-  throwsKind(BuildError, 'encounter', () => encounterBattle(encounterById('column'), 'pool'));
+  throwsKind(BuildError, 'encounter', () => encounterBattle(encounterById('dead-ground'), 'pool'));
   throwsKind(BuildError, 'encounter', () => encounterById('nowhere'));
 });
 
@@ -55,13 +55,13 @@ check('story: an access phrase ignores case, spaces and dashes, opens the missio
 });
 
 check('story: the story screen shows a locked mission as a number only, an open unbuilt one greyed, and ENTER plays the latest built one', () => {
-  const b = storyButtons(3);
-  const one = b.find(x => x.id === 'mission:breakout'), three = b.find(x => x.id === 'mission:column'), four = b.find(x => x.id === 'mission:dead-ground');
+  const b = storyButtons(4);
+  const one = b.find(x => x.id === 'mission:breakout'), four = b.find(x => x.id === 'mission:dead-ground'), five = b.find(x => x.id === 'mission:lab');
   eq([one.state, one.label], ['normal', 'BREAKOUT']);
-  eq([three.state, three.label], ['disabled', 'THE COLUMN']);
-  assert(three.tip.includes('not built'));
-  eq([four.state, four.label], ['disabled', '? ? ?']);
-  eq(latestPlayable(3).id, 'depot', 'the column is open but not built, so ENTER plays the depot');
+  eq([four.state, four.label], ['disabled', 'DEAD GROUND']);
+  assert(four.tip.includes('not built'));
+  eq([five.state, five.label], ['disabled', '? ? ?']);
+  eq(latestPlayable(4).id, 'column', 'dead ground is open but not built, so ENTER plays the column');
   eq(latestPlayable(1).id, 'breakout');
 });
 
@@ -233,4 +233,55 @@ check('repair bay: the AI takes a badly damaged mech to a bay in reach and keeps
   mechById(far, 'P1').pos = [1, 1];
   f.hp = Math.floor(f.maxHp * 0.7); // hurt, but not badly: it fights on
   assert(aiMoveFor(far, 'E1').intent !== 'E1 GOES TO REPAIR');
+});
+
+check('escort: the crawler drives three hexes along its road a move, stops short of anyone on the road, and is never asked to fire', () => {
+  const s = encounterBattle(encounterById('column'), 'pool');
+  const c = mechById(s, s.objective.escort), route = s.objective.route;
+  eq([c.pilot, c.crawler, sameHex(c.pos, route[0])], ['CRAWLER', true, true]);
+  eq(route.length, 29);
+  for (let i = 1; i < route.length; i++) eq(hexDist(...route[i - 1], ...route[i]), 1, 'the road is one joined line');
+  const go = aiMoveFor(s, c.id);
+  eq(go.plan.path, route.slice(1, 4));
+  moveMech(s, go.plan);
+  eq(crawlerToGo(s), route.length - 4);
+  mechById(s, 'E1').pos = route[5].slice(); // stand on the road two hexes ahead
+  const blocked = aiMoveFor(s, c.id);
+  eq([blocked.plan.path, blocked.intent], [[route[4]], `${c.id} BLOCKED BY E1`]);
+  mechById(s, 'E1').pos = route[4].slice(); // right in front: it waits
+  eq(aiMoveFor(s, c.id).plan.mode, 'stand');
+  eq(runAllowance(c), 0);
+  assert(!newFirePlanner(s, 'player').mechIds.includes(c.id), 'the crawler has no guns and is not asked');
+  assert(!aiPlanFire(s, 'player').shots.some(x => x.mechId === c.id), 'nor does it ever blow itself up');
+});
+
+check('escort: the crawler at the end of the road wins; the crawler destroyed or the round limit loses', () => {
+  const s = encounterBattle(encounterById('column'), 'pool');
+  const c = mechById(s, s.objective.escort), route = s.objective.route;
+  c.pos = route[route.length - 3].slice();
+  moveMech(s, { mechId: c.id, mode: 'walk', path: route.slice(-2) });
+  assert(finishIfOver(s));
+  eq([s.winner, s.reason], ['player', 'The crawler made it out of the canyon']);
+  const t = encounterBattle(encounterById('column'), 'pool');
+  mechById(t, t.objective.escort).alive = false;
+  objectiveSync(t, []);
+  assert(finishIfOver(t));
+  eq([t.winner, t.reason], ['enemy', 'The crawler was destroyed']);
+  const u = encounterBattle(encounterById('column'), 'pool');
+  u.round = u.objective.roundLimit;
+  endRound(u, fakeRng([], []));
+  eq([u.winner, u.reason], ['enemy', `Time ran out after round ${u.objective.roundLimit}: the crawler is still in the canyon`]);
+  assert(!OBJECTIVE_IDS.includes('escort'));
+});
+
+check('story: an AI playing the column wins often but not always (tuned for about 55%)', () => {
+  let won = 0;
+  const n = 60;
+  for (let seed = 1; seed <= n; seed++) {
+    const s = encounterBattle(encounterById('column'), 'pool');
+    runFight(s, new Rng(seed), 40);
+    assert(s.over, `seed ${seed} never finished`);
+    if (s.winner === 'player') won += 1;
+  }
+  assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
 });

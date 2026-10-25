@@ -260,6 +260,7 @@ function legsLost(mech) { return LEG_LOCS.filter(l => locationDown(mech, l)).len
 
 function walkAllowance(mech) {
   if (!mech.alive || mech.shutdown || mech.tower) return 0; // a gun tower (story) never moves
+  if (mech.crawler) return CRAWLER_SPEED;                   // the prison crawler (story) drives at its own pace, whatever its heat
   const lost = legsLost(mech);
   if (lost >= 2) return 0;
   const base = chassisById(mech.chassisId).speed;
@@ -269,7 +270,7 @@ function walkAllowance(mech) {
 
 function runAllowance(mech) {
   const walk = walkAllowance(mech);
-  if (walk === 0 || legsLost(mech) > 0 || mech.carrying) return 0;
+  if (walk === 0 || legsLost(mech) > 0 || mech.carrying || mech.crawler) return 0;
   return Math.floor(walk * RUN_FACTOR);
 }
 

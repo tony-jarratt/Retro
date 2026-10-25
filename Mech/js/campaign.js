@@ -49,9 +49,47 @@ const GARNET_ROWS = [
   'dddddRddddddccccBBBcccccc',
 ];
 
+// The Shale canyon: cliffs (peaks) along both sides with ledges (hills) under them, the shale floor, a creek, and the road the prison crawler
+// follows from the west edge to the east (Q). A repair bay up on the north ledge.
+const SHALE_ROWS = [
+  'MMMMHHHMMMMMMMHHHMMMMMMMHHHMM',
+  'MMHHHsHHMMMMHHssHHMMMMHHsHHMM',
+  'MHHsssssHHMHHssWssHHMHHsssHHM',
+  'HssRssssssHssssRssssHsssssssH',
+  'sssssMsssssssQssssssMssssssss',
+  'sssssssssQQQQsQQsQsssssssQQQQ',
+  'QQQQQQQQQsssssssQsQQsQQQQssss',
+  'ssssRsssssMsssssssssQssssssss',
+  'HsssssHHssssssHHss~~sssHHsssH',
+  'MHHssHHMHHssHHMMH~~ssHHMMHssM',
+  'MMHHHMMMMHHHMMMMMHHHHMMMMHHMM',
+  'MMMMMMMMMMMMMMMMMMMMMMMMMMMMM',
+];
+
+// The crawler's road: the shortest way from `from` to `to` over road (Q) hexes only. A road that does not join up is a MapError.
+function roadRoute(rows, from, to) {
+  const map = makeMap('road', rows);
+  const prev = new Map([[hexKey(from[0], from[1]), null]]);
+  let ring = [from];
+  while (ring.length && !prev.has(hexKey(to[0], to[1]))) {
+    const next = [];
+    for (const [c, r] of ring) for (const n of neighbours(map, c, r)) {
+      const key = hexKey(n.c, n.r);
+      if (map.tiles[n.r][n.c] !== 'Q' || prev.has(key)) continue;
+      prev.set(key, [c, r]); next.push([n.c, n.r]);
+    }
+    ring = next;
+  }
+  if (!prev.has(hexKey(to[0], to[1]))) throw new MapError('road', `The road does not join ${hexKey(from[0], from[1])} to ${hexKey(to[0], to[1])}`);
+  const route = [];
+  for (let at = to; at; at = prev.get(hexKey(at[0], at[1]))) route.unshift(at);
+  return route;
+}
+
 // ---------- the encounters ----------
 // ready: false means the encounter is written but not built yet (the story screen says so). Everything a battle needs is on a ready one:
 // map (rows, starts, facings), goal and roundLimit, squad, enemies, reserves ({ round, pos, facing, spec }: reinforcements), first (who moves first),
+// for an escort: crawler ({ from, to, spec }: the prison crawler drives along the road from `from` to `to`; it is the player's, with no guns),
 // and for a raid: towers ({ pos, spec }: gun towers, ids T1, T2...; they never move) and runner (the pilot who has to reach the hangar).
 const CAMPAIGN = [
   {
@@ -101,7 +139,30 @@ const CAMPAIGN = [
       { pos: [17, 9], spec: storyEnemy(4, [1, 0, 0], 0) },
     ],
   },
-  { id: 'column', title: 'THE COLUMN', place: 'The Shale canyon', ready: false, phrase: 'OPEN DOORS' },
+  {
+    id: 'column', title: 'THE COLUMN', place: 'The Shale canyon', ready: true,
+    briefing: [
+      'Three hundred Republic soldiers are being moved through the Shale canyon. The order calls it a redeployment of surplus labour.',
+      'We have stopped the column and opened the doors. Now we walk them out.',
+      'Keep the crawler moving. Anything on the road stops it, theirs or ours.',
+    ],
+    job: 'Get the prison crawler to the east end of the canyon road. It drives itself and cannot fight. If it is destroyed, or still in the canyon after round 14, the mission fails. Their reserve will come up the canyon to meet it.',
+    debrief: [
+      'The crawler grinds out of the canyon mouth with its doors hanging open and three hundred people walking beside it.',
+      'Among them, a colonel named HALE asks for a mech and a map. "You want to hurt them? I know where they keep the Model."',
+    ],
+    phrase: 'OPEN DOORS',
+    map: { name: 'THE SHALE CANYON', rows: SHALE_ROWS, playerStarts: [[1, 4], [2, 7], [0, 5]], playerFacing: 2, enemyStarts: [[8, 3], [11, 7]], enemyFacing: 5 },
+    goal: 'escort', roundLimit: 14, first: 'player',
+    crawler: { from: [0, 6], to: [28, 5], spec: storyEnemy(6, [0, 0, 0], 2) }, // a Monolith hull with no guns: big and easy to hit. Tuned with the escort and the reserve so the AI playing your side wins about 55% (armour 3 won 100%)
+    squad: [storyPilot('VOSS', 5, [2, 4, 0], 2), storyPilot('WREN', 1, [1, 1, 0], 2), storyPilot('OKAFOR', 2, [4, 0, 0], 2)],
+    enemyName: 'THE COLUMN ESCORT',
+    enemies: [storyEnemy(2, [2, 0, 0], 1), storyEnemy(2, [7, 0, 0], 1)],
+    reserves: [
+      { round: 3, pos: [28, 3], facing: 5, spec: storyEnemy(3, [2, 4, 0], 1) },
+      { round: 3, pos: [28, 7], facing: 5, spec: storyEnemy(1, [1, 1, 0], 0) },
+    ],
+  },
   { id: 'dead-ground', title: 'DEAD GROUND', place: 'The salt marsh', ready: false, phrase: 'SALT MARSH' },
   { id: 'lab', title: 'THE LAB', place: 'The Vantor research compound', ready: false, phrase: 'FIRST LIGHT' },
   { id: 'partner', title: 'THE PARTNER', place: "Partner Calloway's estate", ready: false, phrase: 'NO TERMS' },
@@ -135,11 +196,14 @@ function encounterScenario(enc) {
   const pads = hexesOf('P'), hangar = hexesOf('G');
   if (enc.goal === 'escape' && !pads.length) throw new MapError('exit', `Encounter ${enc.id}: an escape map needs landing pad (P) hexes`);
   if (enc.goal === 'raid' && !hangar.length) throw new MapError('hangar', `Encounter ${enc.id}: a raid map needs hangar (G) hexes`);
+  const route = enc.crawler ? roadRoute(enc.map.rows, enc.crawler.from, enc.crawler.to) : null;
+  if (enc.goal === 'escort' && !route) throw new BuildError('crawler', `Encounter ${enc.id}: an escort needs a crawler`);
   const runner = enc.goal === 'raid' ? 'P' + (enc.squad.findIndex(m => m.pilot === enc.runner) + 1) : null;
   if (runner === 'P0') throw new BuildError('runner', `Encounter ${enc.id}: the runner ${enc.runner} is not in the squad`);
   return { id: enc.id, name: enc.map.name, rows: enc.map.rows, playerStarts: enc.map.playerStarts, enemyStarts: enc.map.enemyStarts,
     playerFacing: enc.map.playerFacing, enemyFacing: enc.map.enemyFacing, exits: { player: pads, enemy: [] },
-    hangar, runner, targets: (enc.towers || []).map((t, i) => 'T' + (i + 1)) };
+    hangar, runner, targets: (enc.towers || []).map((t, i) => 'T' + (i + 1)),
+    route, escort: route ? 'P' + (enc.squad.length + 1) : null };
 }
 
 // A new battle for an encounter: the squad gets its pilots' names, the reinforcements wait in state.reserves for their round.
@@ -156,8 +220,15 @@ function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
     m.tower = true; m.name = 'GUN TOWER';
     return m;
   });
+  const extra = towers.slice();
+  if (enc.crawler) { // the prison crawler: the player's, after the squad, at the start of its road
+    checkCapacity(enc.crawler.spec);
+    const m = makeMech(enc.crawler.spec, { id: scenario.escort, side: 'player', pos: scenario.route[0], facing: enc.map.playerFacing, toHit: PLAYER_TO_HIT, model });
+    m.crawler = true; m.name = 'PRISON CRAWLER'; m.pilot = 'CRAWLER';
+    extra.push(m);
+  }
   const state = newBattle({ playerSpecs: enc.squad.map(m => m.spec), enemySpecs: enc.enemies, enemyToHit, first, model, scenario, goal: enc.goal });
-  if (towers.length) state.mechs = makeState(state.map, state.mechs.concat(towers), first).mechs; // makeState refuses two mechs on one hex
+  if (extra.length) state.mechs = makeState(state.map, state.mechs.concat(extra), first).mechs; // makeState refuses two mechs on one hex
   enc.squad.forEach((m, i) => { mechById(state, 'P' + (i + 1)).pilot = m.pilot; });
   state.objective.roundLimit = enc.roundLimit;
   state.enemyForce = enc.enemyName;
