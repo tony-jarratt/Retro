@@ -1,6 +1,6 @@
 'use strict';
 
-// The games on the menu, in the order they appear: by the year of the game that inspired each, then Hexfire.
+// The games on the menu, in the order they appear: by the year of the game that inspired each.
 // To add a game: put its folder (with an index.html inside) next to this file, add a screenshot
 // to thumbs/, then add one entry below. Every field is required; the menu shows an error naming
 // the entry if one is missing or wrong.
@@ -100,17 +100,5 @@ const GAMES = [
   //   accent: '#7ad84a',
   //   thumb: 'thumbs/clinic.jpg',
   //   inspiredBy: 'Theme Hospital (1997)',
-  // },
-  // Hexfire is hidden from the menu until it has been play-tested and its name cleared. Uncomment to restore (it goes last).
-  // {
-  //   id: 'mech',
-  //   title: 'Hexfire',
-  //   folder: 'Mech/',
-  //   tag: 'Mech tactics',
-  //   blurb: 'Hex-grid mech battles. Build a squad of up to three, pick a map and a win condition, then outmanoeuvre the enemy force turn by turn.',
-  //   players: '1 PLAYER',
-  //   controls: 'MOUSE + ARROWS / WASD',
-  //   accent: '#4aa8ff',
-  //   thumb: 'thumbs/mech.jpg',
   // },
 ];
