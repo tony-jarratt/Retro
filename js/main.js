@@ -20,6 +20,7 @@
 //   ?stopresult          stop the key script once the result screen is up
 //   ?damage=locations    the advanced damage model (hit locations, lost limbs) instead of the armour pool
 //   (none)               opens on the title screen: FREE PLAY (select a map and goal, then the mech bay) or STORY (the intro, then the story screen)
+//   ?playtest            the play-test switch (the same name in every game of the owner's): every story mission is open on the story screen
 //   ?story               opens on the story screen; ?mission=breakout on that mission's briefing (with ?fight, straight into its battle)
 //   ?code=XXXX-...       opens straight on the mech bay with that squad; ?intro plays the story intro
 //   ?map=urban&goal=flag the map (basin, urban, mountains) and win condition; the bay keeps these and ?code in the address
@@ -1219,7 +1220,8 @@ function applyTestHooks() {
     game.mapSize = 'large';
   }
   game.wantIntro = q.has('intro');
-  game.wantStory = q.has('story'); // ?story opens the story screen; ?mission=breakout its briefing (with ?fight, the battle)
+  game.wantStory = q.has('story');
+  if (q.has('playtest')) game.storyUnlocked = CAMPAIGN.length; // the arcade-wide play-test switch: every story mission is open (nothing is saved anyway) // ?story opens the story screen; ?mission=breakout its briefing (with ?fight, the battle)
   if (q.get('mission')) game.encounter = encounterById(q.get('mission'));
   if (q.get('holder')) game.holder = q.get('holder').toUpperCase(); // the finale: who holds the doors (?holder=wren)
   game.wantBay = !!q.get('code'); // a squad code in the address means a reload: straight to the bay
