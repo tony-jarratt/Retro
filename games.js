@@ -101,15 +101,16 @@ const GAMES = [
   //   thumb: 'thumbs/clinic.jpg',
   //   inspiredBy: 'Theme Hospital (1997)',
   // },
-  {
-    id: 'mech',
-    title: 'Hexfire',
-    folder: 'Mech/',
-    tag: 'Mech tactics',
-    blurb: 'Hex-grid mech battles. Build a squad of up to three, pick a map and a win condition, then outmanoeuvre the enemy force turn by turn.',
-    players: '1 PLAYER',
-    controls: 'MOUSE + ARROWS / WASD',
-    accent: '#4aa8ff',
-    thumb: 'thumbs/mech.jpg',
-  },
+  // Hexfire is hidden from the menu until it has been play-tested and its name cleared. Uncomment to restore (it goes last).
+  // {
+  //   id: 'mech',
+  //   title: 'Hexfire',
+  //   folder: 'Mech/',
+  //   tag: 'Mech tactics',
+  //   blurb: 'Hex-grid mech battles. Build a squad of up to three, pick a map and a win condition, then outmanoeuvre the enemy force turn by turn.',
+  //   players: '1 PLAYER',
+  //   controls: 'MOUSE + ARROWS / WASD',
+  //   accent: '#4aa8ff',
+  //   thumb: 'thumbs/mech.jpg',
+  // },
 ];
