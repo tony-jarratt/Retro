@@ -247,7 +247,21 @@ const TERRAIN = {
   'R': { name: 'rubble', cost: 2, cover: 0, blocks: false, height: 0, cool: 0 },
   'B': { name: 'building', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false },
   'M': { name: 'peak',     cost: 1, cover: 0, blocks: true, height: 2, cool: 0, passable: false },
+  // The story's own ground (the freight yard): concrete is clear ground by another look, a container stack is a building by another look,
+  // and a landing pad is clear ground marked for a dropship.
+  'c': { name: 'concrete',  cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
+  'C': { name: 'containers', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false },
+  'P': { name: 'landing pad', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
+  'd': { name: 'moon dust', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the depot's moon: clear ground
+  'G': { name: 'hangar',    cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the raid's goal hexes
+  'W': { name: 'repair bay', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, repair: true }, // see REPAIR_ARMOUR
 };
+
+// Repair bays (terrain with `repair`): a mech that stood still on one for the round (it may fire) is repaired at the end of the round: up to
+// REPAIR_ARMOUR armour points back (never above what it started with) and one weapon knocked out by a critical back online. Each repair uses
+// one of the bay's REPAIR_CHARGES; a mech with nothing to repair uses none. Armour is only repaired in the armour-pool game.
+const REPAIR_ARMOUR = 5;
+const REPAIR_CHARGES = 3;
 
 // Self-destruct: a mech may blow itself up in the fire phase instead of firing. Every mech in the six hexes around it,
 // friend or foe, takes this much damage (a hit like any other, so a location is rolled in the advanced game); the

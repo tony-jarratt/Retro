@@ -21,7 +21,9 @@ function makeMap(name, rows) {
       if (!TERRAIN[row[c]]) throw new MapError('terrain', `Map ${name}: unknown terrain "${row[c]}" at column ${c}, row ${r}`);
     }
   });
-  return { name, cols, rows: rows.length, tiles: rows.slice() };
+  const charges = {}; // repair bays: hex key -> repairs left (see REPAIR_CHARGES)
+  rows.forEach((row, r) => { for (let c = 0; c < cols; c++) if (TERRAIN[row[c]].repair) charges[hexKey(c, r)] = REPAIR_CHARGES; });
+  return { name, cols, rows: rows.length, tiles: rows.slice(), charges };
 }
 
 function inMap(map, c, r) { return c >= 0 && r >= 0 && c < map.cols && r < map.rows; }

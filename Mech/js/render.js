@@ -179,7 +179,46 @@ function drawSmoke(g, map, clock) {
   }
 }
 
+// Repair bays: a pip for each charge under the bay, lit while it is left; a used-up bay is greyed over.
+function drawRepairBays(g, map) {
+  for (const [key, left] of Object.entries(map.charges || {})) {
+    const [c, r] = key.split(',').map(Number);
+    const [x, y] = hexToScreen(c, r);
+    if (!left) fillHex(g, c, r, 'rgba(10,12,18,0.55)', null);
+    for (let i = 0; i < REPAIR_CHARGES; i++) {
+      const px = x + (i - (REPAIR_CHARGES - 1) / 2) * 9, py = y + HEX_R * 0.62;
+      g.fillStyle = '#000'; g.fillRect(px - 3.5, py - 3.5, 7, 7);
+      g.fillStyle = i < left ? '#7ee08a' : '#2b3340'; g.fillRect(px - 2.5, py - 2.5, 5, 5);
+    }
+  }
+}
+
+// A gun tower (story): a squat concrete emplacement whose turret turns to its target, or a broken stump once destroyed.
+function drawTowerAt(g, mech, x, y, facing, alpha, flash) {
+  const k = HEX_SCALE;
+  g.save();
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(4 * k, 8 * k, 26 * k, 18 * k, 0, 0, Math.PI * 2); g.fill();
+  const edge = mech.side === 'enemy' ? COLOURS.enemy : COLOURS.player;
+  if (!mech.alive) {
+    g.fillStyle = '#2a2a2e'; hexPathOn(g, 0, 0, 18 * k); g.fill();
+    g.fillStyle = '#4a4a50'; g.fillRect(-10 * k, -6 * k, 9 * k, 7 * k); g.fillRect(3 * k, -2 * k, 8 * k, 6 * k);
+    g.restore(); return;
+  }
+  g.fillStyle = '#6b6e75'; hexPathOn(g, 0, 0, 20 * k); g.fill();          // the base
+  g.strokeStyle = edge; g.lineWidth = 2; hexPathOn(g, 0, 0, 20 * k); g.stroke();
+  g.fillStyle = '#8d9098'; hexPathOn(g, 0, -3 * k, 14 * k); g.fill();     // the top
+  g.rotate(facing * Math.PI / 3);
+  g.fillStyle = '#2d3036'; g.fillRect(-3 * k, -26 * k, 6 * k, 20 * k);     // the barrel (direction 0 is up)
+  g.fillStyle = '#44474f'; g.beginPath(); g.arc(0, -3 * k, 9 * k, 0, Math.PI * 2); g.fill();
+  g.fillStyle = edge; g.beginPath(); g.arc(0, -3 * k, 3 * k, 0, Math.PI * 2); g.fill();
+  if (flash) { g.globalAlpha *= 0.6; g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0, -3 * k, 16 * k, 0, Math.PI * 2); g.fill(); }
+  g.restore();
+}
+
 function drawMechAt(g, mech, x, y, facing, alpha, flash) {
+  if (mech.tower) { drawTowerAt(g, mech, x, y, facing, alpha, flash); return; }
   g.save();
   g.globalAlpha = alpha === undefined ? 1 : alpha;
   g.translate(x, y);
@@ -238,6 +277,20 @@ function drawObjectiveOverlay(g, state, clock) {
       fillHex(g, o.flag.pos[0], o.flag.pos[1], `rgba(255,210,74,${0.10 + 0.10 * pulse})`, '#ffd24a', 2);
       drawFlagIcon(g, x - 4, y + 10, '#ffd24a');
     }
+  } else if (o.id === 'raid') { // the hangar lights up once the towers are down
+    const open = targetsLeft(state) === 0;
+    group(o.hangar, open ? `rgba(216,177,58,${0.10 + 0.12 * pulse})` : 'rgba(216,177,58,0.05)', open ? '#ffd24a' : 'rgba(216,177,58,0.5)', open ? 3 : 2);
+    const low = o.hangar.reduce((a, b) => (hexToScreen(...b)[1] > hexToScreen(...a)[1] ? b : a));
+    const [lx, ly] = hexToScreen(...low);
+    g.font = 'bold 11px ' + MONO; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = open ? '#ffd24a' : '#b9a46a';
+    const text = open ? `HANGAR: ${runnerName(state)}` : 'HANGAR (TOWERS FIRST)';
+    g.strokeText(text, lx - HEX_R, ly + HEX_R + 12); g.fillText(text, lx - HEX_R, ly + HEX_R + 12); g.textAlign = 'left';
+  } else if (o.id === 'escape') { // only the player has somewhere to get to
+    group(o.exits.player, `rgba(216,177,58,${0.08 + 0.10 * pulse})`, '#ffd24a', 3);
+    const low = o.exits.player.reduce((a, b) => (hexToScreen(...b)[1] > hexToScreen(...a)[1] ? b : a)); // the label goes under the pad, clear of the mechs' names
+    const [lx, ly] = hexToScreen(...low);
+    g.font = 'bold 11px ' + MONO; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a';
+    g.strokeText('DROPSHIP', lx, ly + HEX_R + 12); g.fillText('DROPSHIP', lx, ly + HEX_R + 12); g.textAlign = 'left';
   } else if (o.id === 'exit') {
     group(o.exits.player, `rgba(79,179,217,${0.10 + 0.08 * pulse})`, COLOURS.player, 3); label(o.exits.player.slice(0, 1), 'YOUR EXIT', COLOURS.player);
     group(o.exits.enemy, `rgba(255,90,74,${0.10 + 0.08 * pulse})`, COLOURS.enemy, 3); label(o.exits.enemy.slice(0, 1), 'ENEMY EXIT', COLOURS.enemy);
@@ -250,9 +303,10 @@ function drawMechLabel(g, mech, x, y) {
   const f = mechHealth(mech);
   rect(g, f > 0.6 ? '#2f9e63' : f > 0.3 ? '#c9a227' : '#d1642a', bx, by, w * f, h);
   g.font = FONT_SMALL; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000';
-  g.strokeText(mech.id, x, y - HEX_R + 10);
+  const name = callSign(mech);
+  g.strokeText(name, x, y - HEX_R + 10);
   g.fillStyle = mech.side === 'player' ? COLOURS.player : COLOURS.enemy;
-  g.fillText(mech.id, x, y - HEX_R + 10);
+  g.fillText(name, x, y - HEX_R + 10);
   if (mech.shutdown) { g.fillStyle = COLOURS.warn; g.strokeText('SHUT DOWN', x, y + 4); g.fillText('SHUT DOWN', x, y + 4); }
   g.textAlign = 'left';
   if (mech.carrying) drawFlagIcon(g, x + HEX_R * 0.55, y + 4, '#ffd24a'); // the carrier shows the flag
@@ -305,10 +359,10 @@ function drawMechCard(g, mech, x, y, opts = {}) {
   const side = mech.side === 'player' ? COLOURS.player : COLOURS.enemy;
   if (opts.current) { g.strokeStyle = side; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, CARD_H - 2); }
   g.textAlign = 'left'; g.font = FONT; g.fillStyle = side;
-  g.fillText(`${mech.id}  ${mech.name}`, x + 10, y + 18);
+  g.fillText(mech.pilot ? mech.pilot : `${mech.id}  ${mech.name}`, x + 10, y + 18); // a story pilot's name, or the id and chassis
   g.font = FONT_SMALL; g.fillStyle = !mech.alive || mech.shutdown ? '#ff7b6b' : COLOURS.dim;
   g.textAlign = 'right';
-  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : classOf(mech).toUpperCase(), x + w - 10, y + 18);
+  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.tower ? 'FIXED' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
   g.textAlign = 'left';
 
   // armour: points in the simple game, a percentage in the advanced one
@@ -445,7 +499,7 @@ function drawInfoBox(g, hex, lines) {
   for (const l of lines) {
     if (l.style === 'title') { g.font = FONT; g.fillStyle = COLOURS.text; }
     else if (l.style === 'big') { g.font = 'bold 18px ' + MONO; g.fillStyle = COLOURS.warn; ly += 3; }
-    else { g.font = FONT_SMALL; g.fillStyle = l.style === 'warn' ? COLOURS.warn : l.style === 'dim' ? COLOURS.dim : COLOURS.text; }
+    else { g.font = FONT_SMALL; g.fillStyle = l.style === 'warn' ? COLOURS.warn : l.style === 'dim' ? COLOURS.dim : l.style === 'good' ? '#7ee08a' : COLOURS.text; }
     g.fillText(l.t, x + 10, ly);
     ly += heights[l.style];
   }
@@ -514,7 +568,7 @@ function drawResult(g, result) {
   g.font = FONT; g.fillStyle = COLOURS.text;
   result.lines.forEach((line, i) => g.fillText(line, VIEW_W / 2, 290 + i * 24));
   g.fillStyle = COLOURS.warn;
-  g.fillText('ENTER = new battle    R = replay this seed    B = edit squad    M = new map or goal', VIEW_W / 2, 290 + result.lines.length * 24 + 40);
+  g.fillText(result.hint, VIEW_W / 2, 290 + result.lines.length * 24 + 40);
   g.textAlign = 'left';
 }
 
@@ -627,7 +681,7 @@ function drawTitleButton(g, b, hovered, clock) {
   g.textAlign = 'left';
 }
 
-// ---------- the select screen and the campaign placeholder ----------
+// ---------- the select screen ----------
 // A little picture of a map: each hex a small hex in its terrain colour, with a blue dot on each of your starts and a red one on each of theirs.
 function drawMapThumb(g, scenario, x, y, maxW, maxH) {
   const rows = scenario.rows;
@@ -679,13 +733,84 @@ function drawSelect(g, view) {
   g.font = FONT; g.fillStyle = view.statusBad ? '#ff7b6b' : COLOURS.warn; g.fillText(view.status || '', 16, 606);
 }
 
-function drawCampaign(g, view) {
+// ---------- the story's screens (campaign.js) ----------
+const STORY_FONT = 'italic 21px Georgia, "Times New Roman", serif';
+
+// The story screen. view = { buttons, hover, status, statusBad }. One row per encounter: its number, then its title and place once it is open.
+function drawStory(g, view) {
   g.fillStyle = '#000'; g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.textAlign = 'center';
-  g.font = 'italic 24px Georgia, "Times New Roman", serif'; g.fillStyle = INTRO_COLOUR;
-  g.fillText('The campaign is not written yet.', VIEW_W / 2, 320);
-  g.font = FONT; g.fillStyle = COLOURS.dim; g.fillText('Free play has the maps and the win conditions to try in the meantime.', VIEW_W / 2, 360);
+  g.font = 'bold 22px ' + MONO; g.fillStyle = COLOURS.player; g.fillText('ONE LAST MISSION', VIEW_W / 2, 44);
+  g.font = 'italic 16px Georgia, "Times New Roman", serif'; g.fillStyle = INTRO_COLOUR; g.fillText('You fought for an ideal. Now you fight for each other.', VIEW_W / 2, 72);
   g.textAlign = 'left';
+  for (const b of view.buttons) {
+    const hovered = b.id === view.hover && b.state !== 'disabled';
+    if (!b.id.startsWith('mission:')) { drawBayButton(g, b, hovered); continue; }
+    g.fillStyle = hovered ? 'rgba(79,179,217,0.18)' : b.open ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)'; g.fillRect(b.x, b.y, b.w, b.h);
+    g.strokeStyle = hovered ? COLOURS.player : COLOURS.panelEdge; g.lineWidth = 1; g.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    g.font = 'bold 26px ' + MONO; g.fillStyle = b.open ? COLOURS.player : '#3a4558'; g.fillText(String(b.number), b.x + 18, b.y + 37);
+    g.font = 'bold 17px ' + MONO; g.fillStyle = b.state === 'normal' ? COLOURS.text : '#66738a'; g.fillText(b.label, b.x + 64, b.y + 25);
+    g.font = 'italic 14px Georgia, "Times New Roman", serif'; g.fillStyle = b.open ? INTRO_COLOUR : '#3a4558'; g.fillText(b.sub, b.x + 64, b.y + 44);
+    if (b.open && b.state === 'disabled') { g.font = FONT_SMALL; g.fillStyle = COLOURS.warn; g.textAlign = 'right'; g.fillText('NOT BUILT YET', b.x + b.w - 16, b.y + 33); g.textAlign = 'left'; }
+  }
+  const tip = view.buttons.find(b => b.id === view.hover);
+  g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.textAlign = 'center';
+  g.fillText(tip ? tip.tip : 'ENTER = play the latest mission    P = type an access phrase    ESC = back', VIEW_W / 2, 586);
+  g.font = FONT; g.fillStyle = view.statusBad ? '#ff7b6b' : '#7ee08a'; g.fillText(view.status || '', VIEW_W / 2, 606);
+  g.textAlign = 'left';
+}
+
+// The briefing. view = { enc, ms, buttons, hover }: the mission's name, its lines fading in one by one, then the squad and the job.
+function drawBriefing(g, view) {
+  const enc = view.enc, n = CAMPAIGN.indexOf(enc) + 1;
+  g.fillStyle = '#000'; g.fillRect(0, 0, VIEW_W, VIEW_H);
+  g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText(`MISSION ${n} OF ${CAMPAIGN.length}`, 120, 70);
+  g.font = 'bold 30px ' + MONO; g.fillStyle = COLOURS.text; g.fillText(enc.title, 120, 106);
+  g.font = 'italic 15px Georgia, "Times New Roman", serif'; g.fillStyle = COLOURS.dim; g.fillText(enc.place, 120, 132);
+  g.font = STORY_FONT; g.fillStyle = INTRO_COLOUR;
+  let y = 196;
+  enc.briefing.forEach((text, i) => {
+    g.globalAlpha = briefingAlpha(i, view.ms);
+    for (const row of wrapWords(g, text, 760)) { g.fillText(row, 120, y); y += 30; }
+    y += 14;
+  });
+  g.globalAlpha = briefingAlpha(enc.briefing.length, view.ms); // the squad and the job come in after the last line
+  y = Math.max(y + 10, 380);
+  g.strokeStyle = COLOURS.panelEdge; g.beginPath(); g.moveTo(120, y - 22); g.lineTo(904, y - 22); g.stroke();
+  g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText('YOUR SQUAD', 120, y); g.fillText('THE JOB', 520, y);
+  squadLines(enc).forEach((m, i) => {
+    g.font = FONT; g.fillStyle = COLOURS.player; g.fillText(m.pilot, 120, y + 24 + i * 34);
+    g.font = FONT_SMALL; g.fillStyle = COLOURS.text; g.fillText(`${m.chassis}   ${m.weapons}`, 120, y + 39 + i * 34);
+  });
+  g.font = FONT; g.fillStyle = COLOURS.text;
+  wrapWords(g, enc.job, 384).forEach((row, i) => g.fillText(row, 520, y + 24 + i * 19));
+  g.globalAlpha = 1;
+  for (const b of view.buttons) drawBayButton(g, b, b.id === view.hover);
+}
+
+// The debrief after a win. view = { enc, ms, buttons, hover, last }: what happened, then the access phrase that opens the next mission.
+function drawDebrief(g, view) {
+  const enc = view.enc;
+  g.fillStyle = '#000'; g.fillRect(0, 0, VIEW_W, VIEW_H);
+  g.font = 'bold 30px ' + MONO; g.fillStyle = COLOURS.text; g.fillText(enc.title, 120, 106);
+  g.font = 'bold 14px ' + MONO; g.fillStyle = '#7ee08a'; g.fillText('MISSION COMPLETE', 120, 132);
+  g.font = STORY_FONT; g.fillStyle = INTRO_COLOUR;
+  let y = 196;
+  enc.debrief.forEach((text, i) => {
+    g.globalAlpha = briefingAlpha(i, view.ms);
+    for (const row of wrapWords(g, text, 760)) { g.fillText(row, 120, y); y += 30; }
+    y += 14;
+  });
+  g.globalAlpha = briefingAlpha(enc.debrief.length, view.ms);
+  g.textAlign = 'center';
+  if (view.last || !enc.phrase) {
+    g.font = STORY_FONT; g.fillStyle = INTRO_COLOUR; g.fillText('The end.', VIEW_W / 2, 470);
+  } else {
+    g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText('ACCESS PHRASE', VIEW_W / 2, 430);
+    g.font = 'bold 40px ' + MONO; g.fillStyle = '#ffd24a'; g.fillText(enc.phrase.split('').join(' '), VIEW_W / 2, 480);
+    g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.fillText('Write it down. On the story screen it opens the next mission, today or any other day.', VIEW_W / 2, 512);
+  }
+  g.textAlign = 'left'; g.globalAlpha = 1;
   for (const b of view.buttons) drawBayButton(g, b, b.id === view.hover);
 }
 
@@ -707,8 +832,8 @@ function drawBayButton(g, b, hovered) {
   g.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
   g.fillStyle = b.state === 'disabled' ? '#66738a' : COLOURS.text;
   const tall = b.h >= 30 && b.sub;
-  if (b.id === 'fight') g.font = 'bold 22px ' + MONO; else g.font = FONT;
-  if (b.id === 'fight' || b.id === 'copy' || b.id === 'paste' || b.label.length <= 2 || b.id.startsWith('difficulty') || b.id.startsWith('remove')) {
+  if (b.id === 'fight' || b.id === 'begin') g.font = 'bold 22px ' + MONO; else g.font = FONT;
+  if (b.id === 'fight' || b.id === 'begin' || b.id === 'copy' || b.id === 'paste' || b.label.length <= 2 || b.id.startsWith('difficulty') || b.id.startsWith('remove')) {
     g.textAlign = 'center';
     g.fillText(b.label, b.x + b.w / 2, b.y + (tall ? 15 : b.h / 2 + 5));
     if (tall) { g.font = '10px ' + MONO; g.fillStyle = b.state === 'disabled' ? '#66738a' : COLOURS.dim; g.fillText(b.sub, b.x + b.w / 2, b.y + b.h - 6); }
@@ -854,6 +979,7 @@ function drawFrame(g, view) {
     drawMechLabel(g, mech, x, y);
   }
 
+  drawRepairBays(g, state.map);
   drawSmoke(g, state.map, view.clock);
   for (const id of view.destruct || []) { // a mech that will self-destruct: its blast radius, pulsing red
     const bomber = mechById(state, id);

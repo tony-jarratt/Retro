@@ -1,6 +1,6 @@
 'use strict';
 
-// The menus: the title screen's two buttons, the free play select screen (a map and a win condition) and the campaign placeholder.
+// The menus: the title screen's two buttons and the free play select screen (a map and a win condition). The story's screens are in campaign.js.
 // Pure logic and layout like bay.js (no drawing, no DOM), so it can be tested; render.js draws it, main.js wires it.
 // A button is { id, x, y, w, h, label, sub, state: 'normal' | 'selected' | 'disabled', tip, action }; bayButtonAt (bay.js) finds the
 // one under a point, and a disabled button explains itself in its tip.
@@ -39,10 +39,6 @@ function selectButtons(sel) {
   out.push({ id: 'back', x: 16, y: 620, w: 140, h: 44, label: 'BACK', sub: '', state: 'normal', tip: 'Back to the title screen', action: { type: 'back' } });
   out.push({ id: 'continue', x: 818, y: 616, w: 190, h: 52, label: 'CONTINUE', sub: '', state: 'normal', tip: 'Build your squad for this map and goal (ENTER)', action: { type: 'continue' } });
   return out;
-}
-
-function campaignButtons() {
-  return [{ id: 'back', x: 16, y: 620, w: 140, h: 44, label: 'BACK', sub: '', state: 'normal', tip: 'Back to the title screen', action: { type: 'back' } }];
 }
 
 // Applies a map or win condition card to the selection. A disabled card refuses with its reason, as in the bay. Returns a note.

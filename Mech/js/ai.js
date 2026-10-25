@@ -13,7 +13,9 @@
 const AI_RANGE = 4;          // the range, in hexes, it tries to hold
 const AI_STAND_HEAT = 14;    // at this heat it stands still to cool
 const AI_HEAT_CAP = 26;      // it holds a weapon rather than go above this heat
-const AI_NO_VIEW_PENALTY = 3; // when fine-tuning, a hex with no line of sight to the target counts as this many hexes further off
+const AI_NO_VIEW_PENALTY = 3;
+const AI_REPAIR_BELOW = 0.5;  // a mech below this share of its armour, or with a weapon knocked out, goes to a repair bay...
+const AI_REPAIR_RANGE = 8;    // ...if one with charges left is within this many hexes // when fine-tuning, a hex with no line of sight to the target counts as this many hexes further off
 
 // Roles come from the weight class. Lights are raiders: they want water (cooling lets them keep firing). Heavies and
 // assaults are anchors: they want cover (woods hide them from lasers). Mediums are flexible: they value either, so they
@@ -42,6 +44,7 @@ function pathWithin(map, path, allowance) {
 // nearest it can reach), whether it should run, a line for the screen, and how close (in hexes) counts as there (0 = on one of them).
 // Roles, so the side does not all do the same thing:
 //   exit   every mech heads for its exit, running when it can (the whole squad has to get there, so nobody waits behind)
+//   escape (story) the player's side runs for its exit as above; the enemy has no goal and hunts
 //   hill   every mech goes for the hill (a mech already on it holds it)
 //   flag   the mech carrying the flag walks it home; with a loose flag the nearest mech fetches it; with a friendly carrier the nearest other
 //          mech escorts it; a mech left over (the slowest, when there are at least two of them) guards its own base. When the enemy has
@@ -51,6 +54,13 @@ function aiGoalFor(state, mech) {
   if (!o || o.id === 'annihilation') return null;
   const mobile = livingMechs(state, mech.side).filter(m => !m.shutdown && walkAllowance(m) > 0);
   const near = (m, pos) => hexDist(m.pos[0], m.pos[1], pos[0], pos[1]);
+  if (o.id === 'raid') { // a story goal: when the AI plays the player's side (the tests) it fights until the towers are down, then the runner goes in
+    if (mech.side !== 'player' || mech.id !== o.runner || targetsLeft(state) > 0) return null;
+    return { hexes: o.hangar, run: true, why: 'heads for the hangar', intent: `${mech.id} HEADS FOR THE HANGAR`, hold: 0 };
+  }
+  if (o.id === 'escape') { // a story goal: the player's side runs for the exit (when the AI plays it, in the tests); the enemy just hunts
+    return mech.side === 'player' ? { hexes: o.exits.player, run: true, why: 'heads for the exit', intent: `${mech.id} HEADS FOR THE EXIT`, hold: 0 } : null;
+  }
   if (o.id === 'exit') {
     return { hexes: o.exits[mech.side], run: true, why: 'heads for the exit', intent: `${mech.id} HEADS FOR THE EXIT`, hold: 0 };
   }
@@ -76,6 +86,20 @@ function aiGoalFor(state, mech) {
     }
   }
   return null;
+}
+
+// A repair bay as a goal (see repairAtBays): a mech already on a bay with charges stays while it has anything to fix; a badly damaged one
+// (under AI_REPAIR_BELOW of its armour, or a weapon knocked out) heads for the nearest bay with charges within AI_REPAIR_RANGE. Otherwise null.
+function aiRepairGoal(state, mech) {
+  const charges = state.map.charges || {};
+  const broken = mech.weapons.some(w => w.id !== 0 && w.off);
+  const hurt = mech.model === 'pool' && mech.hp < mech.maxHp;
+  const here = charges[hexKey(mech.pos[0], mech.pos[1])];
+  if (here > 0 && (hurt || broken)) return { hexes: [mech.pos], run: false, why: 'repairs on the bay', intent: `${mech.id} REPAIRS`, hold: 0 };
+  if (!broken && !(mech.model === 'pool' && mech.hp < mech.maxHp * AI_REPAIR_BELOW)) return null;
+  const bays = Object.keys(charges).filter(k => charges[k] > 0).map(k => k.split(',').map(Number)).filter(([c, r]) => hexDist(mech.pos[0], mech.pos[1], c, r) <= AI_REPAIR_RANGE);
+  if (!bays.length) return null;
+  return { hexes: bays, run: false, why: 'goes to a repair bay', intent: `${mech.id} GOES TO REPAIR`, hold: 0 };
 }
 
 // Moves toward a goal along the cheapest route across the whole map, as far as one move allows (a run if it should run and can). Returns
@@ -120,6 +144,8 @@ function aiMoveFor(state, mechId) {
   if (mech.heat >= AI_STAND_HEAT) return stand(`cooling down at heat ${mech.heat}`);
 
   const blocked = occupiedKeys(state, mech.id);
+  const repair = aiRepairGoal(state, mech);
+  if (repair) { const moved = aiMoveToGoal(state, mech, repair, blocked); if (moved) return moved; } // (a bay someone stands on cannot be reached)
   const goal = aiGoalFor(state, mech);
   if (goal) { const moved = aiMoveToGoal(state, mech, goal, blocked); if (moved) return moved; }
 

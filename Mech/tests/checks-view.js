@@ -270,7 +270,10 @@ check('view: every map builds, fits the screen and draws every terrain, and the 
   const g = c.getContext('2d');
   drawTitleCard(g, 1, null, titleButtons(0), 'story');
   drawSelect(g, { buttons: selectButtons(newMenuSelection('urban', 'annihilation')), hover: 'goal:flag', status: 'x', statusBad: true });
-  drawCampaign(g, { buttons: campaignButtons(), hover: 'back' });
+  drawStory(g, { buttons: storyButtons(2), hover: 'mission:breakout', status: 'x', statusBad: false });
+  drawBriefing(g, { enc: CAMPAIGN[0], ms: 99999, buttons: briefingButtons(), hover: 'begin' });
+  drawDebrief(g, { enc: CAMPAIGN[0], ms: 99999, buttons: debriefButtons(), hover: null, last: false });
+  drawFrame(g, viewFor(encounterBattle(CAMPAIGN[0], 'pool'), 'P1'));
   const bay = newBay(BAY_SQUAD, 'normal');
   bay.scenarioId = 'mountains';
   drawBay(g, { bay, report: bayReport(bay), buttons: bayButtons(bay), hover: 'change', status: '', statusBad: false });

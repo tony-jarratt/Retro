@@ -19,7 +19,8 @@
 //   ?turbo=300           run that many logic ticks per drawn frame (with ?dt=0.1: a whole fight in a few frames)
 //   ?stopresult          stop the key script once the result screen is up
 //   ?damage=locations    the advanced damage model (hit locations, lost limbs) instead of the armour pool
-//   (none)               opens on the title screen: FREE PLAY (select a map and goal, then the mech bay) or STORY (the intro, then the campaign)
+//   (none)               opens on the title screen: FREE PLAY (select a map and goal, then the mech bay) or STORY (the intro, then the story screen)
+//   ?story               opens on the story screen; ?mission=breakout on that mission's briefing (with ?fight, straight into its battle)
 //   ?code=XXXX-...       opens straight on the mech bay with that squad; ?intro plays the story intro
 //   ?map=urban&goal=flag the map (basin, urban, mountains) and win condition; the bay keeps these and ?code in the address
 //   ?enemy=gunline       a fixed enemy force, by name or number (otherwise a random one each battle, shown in the mech bay)
@@ -69,6 +70,7 @@ const game = {
   state: null,
   lastIntent: {},         // mech id -> the goal line the computer last announced for it
   enemyShots: [],         // the enemy's shots for the coming combat step, planned before yours are asked about
+  encounter: null, storyUnlocked: 1, introSeen: false, // the story mission being played (campaign.js), how many are open, and whether the intro has played
   scrollCur: { x: 0, y: 0 }, scrollTarget: null, userScrolled: false, showMini: true, edgeScroll: false, // the view of a map bigger than the screen (view.js)
   mouse: [0, 0], drag: null, miniDrag: false, suppressClick: false, frameKey: '',
   bay: null, bayHover: null, bayStatus: '', bayStatusBad: false, // the mech bay (bay.js)
@@ -109,26 +111,56 @@ function startIntro() {
   game.mode = 'intro';
   game.introT0 = game.clock;
 }
+function introDone() { game.introSeen = true; showStory(); }
 
 function showTitle() { game.mode = 'title'; game.titleT0 = game.clock; game.titleFocus = 0; game.menuHover = null; }
 
-// ---------- the menus: title, select (a map and a win condition), campaign placeholder ----------
+// ---------- the menus: title, select (a map and a win condition), and the story's screens ----------
 const MENU_DEFAULT_SIZE = 'large'; // the select screen starts on the large maps (a battle started some other way, such as ?fight, still defaults to small)
 function menuSelection() { // the map and win condition being chosen
   if (!game.menuSel) game.menuSel = newMenuSelection(game.scenarioId || DEFAULT_SCENARIO_ID, game.goal || DEFAULT_OBJECTIVE_ID, game.mapSize || MENU_DEFAULT_SIZE);
   return game.menuSel;
 }
 
-function showSelect() { game.menuSel = null; menuSelection(); game.mode = 'select'; game.menuHover = null; game.menuStatus = ''; game.menuStatusBad = false; }
-function showCampaign() { game.mode = 'campaign'; game.menuHover = null; }
+function showSelect() { game.encounter = null; game.menuSel = null; menuSelection(); game.mode = 'select'; game.menuHover = null; game.menuStatus = ''; game.menuStatusBad = false; }
+
+// ---------- the story (campaign.js) ----------
+// The story screen lists the encounters; one opens on its briefing, BEGIN fights it, and a win shows the debrief with the access phrase for the
+// next. Nothing is saved: game.storyUnlocked counts the encounters open in this visit, and an access phrase opens more.
+function showStory() { game.encounter = null; game.mode = 'story'; game.menuHover = null; game.menuStatus = ''; game.menuStatusBad = false; }
+function storyFromTitle() { if (game.introSeen) showStory(); else startIntro(); } // the intro plays the first time only
+function showBriefing(enc) { game.encounter = enc; game.mode = 'briefing'; game.briefT0 = game.clock; game.menuHover = null; }
+function showDebrief() {
+  const i = CAMPAIGN.indexOf(game.encounter);
+  game.storyUnlocked = Math.max(game.storyUnlocked, i + 2); // winning opens the next one, for this visit
+  game.mode = 'debrief'; game.briefT0 = game.clock; game.menuHover = null;
+}
+function enterPhrase() {
+  const text = prompt('Type an access phrase:', ''); // a plain browser box: typing and pasting always work here
+  if (text === null) return;
+  try {
+    const open = phraseUnlocks(text);
+    game.storyUnlocked = Math.max(game.storyUnlocked, open);
+    game.menuStatus = `Accepted. ${CAMPAIGN[Math.min(open, CAMPAIGN.length) - 1].title} is open.`; game.menuStatusBad = false;
+  } catch (err) {
+    if (!(err instanceof BuildError)) throw err;
+    game.menuStatus = err.message; game.menuStatusBad = true;
+  }
+}
+function playLatest() {
+  const enc = latestPlayable(game.storyUnlocked);
+  if (enc) showBriefing(enc); else { game.menuStatus = 'No mission open is built yet.'; game.menuStatusBad = true; }
+}
 
 function menuButtonList() {
   if (game.mode === 'title') return titleButtons(game.titleFocus);
   if (game.mode === 'select') return selectButtons(menuSelection());
-  if (game.mode === 'campaign') return campaignButtons();
+  if (game.mode === 'story') return storyButtons(game.storyUnlocked);
+  if (game.mode === 'briefing') return briefingButtons();
+  if (game.mode === 'debrief') return debriefButtons();
   throw new RulesError('menu', `There is no menu in mode "${game.mode}"`);
 }
-function inMenu() { return game.mode === 'title' || game.mode === 'select' || game.mode === 'campaign'; }
+function inMenu() { return ['title', 'select', 'story', 'briefing', 'debrief'].includes(game.mode); }
 
 function continueToBay() {
   const sel = menuSelection();
@@ -141,7 +173,10 @@ function menuClick(b) {
   if (b.state === 'disabled') { game.menuStatus = b.tip; game.menuStatusBad = true; return; }
   const type = b.action.type;
   if (type === 'play') showSelect();
-  else if (type === 'story') startIntro();
+  else if (type === 'story') { if (game.mode === 'title') storyFromTitle(); else showStory(); }
+  else if (type === 'mission') showBriefing(encounterById(b.action.id));
+  else if (type === 'phrase') enterPhrase();
+  else if (type === 'begin') newGame();
   else if (type === 'back') showTitle();
   else if (type === 'continue') continueToBay();
   else { game.menuStatus = selectPress(menuSelection(), b); game.menuStatusBad = false; }
@@ -149,6 +184,7 @@ function menuClick(b) {
 
 // ---------- the mech bay ----------
 function openBay() {
+  game.encounter = null;
   if (!game.bay) game.bay = newBay(game.squad || DEFAULT_SQUADS[game.difficulty || DEFAULT_DIFFICULTY] || WARDEN_SQUAD, game.difficulty || DEFAULT_DIFFICULTY);
   game.bay.scenarioId = game.scenarioId || DEFAULT_SCENARIO_ID; game.bay.goal = game.goal || DEFAULT_OBJECTIVE_ID; game.bay.mapSize = game.mapSize || 'small';
   game.bay.enemyIndex = game.fixedEnemy && game.enemyIndex !== undefined ? game.enemyIndex : Math.floor(Math.random() * ENEMY_FORCES[game.bay.difficulty].length); // a fresh enemy each time the bay opens
@@ -264,7 +300,9 @@ function newGame(seed, keepEnemy) {
   const difficulty = game.difficulty || DEFAULT_DIFFICULTY;
   if (!game.fixedEnemy && seed === undefined && !keepEnemy) game.enemyIndex = Math.floor(Math.random() * ENEMY_FORCES[difficulty].length);
   if (game.enemyIndex === undefined) game.enemyIndex = pickEnemyForce(difficulty, game.seed);
-  game.state = battleFor(game.squad || DEFAULT_SQUADS[difficulty] || WARDEN_SQUAD, difficulty, first, game.damageModel || DEFAULT_DAMAGE_MODEL, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small'), game.goal || DEFAULT_OBJECTIVE_ID, game.enemyIndex);
+  const enc = game.encounter;
+  game.state = enc ? encounterBattle(enc, game.damageModel || DEFAULT_DAMAGE_MODEL, enc.first || first)
+    : battleFor(game.squad || DEFAULT_SQUADS[difficulty] || WARDEN_SQUAD, difficulty, first, game.damageModel || DEFAULT_DAMAGE_MODEL, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small'), game.goal || DEFAULT_OBJECTIVE_ID, game.enemyIndex);
   for (const [id, c, r] of game.placements || []) mechById(game.state, id).pos = [c, r]; // the ?at= test hook
   for (const [c, r] of game.smokeHexes || []) addSmoke(game.state.map, smokeHexes(game.state.map, c, r), SMOKE_ROUNDS); // the ?smoke= test hook
   game.shown = null; game.anim = null; game.volley = null; game.planner = null; game.active = null;
@@ -272,10 +310,16 @@ function newGame(seed, keepEnemy) {
   game.moveEndsBattle = false; game.lastIntent = {}; game.enemyShots = [];
   game.scrollCur = { x: 0, y: 0 }; game.scrollTarget = null; game.userScrolled = false; game.drag = null; game.miniDrag = false; game.frameKey = '';
   const goal = OBJECTIVES[game.state.objective.id]; // until the first combat the log panel says what the battle is for
-  game.logHeader = 'GOAL: ' + goal.name;
-  for (const line of wrapText(goal.blurb, 30)) game.log.push(line);
-  if (goal.roundLimit) game.log.push(`Time limit: ${goal.roundLimit} rounds.`);
-  game.log.push(first === 'player' ? 'COIN TOSS: you move first.' : 'COIN TOSS: the enemy moves first.'); // luck of the draw, once, at the start
+  if (enc) { // a story mission: its own words, and who moves first is part of the mission
+    game.logHeader = 'MISSION: ' + enc.title;
+    for (const line of wrapText(enc.job, 30)) game.log.push(line);
+    game.log.push(game.state.first === 'player' ? 'You move first.' : 'The enemy moves first.');
+  } else {
+    game.logHeader = 'GOAL: ' + goal.name;
+    for (const line of wrapText(goal.blurb, 30)) game.log.push(line);
+    if (goal.roundLimit) game.log.push(`Time limit: ${goal.roundLimit} rounds.`);
+    game.log.push(first === 'player' ? 'COIN TOSS: you move first.' : 'COIN TOSS: the enemy moves first.'); // luck of the draw, once, at the start
+  }
   fxReset();
   buildMapCanvas(game.state.map);
   if (game.scrollHook) { scrollTo(game.scrollHook[0], game.scrollHook[1], true); game.fixedScroll = true; } // ?scroll=x,y: the camera stays where the hook put it
@@ -300,11 +344,18 @@ function logObjectiveEvents(events) {
     else if (e.type === 'flag-dropped') logLine(`${e.mechId} DROPS THE FLAG`);
     else if (e.type === 'flag-captured') logLine(`${e.mechId} CAPTURES THE FLAG`);
     else if (e.type === 'exit-reached') logLine(`${e.mechId} REACHES THE EXIT`);
+    else if (e.type === 'hangar') logLine(`${e.mechId} IS IN THE HANGAR`);
     else if (e.type === 'score') logLine(`${sideName(e.side)} HOLD THE HILL: ${e.points}`);
   }
 }
 
-function logLine(text) { game.log.push(text); if (game.log.length > LOG_MAX) game.log.splice(0, game.log.length - LOG_MAX); } // oldest first
+// In the story your mechs go by their pilots' names: every P1, P2... in a line of text becomes the pilot's name (the enemy keeps its ids).
+function named(text) {
+  if (!game.state || !game.encounter) return text;
+  return text.replace(/\bP[0-9]+\b/g, id => { const m = game.state.mechs.find(x => x.id === id); return m ? callSign(m) : id; });
+}
+
+function logLine(text) { game.log.push(named(text)); if (game.log.length > LOG_MAX) game.log.splice(0, game.log.length - LOG_MAX); } // oldest first
 
 function debugNotes(notes) { for (const n of notes) console.debug('AI: ' + n); }
 
@@ -336,7 +387,7 @@ function nextStep() {
   const step = currentStep();
   game.status = step.kind === 'fire' ? 'Combat: both sides fire at once.' : `${step.side === 'player' ? 'Your' : 'Enemy'} move.`;
   if (step.kind === 'move') {
-    game.todo = livingMechs(game.state, step.side).map(m => m.id);
+    game.todo = livingMechs(game.state, step.side).filter(m => !m.tower).map(m => m.id); // gun towers never move, so they are not asked
     pause(BANNER_SECONDS, nextMover);
   } else {
     pause(BANNER_SECONDS, beginFire);
@@ -390,8 +441,21 @@ function mechAtHex(c, r) {
 }
 
 // The range finder for a move: what it would cost, in movement and in heat, and what the heat would do.
+// What a repair bay at the end of this move would do for the mech: lines for the range finder (none off a bay).
+function repairLines(mech, at, standing) {
+  const left = (game.state.map.charges || {})[hexKey(at[0], at[1])];
+  if (left === undefined) return [];
+  if (!left) return [{ t: 'REPAIR BAY: used up', style: 'dim' }];
+  const armour = mech.model === 'pool' ? Math.min(REPAIR_ARMOUR, mech.maxHp - mech.hp) : 0;
+  const broken = mech.weapons.find(w => w.id !== 0 && w.off);
+  const fix = [armour ? `+${armour} armour` : '', broken ? `fix ${weaponById(broken.id).name}` : ''].filter(Boolean).join(', ');
+  if (!fix) return [{ t: `REPAIR BAY (${left} left): nothing to fix`, style: 'dim' }];
+  return standing ? [{ t: `REPAIR at round end: ${fix}`, style: 'good' }, { t: `uses 1 of ${left} charges`, style: 'dim' }]
+    : [{ t: `REPAIR BAY (${left} left)`, style: 'good' }, { t: 'stay put here next round to repair', style: 'dim' }];
+}
+
 function finderFor(mech, move) {
-  if (move.mode === 'stand') return { mechId: mech.id, mode: 'stand', path: [], lines: [{ t: 'STAY PUT', style: 'title' }, { t: 'no heat from moving', style: 'dim' }] };
+  if (move.mode === 'stand') return { mechId: mech.id, mode: 'stand', path: [], lines: [{ t: 'STAY PUT', style: 'title' }, { t: 'no heat from moving', style: 'dim' }, ...repairLines(mech, mech.pos, true)] };
   const cost = pathCost(game.state.map, move.path), allowance = allowanceFor(mech, move.mode);
   const now = mech.heat, after = Math.min(HEAT_MAX, now + MOVE_HEAT[move.mode]);
   const before = heatStep({ heat: now }), next = heatStep({ heat: after });
@@ -405,6 +469,7 @@ function finderFor(mech, move) {
   if (after >= COOKOFF_HEAT && now < COOKOFF_HEAT) lines.push({ t: `heat ${COOKOFF_HEAT}+: ammo can explode`, style: 'warn' });
   if (after >= HEAT_MAX) lines.push({ t: 'SHUTDOWN at the end of the round', style: 'warn' });
   lines.push({ t: `+${MOVED_HIT_MOD[move.mode]} to hit you, +${MOVED_HIT_MOD[move.mode]} on your shots`, style: 'dim' });
+  lines.push(...repairLines(mech, move.path[move.path.length - 1], false));
   return { mechId: mech.id, mode: move.mode, path: move.path, lines };
 }
 
@@ -508,7 +573,7 @@ function startVolley(playerShots, note) {
   game.enemyShots = [];
   startCombatLog(); // this combat replaces the last one in the log
   if (note) logLine(note);
-  if (!shots.some(s => s.mechId.startsWith('E'))) logLine('Enemy: nothing to fire.');
+  if (!shots.some(s => mechById(state, s.mechId).side === 'enemy')) logLine('Enemy: nothing to fire.');
   game.shown = cloneState(state); // the copy takes the damage after the last shot has landed
   const involved = new Set(); // every shooter and every target is in view before the first shot, for good: effects hold screen positions
   for (const s of shots) { involved.add(s.mechId); if (s.targetId) involved.add(s.targetId); }
@@ -697,6 +762,18 @@ function finishRound() {
       const [x, y] = hexToScreen(...mechById(state, e.mechId).pos);
       fxBoom(x, y, 1.2, game.clock); fxShake(4);
     } else if (e.type === 'killed') logLine(`${e.mechId} DESTROYED`);
+    else if (e.type === 'repair') { // a repair bay did its work: say what, on the mech and in the log
+      const [x, y] = hexToScreen(...mechById(state, e.mechId).pos);
+      const parts = [e.armour ? `+${e.armour} ARMOUR` : '', e.weaponId ? `${weaponById(e.weaponId).name} FIXED` : ''].filter(Boolean);
+      fxFloat(x, y - 30, parts.join('  '), game.clock, '#7ee08a');
+      logLine(`${e.mechId} REPAIRED: ${parts.join(', ')} (${e.charges} left)`);
+    }
+    else if (e.type === 'arrive') { // reinforcements walk on
+      const m = mechById(state, e.mechId);
+      logLine(`${e.mechId} ${m.name} ARRIVES`);
+      const [x, y] = hexToScreen(...e.pos);
+      fxFloat(x, y - 30, 'REINFORCEMENTS', game.clock, '#ff7b6b');
+    }
   }
   if (state.over) { showResult(); return; }
   startRound();
@@ -707,7 +784,10 @@ function showResult() {
   const count = side => `${livingMechs(state, side).length} of ${state.mechs.filter(m => m.side === side).length}`;
   game.mode = 'result';
   game.active = null;
+  const enc = game.encounter;
   game.result = {
+    hint: !enc ? 'ENTER = new battle    R = replay this seed    B = edit squad    M = new map or goal'
+      : state.winner === 'player' ? 'ENTER = debrief    R = replay this seed    ESC = story screen' : 'ENTER = try again    R = replay this seed    ESC = story screen',
     outcome: state.winner === 'player' ? 'VICTORY' : state.winner === 'enemy' ? 'DEFEAT' : 'DRAW',
     lines: [state.reason, `Fought for ${state.round} round${state.round === 1 ? '' : 's'}`, `Your mechs standing: ${count('player')}`, `Enemy mechs standing: ${count('enemy')}`, `Enemy force: ${state.enemyForce}   ${state.first === 'player' ? 'You' : 'The enemy'} moved first   Seed ${game.seed}`],
   };
@@ -766,7 +846,7 @@ canvas.addEventListener('wheel', e => {
 canvas.addEventListener('click', e => {
   if (game.failed) return;
   if (game.suppressClick) { game.suppressClick = false; return; } // that was the end of a drag, not a click
-  if (game.mode === 'intro') { showCampaign(); return; }
+  if (game.mode === 'intro') { introDone(); return; }
   if (inMenu()) { const b = bayButtonAt(menuButtonList(), ...mousePoint(e)); if (b) menuClick(b); return; }
   if (game.mode === 'bay') { const b = bayButtonAt(bayButtonList(), ...mousePoint(e)); if (b) bayClickButton(b); return; }
   const hex = screenToHex(game.state.map, ...mousePoint(e));
@@ -839,19 +919,25 @@ addEventListener('keydown', e => {
   const modifierKey = e.code.startsWith('Meta') || e.code.startsWith('Control') || e.code.startsWith('Alt') || e.code.startsWith('Shift');
   if (game.mode === 'intro') { // any key skips the story intro to the next screen
     if (e.repeat || modifierKey) return;
-    e.preventDefault(); showCampaign();
+    e.preventDefault(); introDone();
     return;
   }
   if (inMenu()) {
     if (e.repeat || modifierKey) return;
     if (game.mode === 'title') {
       if (e.code === 'Digit1' || e.code === 'Numpad1') showSelect();
-      else if (e.code === 'Digit2' || e.code === 'Numpad2') startIntro();
+      else if (e.code === 'Digit2' || e.code === 'Numpad2') storyFromTitle();
       else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'KeyA' || e.code === 'KeyD' || e.code === 'Tab') game.titleFocus = 1 - game.titleFocus;
       else if (e.code === 'Enter' || e.code === 'Space') menuClick(titleButtons(game.titleFocus)[game.titleFocus]);
     } else if (game.mode === 'select') {
       if (e.code === 'Enter') continueToBay(); else if (e.code === 'Escape' || e.code === 'Backspace') showTitle();
-    } else if (e.code === 'Enter' || e.code === 'Escape' || e.code === 'Backspace') showTitle();
+    } else if (game.mode === 'story') {
+      if (e.code === 'Enter') playLatest(); else if (e.code === 'KeyP') enterPhrase(); else if (e.code === 'Escape' || e.code === 'Backspace') showTitle();
+    } else if (game.mode === 'briefing') {
+      if (e.code === 'Enter') newGame(); else if (e.code === 'Escape' || e.code === 'Backspace') showStory();
+    } else if (game.mode === 'debrief') {
+      if (e.code === 'Enter' || e.code === 'Escape') showStory();
+    }
     e.preventDefault();
     return;
   }
@@ -874,9 +960,13 @@ addEventListener('keydown', e => {
   }
   if (e.code === 'KeyF') { game.fast = true; return; }
   if (e.code === 'KeyN') { newGame(); return; }
-  if (e.code === 'KeyB') { openBay(); return; }
   if (e.code === 'KeyR') { newGame(game.seed); logLine(`Replaying seed ${game.seed}.`); return; }
-  if (game.mode === 'result') { if (e.code === 'Enter') newGame(); else if (e.code === 'KeyM') showSelect(); return; }
+  if (game.encounter) { // a story mission: no mech bay or map choice; from the result, the debrief (a win), another go (a loss) or the story screen
+    if (game.mode === 'result') { if (e.code === 'Enter') { if (game.state.winner === 'player') showDebrief(); else newGame(); } else if (e.code === 'Escape') showStory(); return; }
+  } else {
+    if (e.code === 'KeyB') { openBay(); return; }
+    if (game.mode === 'result') { if (e.code === 'Enter') newGame(); else if (e.code === 'KeyM') showSelect(); return; }
+  }
   if (game.mode === 'move-ask') {
     if (e.code === 'Space' || e.code === 'Escape' || e.code === 'KeyX') { e.preventDefault(); stayOrSkip(); }
     else if (e.code === 'Enter') { // move to the cursor; with the cursor still on the mech itself, stay put
@@ -914,6 +1004,7 @@ const HELP = {
   'fire-ask': ['Click an enemy to lock the highlighted weapon on it.  When the last weapon is answered, both sides fire at once.',
     'SPACE / right-click = skip   ENTER = lock the aimed target   ARROWS / WASD / TAB = next target   K = self-destruct   BACKSPACE = undo'],
   busy: ['Hold F to speed up.   N = new battle   B = mech bay'],
+  storyBusy: ['Hold F to speed up.   N = start the mission again'],
   result: ['ENTER = new battle.   R = replay this seed.   B = edit your squad in the mech bay.   M = choose another map or goal.'],
 };
 
@@ -997,7 +1088,7 @@ function frameAim() {
 function tick(dt) {
   game.clock += dt;
   if (game.mode === 'intro') {
-    if (introFrame((game.clock - game.introT0) * 1000).phase === 'done') showCampaign();
+    if (introFrame((game.clock - game.introT0) * 1000).phase === 'done') introDone();
     runScript(); return;
   }
   if (inMenu()) { runScript(); return; }
@@ -1055,7 +1146,9 @@ function frame(t) {
     if (game.mode === 'intro' || inMenu()) {
       if (game.mode === 'title') drawTitleCard(ctx, game.clock - game.titleT0, titleImageReady ? titleCanvas : null, menuButtonList(), game.menuHover);
       else if (game.mode === 'select') drawSelect(ctx, { size: menuSelection().size, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
-      else if (game.mode === 'campaign') drawCampaign(ctx, { buttons: menuButtonList(), hover: game.menuHover });
+      else if (game.mode === 'story') drawStory(ctx, { buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
+      else if (game.mode === 'briefing') drawBriefing(ctx, { enc: game.encounter, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover });
+      else if (game.mode === 'debrief') drawDebrief(ctx, { enc: game.encounter, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover, last: CAMPAIGN.indexOf(game.encounter) === CAMPAIGN.length - 1 });
       else { const f = introFrame((game.clock - game.introT0) * 1000); if (f.phase === 'lines') drawIntro(ctx, f); else drawBlack(ctx); }
       requestAnimationFrame(frame);
       return;
@@ -1069,7 +1162,7 @@ function frame(t) {
     const view = {
       state: w, clock: game.clock, seed: game.seed,
       camera: { zoom: game.camera.zoom, fx: game.camera.fx, fy: game.camera.fy, sx: rand(-FX.shake, FX.shake), sy: rand(-FX.shake, FX.shake) },
-      banner: bannerFor(), status: game.status, help: HELP[game.mode] || HELP.busy, log: game.log, logHeader: game.logHeader, result: game.result,
+      banner: bannerFor(), status: named(game.status), help: game.encounter && game.mode === 'result' ? [game.result.hint] : HELP[game.mode] || (game.encounter ? HELP.storyBusy : HELP.busy), log: game.log, logHeader: game.logHeader, result: game.result,
       minimap: game.showMini, active: game.active, reach: null, hover: game.hover, hoverMech: null, finder: null, heatGhost: null, aim: [], weapon: null,
       pose: game.anim ? animPose : null, flash: game.flash,
       volley: game.volley ? { local: game.volley.local, projectiles: game.volley.projectiles } : null,
@@ -1112,6 +1205,8 @@ function applyTestHooks() {
     game.mapSize = 'large';
   }
   game.wantIntro = q.has('intro');
+  game.wantStory = q.has('story'); // ?story opens the story screen; ?mission=breakout its briefing (with ?fight, the battle)
+  if (q.get('mission')) game.encounter = encounterById(q.get('mission'));
   game.wantBay = !!q.get('code'); // a squad code in the address means a reload: straight to the bay
   if (q.get('goal')) { if (!OBJECTIVES[q.get('goal')]) throw new BuildError('goal', `Unknown win condition "${q.get('goal')}" (they are ${OBJECTIVE_IDS.join(', ')})`); game.goal = q.get('goal'); }
   if (q.get('keys')) game.script = q.get('keys').split(';');
@@ -1140,6 +1235,8 @@ try {
   const seedParam = new URLSearchParams(location.search).get('seed');
   applyTestHooks();
   if (game.skipBay) newGame(seedParam === null ? undefined : Number(seedParam));
+  else if (game.encounter) showBriefing(game.encounter);
+  else if (game.wantStory) showStory();
   else if (game.wantIntro) startIntro();
   else if (game.wantBay) openBay();
   else showTitle();

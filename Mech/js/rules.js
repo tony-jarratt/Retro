@@ -212,8 +212,11 @@ function livingMechs(state, side) {
 
 function otherSide(side) { return side === 'player' ? 'enemy' : 'player'; }
 
+// Mechs a side still has: the living ones on the map plus any reinforcements yet to arrive (state.reserves, see arriveReserves).
+function mechsLeft(state, side) { return livingMechs(state, side).length + (state.reserves || []).filter(r => r.mech.side === side).length; }
+
 function checkWinner(state) {
-  const p = livingMechs(state, 'player').length, e = livingMechs(state, 'enemy').length;
+  const p = mechsLeft(state, 'player'), e = mechsLeft(state, 'enemy');
   if (p > 0 && e > 0) return state.objective && state.objective.result ? state.objective.result.winner : null; // both sides alive: only the goal can end it
   return p > 0 ? 'player' : e > 0 ? 'enemy' : 'draw'; // a side with nothing left loses, whatever the goal
 }
@@ -222,7 +225,7 @@ function checkWinner(state) {
 function finishIfOver(state) {
   const winner = checkWinner(state);
   if (winner !== null && !state.over) {
-    const eliminated = livingMechs(state, 'player').length === 0 || livingMechs(state, 'enemy').length === 0;
+    const eliminated = mechsLeft(state, 'player') === 0 || mechsLeft(state, 'enemy') === 0;
     state.winner = winner; state.over = true;
     state.reason = reasonText(state, eliminated ? 'annihilated' : state.objective.result.code, winner);
   }
@@ -256,7 +259,7 @@ function locationDown(mech, loc) { return mech.destroyed[loc] || (LIMB_LOCS.incl
 function legsLost(mech) { return LEG_LOCS.filter(l => locationDown(mech, l)).length; }
 
 function walkAllowance(mech) {
-  if (!mech.alive || mech.shutdown) return 0;
+  if (!mech.alive || mech.shutdown || mech.tower) return 0; // a gun tower (story) never moves
   const lost = legsLost(mech);
   if (lost >= 2) return 0;
   const base = chassisById(mech.chassisId).speed;
@@ -715,12 +718,62 @@ function endRound(state, rng) {
       events.push({ type: 'restart', mechId: mech.id, heat: mech.heat });
     }
   }
+  repairAtBays(state, events);
   fadeSmoke(state.map);
   objectiveAfterRound(state, events); // the hill scores and the round limit may end the battle
   if (finishIfOver(state)) {
     events.push({ type: 'over', winner: state.winner });
   } else {
     state.round += 1; // (the same side moves first every round, so the moves go A, B, A, B and the combat step is shared)
+    arriveReserves(state, events);
   }
   return events;
+}
+
+// Repair bays: each living mech that stood still on a bay with charges left gets armour back and its first knocked-out weapon back online,
+// if it needs either; that uses a charge. Events: { type: 'repair', mechId, armour, weaponId (or null), charges (left) }.
+function repairAtBays(state, events) {
+  const charges = state.map.charges || {};
+  for (const mech of livingMechs(state)) {
+    const key = hexKey(mech.pos[0], mech.pos[1]);
+    if (!charges[key] || mech.moved !== 'stand') continue;
+    const armour = mech.model === 'pool' ? Math.min(REPAIR_ARMOUR, mech.maxHp - mech.hp) : 0;
+    const broken = mech.weapons.find(w => w.id !== 0 && w.off);
+    if (!armour && !broken) continue; // nothing to repair: the charge is kept
+    mech.hp += armour;
+    if (broken) broken.off = false;
+    charges[key] -= 1;
+    events.push({ type: 'repair', mechId: mech.id, armour, weaponId: broken ? broken.id : null, charges: charges[key] });
+  }
+}
+
+// Reinforcements (story missions): state.reserves is a list of { round, mech }, mechs made in advance and kept off the map. At the start of
+// their round each one walks on at its own hex, or, if a mech is standing there, at the nearest free hex it could stand on.
+function arriveReserves(state, events) {
+  if (!state.reserves || !state.reserves.length) return;
+  const due = state.reserves.filter(r => r.round <= state.round);
+  state.reserves = state.reserves.filter(r => r.round > state.round);
+  for (const r of due) {
+    const mech = r.mech;
+    mech.pos = nearestFreeHex(state, mech.pos);
+    state.mechs.push(mech);
+    events.push({ type: 'arrive', mechId: mech.id, pos: mech.pos.slice() });
+  }
+}
+
+// The hex nearest `pos` (by steps, then in neighbour order) that a mech could stand on and nobody does: `pos` itself if it is free.
+function nearestFreeHex(state, pos) {
+  const taken = occupiedKeys(state, null);
+  const seen = new Set([hexKey(pos[0], pos[1])]);
+  let ring = [pos];
+  while (ring.length) {
+    for (const [c, r] of ring) if (isPassable(state.map, c, r) && !taken.has(hexKey(c, r))) return [c, r];
+    const next = [];
+    for (const [c, r] of ring) for (const n of neighbours(state.map, c, r)) {
+      const key = hexKey(n.c, n.r);
+      if (!seen.has(key)) { seen.add(key); next.push([n.c, n.r]); }
+    }
+    ring = next;
+  }
+  throw new RulesError('no-room', `No free hex anywhere on the map for a mech arriving at ${hexKey(pos[0], pos[1])}`);
 }

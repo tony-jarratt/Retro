@@ -115,7 +115,8 @@ function hashHex(c, r, k) {
   return v - Math.floor(v);
 }
 
-const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750' };
+const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c' };
+const CONTAINER_COLOURS = ['#a8432f', '#2f6e8f', '#c08a2a', '#3f7a4f', '#7a4f8f', '#8f8a80']; // painted freight containers
 
 // Draws one hex of terrain centred on (x, y). `size` is the hex radius in pixels; the scatter was designed for a
 // radius of 34, so its offsets and sizes are scaled by size / 34. The map is drawn once into an offscreen canvas
@@ -159,6 +160,45 @@ function drawTerrainHex(g, hexPath, kind, c, r, x, y, size) {
     g.fillStyle = '#403c37'; g.beginPath(); g.moveTo(x - 24 * k, y + 16 * k); g.lineTo(x - 4 * k, y - 20 * k); g.lineTo(x + 8 * k, y + 16 * k); g.closePath(); g.fill();
     g.fillStyle = '#7b756b'; g.beginPath(); g.moveTo(x - 4 * k, y - 20 * k); g.lineTo(x + 12 * k, y - 4 * k); g.lineTo(x + 26 * k, y + 16 * k); g.lineTo(x + 8 * k, y + 16 * k); g.closePath(); g.fill();
     g.fillStyle = '#e6e8ec'; g.beginPath(); g.moveTo(x - 4 * k, y - 20 * k); g.lineTo(x - 11 * k, y - 8 * k); g.lineTo(x - 4 * k, y - 11 * k); g.lineTo(x + 3 * k, y - 7 * k); g.closePath(); g.fill();
+  } else if (kind === 'c') { // concrete: slab seams and an oil stain or two
+    g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x - 20 * k, y + (hashHex(c, r, 1) - 0.5) * 20 * k); g.lineTo(x + 20 * k, y + (hashHex(c, r, 2) - 0.5) * 20 * k); g.stroke();
+    if (hashHex(c, r, 3) > 0.6) { g.fillStyle = 'rgba(20,20,24,0.35)'; g.beginPath(); g.ellipse(x + (hashHex(c, r, 4) - 0.5) * 24 * k, y + (hashHex(c, r, 5) - 0.5) * 20 * k, 7 * k, 4 * k, 0, 0, Math.PI * 2); g.fill(); }
+  } else if (kind === 'C') { // a stack of two freight containers, each with a lit top and ribbed side
+    for (let i = 0; i < 2; i++) {
+      const col = CONTAINER_COLOURS[Math.floor(hashHex(c, r, 30 + i) * CONTAINER_COLOURS.length)];
+      const cy = y - 4 * k + i * 15 * k - 6 * k;
+      g.fillStyle = '#16181c'; g.fillRect(x - 18 * k, cy + 2 * k, 36 * k, 13 * k);
+      g.fillStyle = col; g.fillRect(x - 18 * k, cy, 36 * k, 12 * k);
+      g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(x - 18 * k, cy, 36 * k, 3 * k);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      for (let j = 0; j < 6; j++) g.fillRect(x - 15 * k + j * 6 * k, cy + 4 * k, 1.5 * k, 7 * k);
+    }
+  } else if (kind === 'd') { // moon dust: small craters
+    for (let i = 0; i < 2; i++) {
+      if (hashHex(c, r, 40 + i) < 0.45) continue;
+      const cx = x + (hashHex(c, r, 42 + i) - 0.5) * 30 * k, cy = y + (hashHex(c, r, 44 + i) - 0.5) * 26 * k, rad = (3 + hashHex(c, r, 46 + i) * 4) * k;
+      g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1; g.beginPath(); g.arc(cx + 0.5, cy + 0.5, rad, Math.PI * 0.1, Math.PI * 0.9); g.stroke();
+    }
+  } else if (kind === 'G') { // the hangar floor: hazard stripes and the shadow of the roof
+    g.save(); hexPath(g, x, y, size); g.clip();
+    g.fillStyle = '#c9a227';
+    for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(x + i * 10 * k - 4 * k, y - size); g.lineTo(x + i * 10 * k + 4 * k, y - size); g.lineTo(x + i * 10 * k + 4 * k - size, y + size); g.lineTo(x + i * 10 * k - 4 * k - size, y + size); g.closePath(); g.globalAlpha = 0.18; g.fill(); }
+    g.restore();
+  } else if (kind === 'W') { // a repair bay: a green-lit plate with a wrench on it
+    g.strokeStyle = '#7ee08a'; g.lineWidth = 2; hexPath(g, x, y, size * 0.72); g.stroke();
+    g.save(); g.translate(x, y - 2 * k); g.rotate(-Math.PI / 4);
+    g.fillStyle = '#cfe8d6';
+    g.fillRect(-2.5 * k, -4 * k, 5 * k, 18 * k);                                   // the handle
+    g.beginPath(); g.arc(0, -8 * k, 7 * k, 0, Math.PI * 2); g.fill();             // the head
+    g.fillStyle = '#2f4a3c'; g.fillRect(-2.5 * k, -16 * k, 5 * k, 9 * k);           // the jaw
+    g.restore();
+  } else if (kind === 'P') { // a landing pad: a painted ring and hazard marks
+    g.strokeStyle = '#d8b13a'; g.lineWidth = 2;
+    g.beginPath(); g.arc(x, y, 15 * k, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#d8b13a';
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.fillRect(x + Math.cos(a) * 21 * k - 2 * k, y + Math.sin(a) * 21 * k - 2 * k, 4 * k, 4 * k); }
   } else {
     throw new MapError('terrain', `drawTerrainHex: no art for terrain "${kind}"`);
   }
