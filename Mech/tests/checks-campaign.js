@@ -21,7 +21,7 @@ check('story: a built encounter\'s starts are on open ground, every start can re
     const s = encounterBattle(e, 'pool');
     for (const m of s.mechs) assert(isPassable(s.map, m.pos[0], m.pos[1]), `${e.id}: ${m.id} starts on ${hexKey(m.pos[0], m.pos[1])}, which cannot be stood on`);
     const o = s.objective;
-    const goal = o.id === 'escape' ? o.exits.player : o.id === 'raid' ? o.hangar : o.id === 'escort' ? [o.route[o.route.length - 1]]
+    const goal = o.id === 'escape' ? o.exits.player : o.id === 'raid' ? o.hangar : o.id === 'escort' ? [o.route[o.route.length - 1]] : o.id === 'heist' ? [o.flag.pos]
       : neighbours(s.map, ...mechById(s, o.protect).pos).map(n => [n.c, n.r]); // defend: get beside the dropship
     assert(goal.length >= (s.objective.id === 'escape' ? e.squad.length : 1), `${e.id}: the goal needs room`);
     for (const m of s.mechs.filter(x => x.side === 'player' && !x.crawler && !x.tower)) {
@@ -329,4 +329,56 @@ check('story: an AI playing dead ground wins often but not always (tuned for abo
     if (s.winner === 'player') won += 1;
   }
   assert(won > n * 0.45 && won < n * 0.92, `the AI won ${won} times in ${n}`);
+});
+
+check('heist: only the player picks the crate up; carrying it to extraction wins; a fallen carrier drops it; the round limit loses', () => {
+  const s = encounterBattle(encounterById('lab'), 'pool');
+  const o = s.objective, crate = o.flag.pos.slice();
+  eq([o.id, crate, o.bases.player.length, mechById(s, 'E3').name], ['heist', [19, 6], 4, 'PROTOTYPE']);
+  const e1 = mechById(s, 'E1');
+  e1.pos = [crate[0] - 1, crate[1]];
+  moveMech(s, { mechId: 'E1', mode: 'walk', path: [crate] });
+  eq([o.flag.carrier, e1.carrying], [null, false], 'the enemy walks over it and leaves it');
+  const p = mechById(s, 'P3');
+  p.pos = [crate[0], crate[1] - 1]; e1.pos = [crate[0] + 3, crate[1]];
+  moveMech(s, { mechId: 'P3', mode: 'walk', path: [crate] });
+  eq([o.flag.carrier, p.carrying, objectiveStatus(s).lines.includes('CRATE: WREN CARRIES IT')], ['P3', true, true]);
+  eq(runAllowance(p), 0, 'a carrier cannot run');
+  p.alive = false;
+  const events = [];
+  objectiveSync(s, events);
+  eq([o.flag.carrier, o.flag.pos, events.map(e => e.type)], [null, crate, ['flag-dropped']]);
+  const t = encounterBattle(encounterById('lab'), 'pool');
+  const q = mechById(t, 'P1');
+  q.carrying = true; t.objective.flag = { pos: null, carrier: 'P1' };
+  q.pos = [1, 4]; // next to the extraction pad at (0,4)
+  moveMech(t, { mechId: 'P1', mode: 'walk', path: [[0, 4]] });
+  assert(finishIfOver(t));
+  eq([t.winner, t.reason], ['player', 'You got the crate out']);
+  const u = encounterBattle(encounterById('lab'), 'pool');
+  u.round = u.objective.roundLimit;
+  endRound(u, fakeRng([], []));
+  eq([u.winner, u.reason], ['enemy', `Time ran out after round ${u.objective.roundLimit}: the crate never got out`]);
+  assert(!OBJECTIVE_IDS.includes('heist'));
+});
+
+check('heist: the enemy hunts whoever carries the crate', () => {
+  const s = encounterBattle(encounterById('lab'), 'pool');
+  const p = mechById(s, 'P2'), e1 = mechById(s, 'E1');
+  p.carrying = true; s.objective.flag = { pos: null, carrier: 'P2' };
+  p.pos = [16, 6]; e1.pos = [16, 4]; mechById(s, 'P1').pos = [15, 3]; // P1 is nearer to E1, but E1 shoots the carrier
+  const shots = aiPlanFire(s, 'enemy').shots.filter(x => x.mechId === 'E1');
+  assert(shots.length && shots.every(x => x.targetId === 'P2'), `E1 should fire at the carrier, got ${JSON.stringify(shots)}`);
+});
+
+check('story: an AI playing the lab wins often but not always (tuned for about 53%)', () => {
+  let won = 0;
+  const n = 60;
+  for (let seed = 1; seed <= n; seed++) {
+    const s = encounterBattle(encounterById('lab'), 'pool');
+    runFight(s, new Rng(seed), 40);
+    assert(s.over, `seed ${seed} never finished`);
+    if (s.winner === 'player') won += 1;
+  }
+  assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
 });

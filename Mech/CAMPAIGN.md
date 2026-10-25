@@ -1,12 +1,13 @@
 # Hexfire: the campaign (draft 2, 2026-10-25)
 
-**Built:** encounters 1 to 4 (Breakout, The Depot, The Column, Dead Ground) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 5 to 7 are text only.
+**Built:** encounters 1 to 5 (Breakout, The Depot, The Column, Dead Ground, The Lab) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 6 and 7 are text only.
 
 **Something to fight over in every mission** (the owner, 2026-10-25: these "add strategy within a mission"). Each mission gets one contested map feature:
 - 1 Breakout: the pad (and the gates the reinforcements come through).
 - 2 The Depot: repair bays (3 charges, stand still to repair; the enemy uses them too).
 - 3 The Column: the road itself (anything on it stops the crawler) and a repair bay on the ledge.
 - 4 Dead Ground: the dropship (their lights go straight for it) and the water (a lot of cooling; their team runs hot).
+- 5 The Lab: the crate (its carrier is slowed and hunted) and the compound's two gates, with a repair bay inside the west one.
 - **Decided (2026-10-25): the sacrifice belongs to the finale**, where it is most emotional: one pilot holds the way in while the others go on, and the player chooses who.
 - Ideas for the rest: a **resupply crate** for a mission that leans on missiles or the howitzer (6, The Partner, is the natural one); a **sacrifice**: one mech has to hold a tile to keep a route open while the others go on (the finale, "who stays behind", or Dead Ground); field repair caches in the marsh. Implementation notes are in DESIGN.md, Story campaign.
 
@@ -89,7 +90,7 @@ commanders are **partners**. Use the jargon sparingly: one phrase in a briefing 
 
 ## 5. THE LAB
 **Map:** a research compound: walls, labs (blocks), a test range.
-**Goal:** grab the prototype crate and carry it out (flag-style: the carrier cannot run). **Enemy:** lab security plus a prototype walker.
+**Goal:** take the prototype crate from the vault and carry it to the extraction pad (the carrier cannot run, everything hunts the carrier, a fallen carrier drops it); 14 rounds. **Enemy:** two guards and the PROTOTYPE walker (a Warden with the laser array); the alarm brings two more through the east gate on round 5.
 **Squad:** HALE Bulwark, OKAFOR Ranger, WREN Skitter.
 
 > The core is guarded by walkers we cannot match. The Vantor lab builds a gun that can.

@@ -26,6 +26,7 @@ const COLOURS = {
 const MECH_LINE_COLOURS = ['#4fb3d9', '#ffd24a', '#c58bff', '#7ee08a']; // one per player mech, for aim lines
 
 let mapLayout = null;              // layoutFor(...) of the map on screen (view.js), set by buildMapCanvas
+let drawHeist = false;             // the battle is a heist: a carrier shows the crate, not a flag; set by drawFrame
 let drawClock = 0;                 // the frame's clock, for sprites that animate (the dropship's engines); set by drawFrame
 let mapScroll = { x: 0, y: 0 };    // how far the map's picture is scrolled in the viewport (0, 0 for a map that fits)
 let mapCanvas = null;               // the whole map, drawn once
@@ -109,7 +110,7 @@ function drawMinimap(g, state, view) {
   g.strokeStyle = COLOURS.panelEdge; g.lineWidth = 1; g.strokeRect(geo.x - 0.5, geo.y - 0.5, geo.w + 1, geo.h + 1);
   const o = state.objective;
   const dot = (c, r, colour, size) => { const [x, y] = at(c, r); g.fillStyle = colour; g.fillRect(x - size / 2, y - size / 2, size, size); };
-  if (o && o.id === 'flag') {
+  if (o && (o.id === 'flag' || o.id === 'heist')) {
     for (const [c, r] of [...o.bases.player.slice(0, 1), ...o.bases.enemy.slice(0, 1)]) dot(c, r, '#ffffff', 3);
     if (o.flag.pos) dot(o.flag.pos[0], o.flag.pos[1], '#ffd24a', 6);
   } else if (o && o.id === 'hill') { for (const [c, r] of o.zone) dot(c, r, '#ffd24a', 3); }
@@ -140,7 +141,7 @@ function drawEdgeArrows(g, state, view) {
   g.beginPath(); g.rect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); g.clip();
   for (const m of livingMechs(state)) arrow(m.pos[0], m.pos[1], m.side === 'player' ? COLOURS.player : COLOURS.enemy);
   const o = state.objective;
-  if (o && o.id === 'flag' && o.flag.pos) arrow(o.flag.pos[0], o.flag.pos[1], '#ffd24a');
+  if (o && (o.id === 'flag' || o.id === 'heist') && o.flag.pos) arrow(o.flag.pos[0], o.flag.pos[1], '#ffd24a');
   g.restore();
 }
 
@@ -348,6 +349,20 @@ function mechHealth(mech) { // 0 to 1: armour left, of what it started with
 }
 
 // A small flag on a pole, planted at (x, y): the pole's foot. `colour` is the pennant.
+// The prototype crate (the heist): a banded case with a hazard stripe and a blinking light, `scale` 1 on the ground.
+function drawCrateIcon(g, x, y, scale) {
+  const k = HEX_SCALE * scale;
+  g.save(); g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(-12 * k, -6 * k, 28 * k, 18 * k);
+  g.fillStyle = '#000'; g.fillRect(-15 * k, -11 * k, 30 * k, 21 * k);
+  g.fillStyle = '#5b6470'; g.fillRect(-14 * k, -10 * k, 28 * k, 19 * k);
+  g.fillStyle = '#7d8896'; g.fillRect(-14 * k, -10 * k, 28 * k, 5 * k);
+  g.fillStyle = '#c9a227'; for (let i = 0; i < 4; i++) g.fillRect((-12 + i * 7) * k, 3 * k, 4 * k, 4 * k);
+  g.fillStyle = '#2b3038'; g.fillRect(-4 * k, -10 * k, 2 * k, 19 * k); g.fillRect(6 * k, -10 * k, 2 * k, 19 * k);
+  g.fillStyle = Math.sin(drawClock * 6) > 0 ? '#7ee08a' : '#244a2e'; g.fillRect(9 * k, -8 * k, 3 * k, 3 * k);
+  g.restore();
+}
+
 function drawFlagIcon(g, x, y, colour) {
   g.save();
   g.strokeStyle = '#000'; g.lineWidth = 4; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 24); g.stroke();
@@ -382,6 +397,17 @@ function drawObjectiveOverlay(g, state, clock) {
       fillHex(g, o.flag.pos[0], o.flag.pos[1], `rgba(255,210,74,${0.10 + 0.10 * pulse})`, '#ffd24a', 2);
       drawFlagIcon(g, x - 4, y + 10, '#ffd24a');
     }
+  } else if (o.id === 'heist') { // the extraction point, and the crate where it lies
+    group(o.bases.player, `rgba(216,177,58,${0.08 + 0.10 * pulse})`, '#ffd24a', 3);
+    const low = o.bases.player.reduce((a, b) => (hexToScreen(...b)[1] > hexToScreen(...a)[1] ? b : a));
+    const [lx, ly] = hexToScreen(...low);
+    g.font = 'bold 11px ' + MONO; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a';
+    g.strokeText('EXTRACTION', lx + HEX_R * 0.4, ly + HEX_R + 12); g.fillText('EXTRACTION', lx + HEX_R * 0.4, ly + HEX_R + 12); g.textAlign = 'left';
+    if (o.flag.pos) {
+      const [x, y] = hexToScreen(o.flag.pos[0], o.flag.pos[1]);
+      fillHex(g, o.flag.pos[0], o.flag.pos[1], `rgba(255,210,74,${0.10 + 0.12 * pulse})`, '#ffd24a', 2);
+      drawCrateIcon(g, x, y, 1);
+    }
   } else if (o.id === 'raid') { // the hangar lights up once the towers are down
     const open = targetsLeft(state) === 0;
     group(o.hangar, open ? `rgba(216,177,58,${0.10 + 0.12 * pulse})` : 'rgba(216,177,58,0.05)', open ? '#ffd24a' : 'rgba(216,177,58,0.5)', open ? 3 : 2);
@@ -414,7 +440,7 @@ function drawMechLabel(g, mech, x, y) {
   g.fillText(name, x, y - HEX_R + 10);
   if (mech.shutdown) { g.fillStyle = COLOURS.warn; g.strokeText('SHUT DOWN', x, y + 4); g.fillText('SHUT DOWN', x, y + 4); }
   g.textAlign = 'left';
-  if (mech.carrying) drawFlagIcon(g, x + HEX_R * 0.55, y + 4, '#ffd24a'); // the carrier shows the flag
+  if (mech.carrying) { if (mech.side === 'player' && drawHeist) drawCrateIcon(g, x + HEX_R * 0.5, y + 2, 0.7); else drawFlagIcon(g, x + HEX_R * 0.55, y + 4, '#ffd24a'); } // the carrier shows the flag, or the crate
 }
 
 // A dashed line through the hexes of a planned path, with the ghost of the mech at the end.
@@ -1040,6 +1066,7 @@ function drawBay(g, view) {
 function drawFrame(g, view) {
   const { state } = view;
   drawClock = view.clock;
+  drawHeist = !!state.objective && state.objective.id === 'heist';
   g.fillStyle = COLOURS.bg; g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.save();
   const pad = mapLayout.pad;

@@ -103,9 +103,27 @@ const MARSH_ROWS = [
   'ffffffrfrffffffffffffrrff',
 ];
 
+// The Vantor research compound: scrub and woods in the west with the extraction pad (P) on the edge, the compound's walls (buildings) with a
+// gate on each side, lab blocks round the vault in the middle, and a repair bay just inside the west gate.
+const VANTOR_ROWS = [
+  '.T..TT....................R',
+  '..T.......BBBBBBBBBBBBBBB..',
+  '....T.....BcccccccccccccB.R',
+  '......T...BccBBcccccBBccBR.',
+  'P.........BccBcccccccBccB..',
+  'P.........ccccccccccccccB..',
+  'P......T..ccccccccccccccc..',
+  'P.........BccBccccccccccc..',
+  '..T.......BccBBccccccBccB..',
+  '.....T....BcWcccccccBBccB.R',
+  '.T........BBBBBBBBBBBBBBBR.',
+  '...T..T....................',
+];
+
 // ---------- the encounters ----------
 // ready: false means the encounter is written but not built yet (the story screen says so). Everything a battle needs is on a ready one:
 // map (rows, starts, facings), goal and roundLimit, squad, enemies, reserves ({ round, pos, facing, spec }: reinforcements), first (who moves first),
+// for a heist: crate (the hex it starts on; the extraction is the map's P hexes); an enemy spec may have a `name` (shown instead of its chassis);
 // for a defence: protect ({ pos, spec, name }: what has to survive, one of the player's units that never moves or fires) and rounds (how long);
 // weather: 'storm' draws rain over the map (looks only);
 // for an escort: crawler ({ from, to, spec }: the prison crawler drives along the road from `from` to `to`; it is the player's, with no guns),
@@ -209,7 +227,31 @@ const CAMPAIGN = [
       { round: 5, pos: [16, 0], facing: 3, spec: storyEnemy(2, [3, 0, 0], 1) },
     ],
   },
-  { id: 'lab', title: 'THE LAB', place: 'The Vantor research compound', ready: false, phrase: 'FIRST LIGHT' },
+  {
+    id: 'lab', title: 'THE LAB', place: 'The Vantor research compound', ready: true,
+    briefing: [
+      'The core is guarded by walkers we cannot match. The Vantor lab builds a gun that can.',
+      'Take the prototype. Leave the staff.',
+      'One of them has asked to come with us. HALE says no. OKAFOR says we need her.',
+    ],
+    job: 'Get into the compound, take the prototype crate from the vault and carry it back to the extraction pad. Whoever carries it cannot run, and everything they have will hunt the carrier. A carrier who goes down drops it. 14 rounds.',
+    debrief: [
+      'The crate holds a howitzer. SABLE, the analyst who asked to come, holds the manual, and admits she helped write the Model.',
+      'She comes with us. Nobody sleeps near her.',
+    ],
+    phrase: 'FIRST LIGHT',
+    map: { name: 'VANTOR RESEARCH COMPOUND', rows: VANTOR_ROWS, playerStarts: [[2, 4], [2, 6], [1, 5]], playerFacing: 2, enemyStarts: [[15, 2], [15, 9], [22, 6]], enemyFacing: 5 },
+    goal: 'heist', roundLimit: 14, first: 'player', crate: [19, 6],
+    squad: [storyPilot('HALE', 4, [2, 7, 0], 3), storyPilot('OKAFOR', 3, [4, 2, 0], 3), storyPilot('WREN', 1, [1, 1, 0], 3)],
+    enemyName: 'VANTOR SECURITY',
+    // two guards and the prototype walker with its laser array. Tuned so the AI playing your side wins about 53%: two security turrets as well
+    // won 2%, and even one 18%, so there are none
+    enemies: [storyEnemy(1, [1, 1, 0], 0), storyEnemy(2, [2, 0, 0], 0), { ...storyEnemy(5, [9, 2, 0], 0), name: 'PROTOTYPE' }],
+    reserves: [ // the alarm: more come through the east gate
+      { round: 5, pos: [26, 6], facing: 5, spec: storyEnemy(2, [2, 1, 0], 1) },
+      { round: 5, pos: [26, 7], facing: 5, spec: storyEnemy(1, [1, 1, 0], 0) },
+    ],
+  },
   { id: 'partner', title: 'THE PARTNER', place: "Partner Calloway's estate", ready: false, phrase: 'NO TERMS' },
   { id: 'core', title: 'THE CORE', place: 'Halcyon', ready: false, phrase: null }, // the last one has no phrase: there is nothing after it
 ];
@@ -239,7 +281,7 @@ function phraseUnlocks(text) {
 function encounterScenario(enc) {
   const hexesOf = letter => { const out = []; enc.map.rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === letter) out.push([c, r]); }); return out; };
   const pads = hexesOf('P'), hangar = hexesOf('G');
-  if (enc.goal === 'escape' && !pads.length) throw new MapError('exit', `Encounter ${enc.id}: an escape map needs landing pad (P) hexes`);
+  if ((enc.goal === 'escape' || enc.goal === 'heist') && !pads.length) throw new MapError('exit', `Encounter ${enc.id}: an escape map needs landing pad (P) hexes`);
   if (enc.goal === 'raid' && !hangar.length) throw new MapError('hangar', `Encounter ${enc.id}: a raid map needs hangar (G) hexes`);
   const protect = enc.protect ? 'P' + (enc.squad.length + 1) : null;
   const route = enc.crawler ? roadRoute(enc.map.rows, enc.crawler.from, enc.crawler.to) : null;
@@ -249,7 +291,8 @@ function encounterScenario(enc) {
   return { id: enc.id, name: enc.map.name, rows: enc.map.rows, playerStarts: enc.map.playerStarts, enemyStarts: enc.map.enemyStarts,
     playerFacing: enc.map.playerFacing, enemyFacing: enc.map.enemyFacing, exits: { player: pads, enemy: [] },
     hangar, runner, targets: (enc.towers || []).map((t, i) => 'T' + (i + 1)),
-    route, escort: route ? 'P' + (enc.squad.length + 1) : null, protect, rounds: enc.rounds || null };
+    route, escort: route ? 'P' + (enc.squad.length + 1) : null, protect, rounds: enc.rounds || null,
+    flag: enc.crate || null, bases: { player: pads, enemy: [] } };
 }
 
 // A new battle for an encounter: the squad gets its pilots' names, the reinforcements wait in state.reserves for their round.
@@ -281,6 +324,7 @@ function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
   }
   const state = newBattle({ playerSpecs: enc.squad.map(m => m.spec), enemySpecs: enc.enemies, enemyToHit, first, model, scenario, goal: enc.goal });
   state.weather = enc.weather || null;
+  enc.enemies.forEach((spec, i) => { if (spec.name) mechById(state, 'E' + (i + 1)).name = spec.name; });
   if (extra.length) state.mechs = makeState(state.map, state.mechs.concat(extra), first).mechs; // makeState refuses two mechs on one hex
   enc.squad.forEach((m, i) => { mechById(state, 'P' + (i + 1)).pilot = m.pilot; });
   state.objective.roundLimit = enc.roundLimit;

@@ -86,7 +86,8 @@ function aiGoalFor(state, mech) {
     if (inGroup(o.zone, mech.pos)) return { hexes: [mech.pos], run: false, why: 'holds the hill', intent: `${mech.id} HOLDS THE HILL`, hold: 0 };
     return { hexes: o.zone, run: true, why: 'goes for the hill', intent: `${mech.id} GOES FOR THE HILL`, hold: 0 };
   }
-  if (o.id === 'flag') {
+  if (o.id === 'heist' && mech.side === 'enemy') return null; // a heist: the enemy cannot pick the crate up, so it hunts (the carrier first, see aiMoveFor)
+  if (o.id === 'flag' || o.id === 'heist') {
     if (mech.carrying) return { hexes: o.bases[mech.side], run: false, why: 'carries the flag home', intent: `${mech.id} CARRIES THE FLAG HOME`, hold: 0 };
     const enemyHas = livingMechs(state, otherSide(mech.side)).some(m => m.carrying);
     if (enemyHas) return null; // everyone hunts the carrier

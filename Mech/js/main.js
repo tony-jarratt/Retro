@@ -340,9 +340,10 @@ function wrapText(text, width) {
 // The log lines for what a goal's rules did (a flag picked up, dropped or captured, an exit reached, a hill point).
 function logObjectiveEvents(events) {
   for (const e of events) {
-    if (e.type === 'flag-taken') logLine(`${e.mechId} PICKS UP THE FLAG`);
-    else if (e.type === 'flag-dropped') logLine(`${e.mechId} DROPS THE FLAG`);
-    else if (e.type === 'flag-captured') logLine(`${e.mechId} CAPTURES THE FLAG`);
+    const thing = game.state.objective.id === 'heist' ? 'CRATE' : 'FLAG';
+    if (e.type === 'flag-taken') logLine(`${e.mechId} PICKS UP THE ${thing}`);
+    else if (e.type === 'flag-dropped') logLine(`${e.mechId} DROPS THE ${thing}`);
+    else if (e.type === 'flag-captured') logLine(thing === 'CRATE' ? `${e.mechId} GETS THE CRATE OUT` : `${e.mechId} CAPTURES THE FLAG`);
     else if (e.type === 'exit-reached') logLine(`${e.mechId} REACHES THE EXIT`);
     else if (e.type === 'hangar') logLine(`${e.mechId} IS IN THE HANGAR`);
     else if (e.type === 'crawler-out') logLine(`${e.mechId} IS OUT OF THE CANYON`);
