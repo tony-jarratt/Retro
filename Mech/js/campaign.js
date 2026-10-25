@@ -86,9 +86,28 @@ function roadRoute(rows, from, to) {
   return route;
 }
 
+// The salt marsh: salt flats, pools and channels of water (a lot of cooling), reeds that hide and slow you. The dropship sits on a dry bank (P)
+// in the west; the turnaround team comes from the east, and more of them from the north and south edges.
+const MARSH_ROWS = [
+  'ffff~~~ff~~~~~fffffffrfff',
+  'frrf~~~ff~~~~ffffff~rrrff',
+  'frrff~fff~~~fffrr~~~rrrff',
+  'fff~f~~rf~~fffrrff~~~~fff',
+  'fff~~~~rr~~ffffff~~~~~~ff',
+  'ffff~frrrffffrrfff~~~f~ff',
+  'ff~ffPffffffrrrff~fffrfff',
+  'f~~ffffffffffrfr~~~~ffrff',
+  'ff~fffrrfffffff~~~~frrrff',
+  'ffffffrrfrffrrf~~~~~fffff',
+  'fffffffrffffrrff~~~ffrrff',
+  'ffffffrfrffffffffffffrrff',
+];
+
 // ---------- the encounters ----------
 // ready: false means the encounter is written but not built yet (the story screen says so). Everything a battle needs is on a ready one:
 // map (rows, starts, facings), goal and roundLimit, squad, enemies, reserves ({ round, pos, facing, spec }: reinforcements), first (who moves first),
+// for a defence: protect ({ pos, spec, name }: what has to survive, one of the player's units that never moves or fires) and rounds (how long);
+// weather: 'storm' draws rain over the map (looks only);
 // for an escort: crawler ({ from, to, spec }: the prison crawler drives along the road from `from` to `to`; it is the player's, with no guns),
 // and for a raid: towers ({ pos, spec }: gun towers, ids T1, T2...; they never move) and runner (the pilot who has to reach the hangar).
 const CAMPAIGN = [
@@ -163,7 +182,33 @@ const CAMPAIGN = [
       { round: 3, pos: [28, 7], facing: 5, spec: storyEnemy(1, [1, 1, 0], 0) },
     ],
   },
-  { id: 'dead-ground', title: 'DEAD GROUND', place: 'The salt marsh', ready: false, phrase: 'SALT MARSH' },
+  {
+    id: 'dead-ground', title: 'DEAD GROUND', place: 'The salt marsh, in a storm', ready: true,
+    briefing: [
+      'The Consortium has brought in a turnaround team. They are sent when a problem has gone on too long.',
+      'The dropship needs eight minutes of fuel, and the marsh is the only cover for a hundred kilometres.',
+      'Their fast ones will go for the ship. Stay in the water: they run hot.',
+    ],
+    job: 'Keep the dropship standing until it has refuelled at the end of round 8. Their light mechs will go straight for it; the rest will come for you. Water cools you a lot; reeds hide you.',
+    debrief: [
+      'The dropship lifts out of the storm with the turnaround team still firing into the rain.',
+      'HALE draws the core at Halcyon on a fogged window. "The banks only open to a partner\'s credentials. There is one partner on this side of the world, and a lab that builds what guards him."',
+    ],
+    phrase: 'SALT MARSH',
+    map: { name: 'THE SALT MARSH', rows: MARSH_ROWS, playerStarts: [[3, 6], [7, 6], [5, 8]], playerFacing: 2, enemyStarts: [[24, 3], [24, 6], [24, 9]], enemyFacing: 5 },
+    goal: 'defend', rounds: 8, first: 'player', weather: 'storm',
+    protect: { pos: [5, 6], spec: storyEnemy(6, [0, 0, 0], 2), name: 'DROPSHIP' }, // a Monolith-sized hull, no guns. Tuned with the raiders so the AI playing your side wins about 72%: the breather of the story (very sensitive to when raiders arrive: the southern one a round later gives 92%)
+    squad: [storyPilot('VOSS', 5, [2, 4, 0], 2), storyPilot('HALE', 4, [2, 7, 0], 2), storyPilot('WREN', 1, [1, 1, 0], 2)],
+    enemyName: 'TURNAROUND TEAM',
+    enemies: [storyEnemy(1, [2, 1, 0], 1), storyEnemy(3, [7, 2, 0], 1), storyEnemy(2, [3, 0, 0], 1)], // a Skitter and a Jackal (Scorcher) raid; the Ranger fights
+    reserves: [
+      { round: 2, pos: [8, 11], facing: 0, spec: storyEnemy(1, [2, 1, 0], 1) }, // an early raider from the south: the threat is not only from the east
+      { round: 3, pos: [24, 0], facing: 4, spec: storyEnemy(4, [3, 2, 0], 1) },
+      { round: 3, pos: [12, 11], facing: 0, spec: storyEnemy(1, [2, 1, 0], 1) },
+      { round: 4, pos: [12, 0], facing: 3, spec: storyEnemy(1, [2, 1, 0], 1) },
+      { round: 5, pos: [16, 0], facing: 3, spec: storyEnemy(2, [3, 0, 0], 1) },
+    ],
+  },
   { id: 'lab', title: 'THE LAB', place: 'The Vantor research compound', ready: false, phrase: 'FIRST LIGHT' },
   { id: 'partner', title: 'THE PARTNER', place: "Partner Calloway's estate", ready: false, phrase: 'NO TERMS' },
   { id: 'core', title: 'THE CORE', place: 'Halcyon', ready: false, phrase: null }, // the last one has no phrase: there is nothing after it
@@ -196,6 +241,7 @@ function encounterScenario(enc) {
   const pads = hexesOf('P'), hangar = hexesOf('G');
   if (enc.goal === 'escape' && !pads.length) throw new MapError('exit', `Encounter ${enc.id}: an escape map needs landing pad (P) hexes`);
   if (enc.goal === 'raid' && !hangar.length) throw new MapError('hangar', `Encounter ${enc.id}: a raid map needs hangar (G) hexes`);
+  const protect = enc.protect ? 'P' + (enc.squad.length + 1) : null;
   const route = enc.crawler ? roadRoute(enc.map.rows, enc.crawler.from, enc.crawler.to) : null;
   if (enc.goal === 'escort' && !route) throw new BuildError('crawler', `Encounter ${enc.id}: an escort needs a crawler`);
   const runner = enc.goal === 'raid' ? 'P' + (enc.squad.findIndex(m => m.pilot === enc.runner) + 1) : null;
@@ -203,7 +249,7 @@ function encounterScenario(enc) {
   return { id: enc.id, name: enc.map.name, rows: enc.map.rows, playerStarts: enc.map.playerStarts, enemyStarts: enc.map.enemyStarts,
     playerFacing: enc.map.playerFacing, enemyFacing: enc.map.enemyFacing, exits: { player: pads, enemy: [] },
     hangar, runner, targets: (enc.towers || []).map((t, i) => 'T' + (i + 1)),
-    route, escort: route ? 'P' + (enc.squad.length + 1) : null };
+    route, escort: route ? 'P' + (enc.squad.length + 1) : null, protect, rounds: enc.rounds || null };
 }
 
 // A new battle for an encounter: the squad gets its pilots' names, the reinforcements wait in state.reserves for their round.
@@ -227,7 +273,14 @@ function encounterBattle(enc, model = DEFAULT_DAMAGE_MODEL, first = enc.first) {
     m.crawler = true; m.name = 'PRISON CRAWLER'; m.pilot = 'CRAWLER';
     extra.push(m);
   }
+  if (enc.protect) { // the thing to defend: the player's, after the squad; it never moves and has no guns (a tower that is ours)
+    checkCapacity(enc.protect.spec);
+    const m = makeMech(enc.protect.spec, { id: scenario.protect, side: 'player', pos: enc.protect.pos, facing: enc.map.playerFacing, toHit: PLAYER_TO_HIT, model });
+    m.tower = true; m.ship = true; m.name = enc.protect.name; m.pilot = enc.protect.name;
+    extra.push(m);
+  }
   const state = newBattle({ playerSpecs: enc.squad.map(m => m.spec), enemySpecs: enc.enemies, enemyToHit, first, model, scenario, goal: enc.goal });
+  state.weather = enc.weather || null;
   if (extra.length) state.mechs = makeState(state.map, state.mechs.concat(extra), first).mechs; // makeState refuses two mechs on one hex
   enc.squad.forEach((m, i) => { mechById(state, 'P' + (i + 1)).pilot = m.pilot; });
   state.objective.roundLimit = enc.roundLimit;

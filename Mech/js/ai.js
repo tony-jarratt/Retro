@@ -15,7 +15,14 @@ const AI_STAND_HEAT = 14;    // at this heat it stands still to cool
 const AI_HEAT_CAP = 26;      // it holds a weapon rather than go above this heat
 const AI_NO_VIEW_PENALTY = 3;
 const AI_REPAIR_BELOW = 0.5;  // a mech below this share of its armour, or with a weapon knocked out, goes to a repair bay...
-const AI_REPAIR_RANGE = 8;    // ...if one with charges left is within this many hexes // when fine-tuning, a hex with no line of sight to the target counts as this many hexes further off
+const AI_REPAIR_RANGE = 8;
+const AI_RAID_RANGE = 3;      // the defend goal: a raider closes to this many hexes of the dropship
+
+// The defend goal (story): the enemy's lights are raiders, sent for the thing the player is protecting.
+function aiIsRaider(state, mech) {
+  const o = state.objective;
+  return !!o && o.id === 'defend' && mech.side === 'enemy' && chassisById(mech.chassisId).cls === 'light' && mechById(state, o.protect).alive;
+}    // ...if one with charges left is within this many hexes // when fine-tuning, a hex with no line of sight to the target counts as this many hexes further off
 
 // Roles come from the weight class. Lights are raiders: they want water (cooling lets them keep firing). Heavies and
 // assaults are anchors: they want cover (woods hide them from lasers). Mediums are flexible: they value either, so they
@@ -44,6 +51,7 @@ function pathWithin(map, path, allowance) {
 // nearest it can reach), whether it should run, a line for the screen, and how close (in hexes) counts as there (0 = on one of them).
 // Roles, so the side does not all do the same thing:
 //   exit   every mech heads for its exit, running when it can (the whole squad has to get there, so nobody waits behind)
+//   defend (story) the enemy's lights are raiders: they run for the dropship (`protect`) and shoot it first (aiPlanFire); the rest hunt
 //   escape (story) the player's side runs for its exit as above; the enemy has no goal and hunts
 //   hill   every mech goes for the hill (a mech already on it holds it)
 //   flag   the mech carrying the flag walks it home; with a loose flag the nearest mech fetches it; with a friendly carrier the nearest other
@@ -54,6 +62,16 @@ function aiGoalFor(state, mech) {
   if (!o || o.id === 'annihilation') return null;
   const mobile = livingMechs(state, mech.side).filter(m => !m.shutdown && walkAllowance(m) > 0);
   const near = (m, pos) => hexDist(m.pos[0], m.pos[1], pos[0], pos[1]);
+  if (o.id === 'defend') {
+    if (!aiIsRaider(state, mech)) return null;
+    const ship = mechById(state, o.protect);
+    const near = [];
+    for (let c = 0; c < state.map.cols; c++) for (let r = 0; r < state.map.rows; r++) {
+      const d = hexDist(c, r, ship.pos[0], ship.pos[1]);
+      if (d >= 1 && d <= AI_RAID_RANGE && isPassable(state.map, c, r)) near.push([c, r]);
+    }
+    return { hexes: near, run: true, why: 'goes for the dropship', intent: `${mech.id} GOES FOR THE DROPSHIP`, hold: AI_RAID_RANGE };
+  }
   if (o.id === 'raid') { // a story goal: when the AI plays the player's side (the tests) it fights until the towers are down, then the runner goes in
     if (mech.side !== 'player' || mech.id !== o.runner || targetsLeft(state) > 0) return null;
     return { hexes: o.hangar, run: true, why: 'heads for the hangar', intent: `${mech.id} HEADS FOR THE HANGAR`, hold: 0 };
@@ -254,6 +272,8 @@ function aiPlanFire(state, side) {
       }
       const carrier = livingMechs(state, otherSide(mech.side)).find(e => e.carrying); // the enemy with the flag is the target that matters
       if (!weapon.smoke && carrier && validTargets(state, mech.id, slot).some(s => s.targetId === carrier.id)) aim = { targetId: carrier.id, reason: 'shoots the flag carrier' };
+      const ship = aiIsRaider(state, mech) ? state.objective.protect : null; // a raider shoots the dropship when it can
+      if (!weapon.smoke && ship && validTargets(state, mech.id, slot).some(s => s.targetId === ship)) aim = { targetId: ship, reason: 'raids the dropship' };
       if (weapon.splash && aim.targetId !== null) { // the howitzer's splash hurts friends too: hold it if more friends than enemies stand beside the target
         const t = mechById(state, aim.targetId);
         const beside = state.mechs.filter(m => m.alive && m.id !== t.id && neighbours(state.map, t.pos[0], t.pos[1]).some(n => n.c === m.pos[0] && n.r === m.pos[1]));

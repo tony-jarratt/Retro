@@ -20,9 +20,11 @@ check('story: a built encounter\'s starts are on open ground, every start can re
   for (const e of CAMPAIGN.filter(x => x.ready)) {
     const s = encounterBattle(e, 'pool');
     for (const m of s.mechs) assert(isPassable(s.map, m.pos[0], m.pos[1]), `${e.id}: ${m.id} starts on ${hexKey(m.pos[0], m.pos[1])}, which cannot be stood on`);
-    const goal = s.objective.id === 'escape' ? s.objective.exits.player : s.objective.id === 'raid' ? s.objective.hangar : [s.objective.route[s.objective.route.length - 1]];
+    const o = s.objective;
+    const goal = o.id === 'escape' ? o.exits.player : o.id === 'raid' ? o.hangar : o.id === 'escort' ? [o.route[o.route.length - 1]]
+      : neighbours(s.map, ...mechById(s, o.protect).pos).map(n => [n.c, n.r]); // defend: get beside the dropship
     assert(goal.length >= (s.objective.id === 'escape' ? e.squad.length : 1), `${e.id}: the goal needs room`);
-    for (const m of s.mechs.filter(x => x.side === 'player' && !x.crawler)) {
+    for (const m of s.mechs.filter(x => x.side === 'player' && !x.crawler && !x.tower)) {
       const reach = reachableHexes(s.map, m.pos, 999, new Set());
       assert(goal.some(([c, r]) => reach.has(hexKey(c, r))), `${e.id}: ${m.id} cannot reach the goal`);
       for (const t of s.mechs.filter(x => x.side === 'enemy')) assert([0, 1, 2, 3, 4, 5].some(d => reach.has(hexKey(...neighbour(t.pos[0], t.pos[1], d)))), `${e.id}: ${m.id} cannot get next to ${t.id}`);
@@ -42,7 +44,7 @@ check('story: the battle names the pilots, keeps the reinforcements off the map,
   eq(s.mechs.length, 5, 'three of ours and two of theirs on the map');
   eq(s.reserves.map(r => [r.round, r.mech.id]), [[4, 'E3'], [4, 'E4']]);
   eq([s.objective.id, s.objective.roundLimit, s.first], ['escape', 10, 'player']);
-  throwsKind(BuildError, 'encounter', () => encounterBattle(encounterById('dead-ground'), 'pool'));
+  throwsKind(BuildError, 'encounter', () => encounterBattle(CAMPAIGN.find(e => !e.ready), 'pool'));
   throwsKind(BuildError, 'encounter', () => encounterById('nowhere'));
 });
 
@@ -55,13 +57,14 @@ check('story: an access phrase ignores case, spaces and dashes, opens the missio
 });
 
 check('story: the story screen shows a locked mission as a number only, an open unbuilt one greyed, and ENTER plays the latest built one', () => {
-  const b = storyButtons(4);
-  const one = b.find(x => x.id === 'mission:breakout'), four = b.find(x => x.id === 'mission:dead-ground'), five = b.find(x => x.id === 'mission:lab');
+  const unbuilt = CAMPAIGN.findIndex(e => !e.ready); // the first mission not built yet; open it and the one after stays locked
+  const b = storyButtons(unbuilt + 1);
+  const one = b[0], open = b[unbuilt], locked = b[unbuilt + 1];
   eq([one.state, one.label], ['normal', 'BREAKOUT']);
-  eq([four.state, four.label], ['disabled', 'DEAD GROUND']);
-  assert(four.tip.includes('not built'));
-  eq([five.state, five.label], ['disabled', '? ? ?']);
-  eq(latestPlayable(4).id, 'column', 'dead ground is open but not built, so ENTER plays the column');
+  eq([open.state, open.label], ['disabled', CAMPAIGN[unbuilt].title]);
+  assert(open.tip.includes('not built'));
+  eq([locked.state, locked.label], ['disabled', '? ? ?']);
+  eq(latestPlayable(unbuilt + 1).id, CAMPAIGN[unbuilt - 1].id, 'the open one is not built, so ENTER plays the one before');
   eq(latestPlayable(1).id, 'breakout');
 });
 
@@ -284,4 +287,46 @@ check('story: an AI playing the column wins often but not always (tuned for abou
     if (s.winner === 'player') won += 1;
   }
   assert(won > n * 0.3 && won < n * 0.85, `the AI won ${won} times in ${n}`);
+});
+
+check('defend: the dropship is ours, never moves or is asked to fire; holding to the end of the last round wins, losing it loses', () => {
+  const s = encounterBattle(encounterById('dead-ground'), 'pool');
+  const ship = mechById(s, s.objective.protect);
+  eq([ship.pilot, ship.side, ship.tower, s.objective.rounds, s.weather], ['DROPSHIP', 'player', true, 8, 'storm']);
+  eq(walkAllowance(ship), 0);
+  assert(!newFirePlanner(s, 'player').mechIds.includes(ship.id));
+  s.round = s.objective.rounds - 1;
+  endRound(s, fakeRng([], []));
+  eq(s.over, false, 'one round still to go');
+  endRound(s, fakeRng([], []));
+  eq([s.over, s.winner, s.reason], [true, 'player', 'You held out for 8 rounds: the dropship is fuelled']);
+  const t = encounterBattle(encounterById('dead-ground'), 'pool');
+  mechById(t, t.objective.protect).alive = false;
+  objectiveSync(t, []);
+  assert(finishIfOver(t));
+  eq([t.winner, t.reason], ['enemy', 'The dropship was destroyed']);
+});
+
+check('defend: the enemy lights are raiders that head for the dropship and shoot it first; the heavier ones hunt', () => {
+  const s = encounterBattle(encounterById('dead-ground'), 'pool');
+  eq(livingMechs(s, 'enemy').filter(m => aiIsRaider(s, m)).map(m => m.id), ['E1', 'E3'], 'the Skitter and the Jackal');
+  eq(aiMoveFor(s, 'E1').intent, 'E1 GOES FOR THE DROPSHIP');
+  assert(aiMoveFor(s, 'E2').intent !== 'E2 GOES FOR THE DROPSHIP', 'the Ranger hunts');
+  const ship = mechById(s, s.objective.protect), e1 = mechById(s, 'E1');
+  e1.pos = [ship.pos[0] + 3, ship.pos[1]];
+  mechById(s, 'P1').pos = [ship.pos[0] + 4, ship.pos[1] + 1]; // VOSS is nearer, but the raider shoots the ship
+  const shots = aiPlanFire(s, 'enemy').shots.filter(x => x.mechId === 'E1');
+  assert(shots.length && shots.every(x => x.targetId === ship.id), `E1 should fire at the dropship, got ${JSON.stringify(shots)}`);
+});
+
+check('story: an AI playing dead ground wins often but not always (tuned for about 72%, the breather)', () => {
+  let won = 0;
+  const n = 60;
+  for (let seed = 1; seed <= n; seed++) {
+    const s = encounterBattle(encounterById('dead-ground'), 'pool');
+    runFight(s, new Rng(seed), 40);
+    assert(s.over, `seed ${seed} never finished`);
+    if (s.winner === 'player') won += 1;
+  }
+  assert(won > n * 0.45 && won < n * 0.92, `the AI won ${won} times in ${n}`);
 });

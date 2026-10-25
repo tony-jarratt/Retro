@@ -26,6 +26,7 @@ const COLOURS = {
 const MECH_LINE_COLOURS = ['#4fb3d9', '#ffd24a', '#c58bff', '#7ee08a']; // one per player mech, for aim lines
 
 let mapLayout = null;              // layoutFor(...) of the map on screen (view.js), set by buildMapCanvas
+let drawClock = 0;                 // the frame's clock, for sprites that animate (the dropship's engines); set by drawFrame
 let mapScroll = { x: 0, y: 0 };    // how far the map's picture is scrolled in the viewport (0, 0 for a map that fits)
 let mapCanvas = null;               // the whole map, drawn once
 let miniCanvas = null;              // a small copy of it for the minimap
@@ -193,6 +194,85 @@ function drawRepairBays(g, map) {
   }
 }
 
+// The storm (story weather, looks only): slanting rain over the map and, now and then, a lightning flash. Driven by the clock, so it is the same
+// every time for the same moment.
+function drawStorm(g, clock) {
+  g.save();
+  g.beginPath(); g.rect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); g.clip();
+  g.fillStyle = 'rgba(12,22,42,0.30)'; g.fillRect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); // the gloom
+  g.strokeStyle = 'rgba(200,220,245,0.45)'; g.lineWidth = 1.2;
+  g.beginPath();
+  for (let i = 0; i < 220; i++) {
+    const sx = ((i * 97.3 + clock * 60) % (VIEWPORT.w + 120)) - 60 + VIEWPORT.x;
+    const sy = ((i * 53.1 + clock * 520) % (VIEWPORT.h + 40)) - 20 + VIEWPORT.y;
+    g.moveTo(sx, sy); g.lineTo(sx - 6, sy + 18);
+  }
+  g.stroke();
+  const flash = (clock % 9.5) < 0.12 || ((clock + 0.25) % 9.5) < 0.06; // a double flicker every few seconds
+  if (flash) { g.fillStyle = 'rgba(220,230,255,0.18)'; g.fillRect(VIEWPORT.x, VIEWPORT.y, VIEWPORT.w, VIEWPORT.h); }
+  g.restore();
+}
+
+// The dropship (story, the defend goal), seen from above, nose to the east: a delta-winged lander on four pads, lit from the north west, with a
+// Republic chevron on the wings, three engines idling, and a fuel hose running to a bladder on the ground while it refuels. A broken, scorched
+// hull once destroyed.
+function drawShipAt(g, mech, x, y, alpha, flash, clock) {
+  const k = HEX_SCALE * 1.3; // bigger than a mech: it spills over its bank
+  const t = clock || 0;
+  const path = pts => { g.beginPath(); pts.forEach(([px, py], i) => g[i ? 'lineTo' : 'moveTo'](px * k, py * k)); g.closePath(); };
+  const wing = [[18, -4], [-14, -30], [-26, -30], [-22, -8], [-22, 8], [-26, 30], [-14, 30], [18, 4]];
+  const hull = [[38, 0], [30, -6], [10, -10], [-30, -10], [-36, -6], [-36, 6], [-30, 10], [10, 10], [30, 6]];
+  g.save();
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  g.translate(x, y);
+  g.fillStyle = 'rgba(0,0,0,0.38)'; // the shadow, offset to the south east
+  g.save(); g.translate(5 * k, 7 * k); path(wing); g.fill(); path(hull); g.fill(); g.restore();
+  if (!mech.alive) { // the wreck: half a wing gone, scorched, a smouldering glow
+    g.fillStyle = '#2b2a2c'; path([[18, -4], [-14, -30], [-26, -30], [-22, -8], [-22, 4], [-8, 6], [6, 3]]); g.fill();
+    g.fillStyle = '#3a3836'; path(hull); g.fill();
+    g.fillStyle = 'rgba(255,120,40,0.35)'; g.beginPath(); g.arc(-6 * k, 2 * k, (5 + Math.sin(t * 6)) * k, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#151416'; g.lineWidth = 2; for (const [a, b] of [[-20, -6], [4, 6], [-10, 8]]) { g.beginPath(); g.moveTo(a * k, -8 * k); g.lineTo(b * k, 8 * k); g.stroke(); }
+    g.restore(); return;
+  }
+  // the fuel hose: from the port side down to a fuel bladder on the ground, with a pulse running along it
+  const hose = [[-6, 10], [-4, 22], [-14, 30], [-24, 36]];
+  g.strokeStyle = '#1b1c1f'; g.lineWidth = 3.5 * k; g.beginPath(); hose.forEach(([px, py], i) => g[i ? 'lineTo' : 'moveTo'](px * k, py * k)); g.stroke();
+  g.strokeStyle = '#c9a227'; g.lineWidth = 1.5 * k; g.setLineDash([3 * k, 4 * k]); g.lineDashOffset = -t * 20; g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#26323a'; g.beginPath(); g.ellipse(-30 * k, 38 * k, 9 * k, 6 * k, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#3d4f5c'; g.beginPath(); g.ellipse(-31 * k, 36.5 * k, 6 * k, 3.5 * k, 0, 0, Math.PI * 2); g.fill();
+  // landing pads
+  g.fillStyle = '#2a2c31';
+  for (const [px, py] of [[-20, -22], [-20, 22], [16, -9], [16, 9]]) { g.beginPath(); g.arc(px * k, py * k, 3 * k, 0, Math.PI * 2); g.fill(); }
+  // the wings: lit on the north side, darker on the south
+  const wingShade = g.createLinearGradient(0, -30 * k, 0, 30 * k);
+  wingShade.addColorStop(0, '#6c7a90'); wingShade.addColorStop(0.5, '#4d5a6e'); wingShade.addColorStop(1, '#343d4c');
+  g.strokeStyle = '#000'; g.lineWidth = 4; path(wing); g.stroke(); path(hull); g.stroke(); // a dark outline under everything, as the mech sprites have
+  g.fillStyle = wingShade; path(wing); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; // the lit leading edges
+  g.beginPath(); g.moveTo(18 * k, -4 * k); g.lineTo(-14 * k, -30 * k); g.moveTo(18 * k, 4 * k); g.lineTo(-14 * k, 30 * k); g.stroke();
+  g.fillStyle = '#7fd0ff'; // the Republic chevron, one on each wing
+  for (const sgn of [-1, 1]) { path([[-4, 11 * sgn], [-13, 25 * sgn], [-19, 25 * sgn], [-10, 11 * sgn]]); g.fill(); }
+  // the hull
+  const hullShade = g.createLinearGradient(0, -10 * k, 0, 10 * k);
+  hullShade.addColorStop(0, '#d4d9df'); hullShade.addColorStop(0.45, '#b3bac3'); hullShade.addColorStop(1, '#7f8792');
+  g.fillStyle = hullShade; path(hull); g.fill();
+  g.strokeStyle = 'rgba(30,34,40,0.55)'; g.lineWidth = 1; // panel lines
+  for (const px of [-22, -10, 2]) { g.beginPath(); g.moveTo(px * k, -10 * k); g.lineTo(px * k, 10 * k); g.stroke(); }
+  g.beginPath(); g.moveTo(-30 * k, 0); g.lineTo(10 * k, 0); g.stroke();
+  // the cockpit glass, with a highlight
+  g.fillStyle = '#16253a'; path([[34, 0], [26, -5], [16, -5], [16, 5], [26, 5]]); g.fill();
+  g.fillStyle = 'rgba(160,210,255,0.55)'; path([[30, -2], [25, -4], [19, -4], [19, -2]]); g.fill();
+  // the engines: three nozzles, idling with a flicker
+  for (const py of [-6, 0, 6]) {
+    g.fillStyle = '#2a2d33'; g.fillRect(-40 * k, (py - 2.5) * k, 5 * k, 5 * k);
+    const glow = 0.45 + 0.25 * Math.sin(t * 9 + py);
+    g.fillStyle = `rgba(110,190,255,${glow})`; g.beginPath(); g.ellipse(-43 * k, py * k, (4 + 1.5 * Math.sin(t * 13 + py)) * k, 2 * k, 0, 0, Math.PI * 2); g.fill();
+  }
+  g.strokeStyle = COLOURS.player; g.lineWidth = 1.5; path(wing); g.stroke(); path(hull); g.stroke(); // our colour round the edge
+  if (flash) { g.globalAlpha *= 0.6; g.fillStyle = '#fff'; path(wing); g.fill(); path(hull); g.fill(); }
+  g.restore();
+}
+
 // A gun tower (story): a squat concrete emplacement whose turret turns to its target, or a broken stump once destroyed.
 function drawTowerAt(g, mech, x, y, facing, alpha, flash) {
   const k = HEX_SCALE;
@@ -241,6 +321,7 @@ function drawCrawlerAt(g, mech, x, y, facing, alpha, flash) {
 }
 
 function drawMechAt(g, mech, x, y, facing, alpha, flash) {
+  if (mech.ship) { drawShipAt(g, mech, x, y, alpha, flash, drawClock); return; }
   if (mech.tower) { drawTowerAt(g, mech, x, y, facing, alpha, flash); return; }
   if (mech.crawler) { drawCrawlerAt(g, mech, x, y, facing, alpha, flash); return; }
   g.save();
@@ -386,7 +467,7 @@ function drawMechCard(g, mech, x, y, opts = {}) {
   g.fillText(mech.pilot ? mech.pilot : `${mech.id}  ${mech.name}`, x + 10, y + 18); // a story pilot's name, or the id and chassis
   g.font = FONT_SMALL; g.fillStyle = !mech.alive || mech.shutdown ? '#ff7b6b' : COLOURS.dim;
   g.textAlign = 'right';
-  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.tower ? 'FIXED' : mech.crawler ? 'NO GUNS' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
+  g.fillText(!mech.alive ? 'DESTROYED' : mech.shutdown ? 'SHUT DOWN' : mech.ship ? 'REFUELLING' : mech.tower ? 'FIXED' : mech.crawler ? 'NO GUNS' : mech.pilot ? mech.name : classOf(mech).toUpperCase(), x + w - 10, y + 18);
   g.textAlign = 'left';
 
   // armour: points in the simple game, a percentage in the advanced one
@@ -958,6 +1039,7 @@ function drawBay(g, view) {
 // }
 function drawFrame(g, view) {
   const { state } = view;
+  drawClock = view.clock;
   g.fillStyle = COLOURS.bg; g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.save();
   const pad = mapLayout.pad;
@@ -1019,6 +1101,7 @@ function drawFrame(g, view) {
   if (view.finder && view.finder.lines.length) drawInfoBox(g, view.finder.path.length ? view.finder.path[view.finder.path.length - 1] : mechById(state, view.finder.mechId).pos, view.finder.lines);
   if (view.weapon && view.weapon.status) drawInfoBox(g, mechById(state, view.weapon.targetId).pos, weaponCalloutLines(view.weapon));
   g.restore();
+  if (state.weather === 'storm') drawStorm(g, view.clock); // over the viewport, in screen space (it does not zoom with the camera)
   drawEdgeArrows(g, state, view);
   drawMinimap(g, state, view);
 

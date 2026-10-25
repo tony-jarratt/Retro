@@ -254,6 +254,8 @@ const TERRAIN = {
   'P': { name: 'landing pad', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
   'd': { name: 'moon dust', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the depot's moon: clear ground
   'G': { name: 'hangar',    cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the raid's goal hexes
+  'f': { name: 'salt flat', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the marsh's open ground
+  'r': { name: 'reeds',     cost: 2, cover: 2, blocks: true,  height: 0, cool: 0 },   // the marsh's woods: cover, slow, block sight
   's': { name: 'shale',     cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the canyon floor: clear ground
   'Q': { name: 'road',      cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the prison crawler's road (the escort goal follows it)
   'W': { name: 'repair bay', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, repair: true }, // see REPAIR_ARMOUR

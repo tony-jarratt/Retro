@@ -1,11 +1,13 @@
 # Hexfire: the campaign (draft 2, 2026-10-25)
 
-**Built:** encounters 1 to 3 (Breakout, The Depot, The Column) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 4 to 7 are text only.
+**Built:** encounters 1 to 4 (Breakout, The Depot, The Column, Dead Ground) are playable from STORY, with the story screen, briefing, debrief and access phrase. Encounters 5 to 7 are text only.
 
 **Something to fight over in every mission** (the owner, 2026-10-25: these "add strategy within a mission"). Each mission gets one contested map feature:
 - 1 Breakout: the pad (and the gates the reinforcements come through).
 - 2 The Depot: repair bays (3 charges, stand still to repair; the enemy uses them too).
 - 3 The Column: the road itself (anything on it stops the crawler) and a repair bay on the ledge.
+- 4 Dead Ground: the dropship (their lights go straight for it) and the water (a lot of cooling; their team runs hot).
+- **Decided (2026-10-25): the sacrifice belongs to the finale**, where it is most emotional: one pilot holds the way in while the others go on, and the player chooses who.
 - Ideas for the rest: a **resupply crate** for a mission that leans on missiles or the howitzer (6, The Partner, is the natural one); a **sacrifice**: one mech has to hold a tile to keep a route open while the others go on (the finale, "who stays behind", or Dead Ground); field repair caches in the marsh. Implementation notes are in DESIGN.md, Story campaign.
 
 A fixed, linear story in seven encounters. No mech bay (free play is the sandbox), no damage carried over, no saving:
@@ -75,12 +77,12 @@ commanders are **partners**. Use the jargon sparingly: one phrase in a briefing 
 
 ## 4. DEAD GROUND
 **Map:** a salt marsh in a storm: water, reeds (woods), short sight lines.
-**Goal:** survive 8 rounds while the dropship refuels. **Enemy:** a turnaround team, faster than you.
+**Goal:** keep the dropship standing until the end of round 8. **Enemy:** a turnaround team: their lights are raiders that go straight for the dropship, the rest hunt you; more arrive from the south, north and east over rounds 2 to 5.
 **Squad:** VOSS Warden, HALE Bulwark, WREN Skitter.
 
 > The Consortium has brought in a turnaround team. They are sent when a problem has gone on too long.
-> The dropship needs eight minutes of fuel. The marsh is the only cover for a hundred kilometres.
-> Hold them off. Stay in the water: they run hot.
+> The dropship needs eight minutes of fuel, and the marsh is the only cover for a hundred kilometres.
+> Their fast ones will go for the ship. Stay in the water: they run hot.
 
 *Debrief:* HALE draws the core at Halcyon in the mud with a stick. "The banks only open to a partner's credentials. There is one partner on this side of the world, and a lab that builds what guards him."
 **Access phrase: SALT MARSH**

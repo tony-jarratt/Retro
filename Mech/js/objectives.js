@@ -9,6 +9,8 @@
 //   exit          get to the exit: when every living mech of a side is inside its side's exit hexes at once, that side wins (the slowest mech sets the pace)
 //   raid          (story only) destroy every target (the gun towers, ids in `targets`), then the runner (one named mech of the player's) has to
 //                 stand in the hangar. If the runner is destroyed the player has lost; at the round limit too
+//   defend        (story only) hold out until the end of round `rounds` with `protect` (one of the player's units, the dropship) still standing.
+//                 It destroyed and the player has lost
 //   escort        (story only) the prison crawler (`escort`, one of the player's units, no guns) drives itself along `route` (a list of road hexes)
 //                 and has to reach its end. It destroyed, or the round limit, and the player has lost
 //   escape        (story only) the player's whole living squad has to reach its exit before the round limit; the enemy only hunts. At the limit the
@@ -44,6 +46,10 @@ OBJECTIVES.raid = { // a story goal
   id: 'raid', name: 'RAID', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
   blurb: 'Destroy the gun towers, then get the runner into the hangar. Lose the runner and you have lost.',
 };
+OBJECTIVES.defend = { // a story goal
+  id: 'defend', name: 'DEFEND', ready: true, roundLimit: null, sizes: ['small', 'large'], story: true,
+  blurb: 'Keep the dropship standing until it has refuelled. Their raiders will go for it.',
+};
 OBJECTIVES.escort = { // a story goal
   id: 'escort', name: 'ESCORT', ready: true, roundLimit: 14, sizes: ['small', 'large'], story: true,
   blurb: 'Keep the prison crawler alive until it reaches the end of the road. Anything on the road stops it.',
@@ -68,6 +74,8 @@ function setupObjective(state, scenario, goalId) {
     o.target = HILL_TARGET;
   } else if (goalId === 'exit' || goalId === 'escape') {
     o.exits = scenario.exits;
+  } else if (goalId === 'defend') {
+    o.protect = scenario.protect; o.rounds = scenario.rounds;
   } else if (goalId === 'escort') {
     o.escort = scenario.escort; o.route = scenario.route;
   } else if (goalId === 'raid') {
@@ -117,6 +125,7 @@ function objectiveAfterMove(state, mech, path, events) {
 function objectiveSync(state, events) {
   const o = state.objective;
   if (o && o.id === 'raid' && !o.result) { raidCheck(state, events); return; }
+  if (o && o.id === 'defend' && !o.result) { if (!mechById(state, o.protect).alive) o.result = { winner: 'enemy', code: 'defend-lost' }; return; }
   if (o && o.id === 'escort' && !o.result) { if (!mechById(state, o.escort).alive) o.result = { winner: 'enemy', code: 'escort-lost' }; return; } // the last tower may fall with the runner already inside, or the runner may die
   if (!o || o.id !== 'flag' || !o.flag.carrier) return;
   const carrier = mechById(state, o.flag.carrier);
@@ -131,6 +140,7 @@ function objectiveAfterRound(state, events) {
   if (!o || o.result) return;
   objectiveSync(state, events);
   if (o.result) return; // (the raid's runner may have died in the heat, or got in)
+  if (o.id === 'defend' && state.round >= o.rounds) { o.result = { winner: 'player', code: 'defend' }; return; } // refuelled, and still standing
   if (o.id === 'hill') {
     const inside = side => livingMechs(state, side).filter(m => inGroup(o.zone, m.pos)).length;
     const p = inside('player'), e = inside('enemy');
@@ -200,6 +210,8 @@ function reasonText(state, code, winner) {
     case 'flag': return you ? 'You carried the flag back to your base' : 'The enemy carried the flag back to their base';
     case 'exit': return you ? 'Your whole squad reached the exit' : 'The enemy squad reached their exit';
     case 'escape': return 'Your whole squad got out';
+    case 'defend': return `You held out for ${o.rounds} rounds: the dropship is fuelled`;
+    case 'defend-lost': return 'The dropship was destroyed';
     case 'escort': return 'The crawler made it out of the canyon';
     case 'escort-lost': return 'The crawler was destroyed';
     case 'escort-late': return `Time ran out after round ${o.roundLimit}: the crawler is still in the canyon`;
@@ -222,6 +234,7 @@ function objectiveStatus(state) {
   const lines = [];
   if (o.roundLimit) lines.push(`ROUND ${state.round} OF ${o.roundLimit}`);
   if (o.id === 'hill') lines.push(`HILL  YOU ${o.score.player}  ENEMY ${o.score.enemy}  (FIRST TO ${o.target})`);
+  if (o.id === 'defend') lines.push(`REFUELLING: ROUND ${state.round} OF ${o.rounds}`);
   if (o.id === 'escort') lines.push(`CRAWLER: ${crawlerToGo(state)} HEXES TO GO`);
   if (o.id === 'raid') lines.push(targetsLeft(state) ? `TOWERS STANDING ${targetsLeft(state)} OF ${o.targets.length}` : `TOWERS DOWN: ${runnerName(state)} TO THE HANGAR`);
   if (o.id === 'flag') lines.push(o.flag.carrier ? `FLAG: ${o.flag.carrier} CARRIES IT` : o.flag.pos ? 'FLAG: ON THE GROUND' : 'FLAG: LOST');
