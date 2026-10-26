@@ -12,13 +12,13 @@
 
 // ---------- lookups ----------
 function chassisById(id) {
-  const c = CHASSIS.find(x => x.id === id);
+  const c = id === SQUAD_CHASSIS.id ? SQUAD_CHASSIS : CHASSIS.find(x => x.id === id);
   if (!c) throw new BuildError('chassis', `Unknown chassis id ${id}`);
   return c;
 }
 
 function weaponById(id) {
-  const w = WEAPONS.find(x => x.id === id);
+  const w = id === SQUAD_RIFLE.id ? SQUAD_RIFLE : WEAPONS.find(x => x.id === id);
   if (!w) throw new BuildError('part', `Unknown weapon id ${id}`);
   return w;
 }
@@ -195,6 +195,27 @@ function battleFor(playerSpecs, difficultyName, first = 'player', model = DEFAUL
   return state;
 }
 
+// An infantry squad (see SQUAD_CHASSIS): a unit in state.mechs with one armour point and the squad rifles, in the armour-pool model whatever
+// the battle's model (one hit, gone).
+function makeSquad(id, side, pos, facing) {
+  const squad = makeMech({ chassis: SQUAD_CHASSIS.id, armour: 0, sinks: 0, weapons: [SQUAD_RIFLE.id, 0, 0] }, { id, side, pos, facing, toHit: SQUAD_NEED, model: 'pool' });
+  squad.hp = 1; squad.maxHp = 1; squad.infantry = true;
+  return squad;
+}
+
+// The INFANTRY switch: SQUADS_PER_SIDE squads a side (I1, I2 yours, J1, J2 theirs), each starting on the nearest free hex one step in from
+// a mech start (the first and last starts, so one goes north and one south).
+function addSquads(state, scenario) {
+  for (const [side, starts, facing, prefix, inward] of [['player', scenario.playerStarts, scenario.playerFacing, 'I', 1], ['enemy', scenario.enemyStarts, scenario.enemyFacing, 'J', -1]]) {
+    const from = [starts[0], starts[starts.length - 1]];
+    for (let i = 0; i < SQUADS_PER_SIDE; i++) {
+      const [c, r] = from[i % from.length];
+      state.mechs.push(makeSquad(prefix + (i + 1), side, nearestFreeHex(state, [c + inward, r]), facing));
+    }
+  }
+  return state;
+}
+
 function cloneState(state) { return JSON.parse(JSON.stringify(state)); }
 
 function mechById(state, id) {
@@ -213,7 +234,8 @@ function livingMechs(state, side) {
 function otherSide(side) { return side === 'player' ? 'enemy' : 'player'; }
 
 // Mechs a side still has: the living ones on the map plus any reinforcements yet to arrive (state.reserves, see arriveReserves).
-function mechsLeft(state, side) { return livingMechs(state, side).length + (state.reserves || []).filter(r => r.mech.side === side).length; }
+// Infantry squads do not count: a side with only squads left has lost.
+function mechsLeft(state, side) { return livingMechs(state, side).filter(m => !m.infantry).length + (state.reserves || []).filter(r => r.mech.side === side).length; }
 
 function checkWinner(state) {
   const p = mechsLeft(state, 'player'), e = mechsLeft(state, 'enemy');
@@ -271,7 +293,7 @@ function walkAllowance(mech) {
 
 function runAllowance(mech) {
   const walk = walkAllowance(mech);
-  if (walk === 0 || legsLost(mech) > 0 || mech.carrying || mech.crawler) return 0;
+  if (walk === 0 || legsLost(mech) > 0 || mech.carrying || mech.crawler || mech.infantry) return 0; // (squads never run)
   return Math.floor(walk * RUN_FACTOR);
 }
 
@@ -293,7 +315,7 @@ function occupiedKeys(state, exceptId) {
 // Every hex the mech could reach in this mode (a Map, see reachableHexes in map.js). Use pathTo for a plan's path.
 function reachableFor(state, mechId, mode) {
   const mech = mechById(state, mechId);
-  return reachableHexes(state.map, mech.pos, allowanceFor(mech, mode), occupiedKeys(state, mech.id));
+  return reachableHexes(state.map, mech.pos, allowanceFor(mech, mode), occupiedKeys(state, mech.id), mech.infantry);
 }
 
 // ---------- movement ----------
@@ -322,7 +344,7 @@ function validateMovePlan(state, plan) {
     if (!inMap(state.map, hex[0], hex[1])) throw new PlanError('off-map', `${who}: hex ${key} is off the map`);
     if (hexDist(prev[0], prev[1], hex[0], hex[1]) !== 1) throw new PlanError('not-adjacent', `${who}: hex ${key} does not touch the previous hex`);
     if (seen.has(key)) throw new PlanError('revisit', `${who}: the path visits hex ${key} twice`);
-    if (!isPassable(state.map, hex[0], hex[1])) throw new PlanError('impassable', `${who}: hex ${key} is ${terrainAt(state.map, hex[0], hex[1]).name}, which no mech can enter`);
+    if (!canEnter(state.map, hex[0], hex[1], mech.infantry)) throw new PlanError('impassable', `${who}: hex ${key} is ${terrainAt(state.map, hex[0], hex[1]).name}, which no mech can enter`);
     if (occupied.has(key)) throw new PlanError('occupied', `${who}: hex ${key} is occupied by another mech`);
     seen.add(key);
     cost += terrainAt(state.map, hex[0], hex[1]).cost;
@@ -369,7 +391,7 @@ function eligibleWeapons(state, mechId) {
 }
 
 // Can this weapon fire at this target now, and what are the odds? Returns { valid: false, reason } with the
-// reason one of self, friendly, target-dead, too-close, out-of-range, no-line-of-sight; or, when valid,
+// reason one of self, friendly, target-dead, too-close, out-of-range, no-line-of-sight, not-a-squad; or, when valid,
 // { valid: true, dist, band, need, chance, mods } where `need` is the d20 number to equal or beat.
 //
 // Lasers and cannon need line of sight. Indirect weapons (rockets, the howitzer) need range but not line of sight, and firing
@@ -396,22 +418,40 @@ function targetStatus(state, attackerId, slot, targetId) {
   if (band < 0) return no('out-of-range');
   const sees = hasLineOfSight(state.map, attacker.pos, target.pos);
   if (!sees && !weapon.indirect) return no('no-line-of-sight');
+  const terrain = terrainAt(state.map, target.pos[0], target.pos[1]);
 
-  const mods = [
-    { name: 'base to-hit', value: attacker.toHit },
-    { name: `range ${dist} hexes`, value: Math.floor((dist - 1) / RANGE_STEP_HEXES) },
-    { name: 'target size', value: SIZE_MOD[chassisById(target.chassisId).cls] },
-    { name: 'you moved', value: MOVED_HIT_MOD[attacker.moved] },
-    { name: 'they moved', value: MOVED_HIT_MOD[target.moved] * (weapon.moverFactor || 1) }, // slow shells are worse against movers
-    { name: 'heat', value: heatStep(attacker).hit },
-    { name: 'cover', value: terrainAt(state.map, target.pos[0], target.pos[1]).cover },
-    { name: 'target shut down', value: target.shutdown ? SHUTDOWN_TARGET_MOD : 0 },
-    { name: 'no line of sight', value: sees ? 0 : INDIRECT_NO_LOS_MOD },
-    { name: 'sensor tower', value: holdsSensor(state, attacker.side) ? SENSOR_HIT_MOD : 0 },
-  ].filter(m => m.value !== 0 || m.name === 'base to-hit');
+  let mods;
+  if (weapon.squadOnly) { // a squad's rifles: only at another squad, a flat chance made harder by its cover
+    if (!target.infantry) return no('not-a-squad');
+    mods = [{ name: 'squad rifles', value: SQUAD_NEED }, { name: 'dug in', value: squadCover(terrain) }].filter(m => m.value !== 0 || m.name === 'squad rifles');
+  } else {
+    const spotted = spotters(state, attacker.side, target).length > 0;
+    mods = [
+      { name: 'base to-hit', value: attacker.toHit },
+      { name: `range ${dist} hexes`, value: Math.floor((dist - 1) / RANGE_STEP_HEXES) },
+      { name: 'target size', value: target.infantry ? 0 : SIZE_MOD[chassisById(target.chassisId).cls] },
+      { name: 'you moved', value: MOVED_HIT_MOD[attacker.moved] },
+      { name: 'they moved', value: MOVED_HIT_MOD[target.moved] * (weapon.moverFactor || 1) }, // slow shells are worse against movers
+      { name: 'heat', value: heatStep(attacker).hit },
+      { name: 'cover', value: target.infantry ? 0 : terrain.cover },
+      { name: 'dug in', value: target.infantry ? squadCover(terrain) : 0 }, // a squad's cover in place of the size and the cover
+      { name: 'target shut down', value: target.shutdown ? SHUTDOWN_TARGET_MOD : 0 },
+      { name: 'no line of sight', value: sees || spotted ? 0 : INDIRECT_NO_LOS_MOD }, // a squad that sees it guides the rockets in
+      { name: 'spotted', value: spotted ? SPOT_HIT_MOD : 0 },
+      { name: 'sensor tower', value: holdsSensor(state, attacker.side) ? SENSOR_HIT_MOD : 0 },
+    ].filter(m => m.value !== 0 || m.name === 'base to-hit');
+  }
   const raw = mods.reduce((sum, m) => sum + m.value, 0);
   const need = Math.min(NEED_MAX, Math.max(NEED_MIN, raw));
   return { valid: true, reason: 'ok', targetId, dist, band: BAND_NAMES[band], need, chance: (21 - need) * 5, mods };
+}
+
+// The cover a squad has on this terrain (SQUAD_COVER): a building, cover (woods, reeds), or the open.
+function squadCover(terrain) { return terrain.passable === false ? SQUAD_COVER.building : terrain.cover > 0 ? SQUAD_COVER.cover : SQUAD_COVER.open; }
+
+// The living squads of `side` that can see `target` within SPOT_RANGE (they spot it for their side's mechs).
+function spotters(state, side, target) {
+  return livingMechs(state, side).filter(m => m.infantry && hexDist(m.pos[0], m.pos[1], target.pos[0], target.pos[1]) <= SPOT_RANGE && hasLineOfSight(state.map, m.pos, target.pos));
 }
 
 // Does this side have a living mech standing on a sensor tower? (Then its shots are SENSOR_HIT_MOD easier.)
@@ -440,7 +480,8 @@ function defaultTarget(state, attackerId, slot) {
     lockLost = status.reason;
   }
   // smoke is offered on anyone, but is suggested on an enemy
-  const options = validTargets(state, attackerId, slot).filter(s => !s.smoke || mechById(state, s.targetId).side !== attacker.side);
+  let options = validTargets(state, attackerId, slot).filter(s => !s.smoke || mechById(state, s.targetId).side !== attacker.side);
+  if (options.some(s => !mechById(state, s.targetId).infantry)) options = options.filter(s => !mechById(state, s.targetId).infantry); // a mech before a squad
   if (!options.length) return { targetId: null, reason: 'none', lockLost };
   return { targetId: options[0].targetId, reason: lockLost ? 'lost-lock-nearest' : 'nearest', lockLost };
 }

@@ -18,7 +18,7 @@
 
 function newFirePlanner(state, side) {
   const items = [], skipped = [];
-  const mechIds = livingMechs(state, side).filter(m => !m.crawler && !m.tower).map(m => m.id); // the prison crawler and the dropship (story) have no guns and are never asked
+  const mechIds = livingMechs(state, side).filter(m => !m.crawler && !m.tower && !m.infantry).map(m => m.id); // the prison crawler and the dropship (story) have no guns, and infantry fire by themselves: never asked
   for (const id of mechIds) {
     const mech = mechById(state, id);
     // a mech with no weapon that can fire gets one question of its own, so it can still choose to self-destruct

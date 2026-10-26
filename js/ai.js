@@ -17,6 +17,7 @@ const AI_NO_VIEW_PENALTY = 3;
 const AI_REPAIR_BELOW = 0.5;  // a mech below this share of its armour, or with a weapon knocked out, goes to a repair bay...
 const AI_REPAIR_RANGE = 8;
 const AI_SENSOR_RANGE = 10; // a side that holds no sensor tower sends the mech nearest a free one, if it is within this many hexes
+const AI_SQUAD_LEASH = 4;    // a squad spots from cover within this many hexes of one of its side's mechs, and goes for an enemy squad this close to one
 const AI_RAID_RANGE = 3;      // the defend goal: a raider closes to this many hexes of the dropship
 
 // The defend goal (story): the enemy's lights are raiders, sent for the thing the player is protecting.
@@ -143,7 +144,7 @@ function aiSensorGoal(state, mech) {
   if (holdsSensor(state, mech.side)) return null;
   const free = towers.filter(t => !livingMechs(state).some(m => sameHex(m.pos, t)));
   const near = (m, t) => hexDist(m.pos[0], m.pos[1], t[0], t[1]);
-  const mobile = livingMechs(state, mech.side).filter(m => !m.shutdown && walkAllowance(m) > 0 && !m.crawler);
+  const mobile = livingMechs(state, mech.side).filter(m => !m.shutdown && walkAllowance(m) > 0 && !m.crawler && !m.infantry); // (squads have their own jobs)
   let best = null; // the side's mech nearest any free tower in range
   for (const t of free) for (const m of mobile) {
     const d = near(m, t);
@@ -157,7 +158,7 @@ function aiSensorGoal(state, mech) {
 // a plan, a note and the goal's intent line, or null if no goal hex can be reached (then the mech just fights). A mech within `hold` hexes of
 // the goal stays where it is, so a guard does not walk into the hexes it is guarding.
 function aiMoveToGoal(state, mech, goal, blocked) {
-  const everywhere = reachableHexes(state.map, mech.pos, 999, blocked);
+  const everywhere = reachableHexes(state.map, mech.pos, 999, blocked, mech.infantry);
   const here = hexKey(mech.pos[0], mech.pos[1]);
   let best = null;
   for (const [c, r] of goal.hexes) {
@@ -177,6 +178,63 @@ function aiMoveToGoal(state, mech, goal, blocked) {
   return { plan: { mechId: mech.id, mode, path }, note: `${mech.id} ${mode}s to ${hexKey(end[0], end[1])}: ${goal.why} (${best.node.cost} movement away)`, intent: goal.intent };
 }
 
+// An infantry squad's move (free play, the INFANTRY switch; on both sides, as squads are never the player's to command). Its jobs, the first
+// that it can do:
+//   1. hold: a squad on a sensor tower (or the hill) stays; a side that holds no tower (no hill) sends its squad nearest a free one
+//   2. clear: go for an enemy squad that holds a tower or the hill, or that is within AI_SQUAD_LEASH of one of its side's mechs (spotting
+//      for them), to a hex within its rifles' reach that sees it (only the side's squad nearest that enemy squad goes)
+//   3. spot: from cover (woods, reeds, a building) within AI_SQUAD_LEASH of a friendly mech that sees an enemy mech within SPOT_RANGE
+//   4. otherwise keep close to the nearest friendly mech
+function aiSquadMove(state, squad) {
+  const o = state.objective, map = state.map, side = squad.side;
+  const near = (a, pos) => hexDist(a.pos[0], a.pos[1], pos[0], pos[1]);
+  const ownSquads = livingMechs(state, side).filter(m => m.infantry);
+  const nearestOwn = pos => ownSquads.slice().sort((a, b) => near(a, pos) - near(b, pos) || byId(a, b))[0];
+  const friends = livingMechs(state, side).filter(m => !m.infantry && !m.crawler);
+  const foes = livingMechs(state, otherSide(side)), enemyMechs = foes.filter(m => !m.infantry), enemySquads = foes.filter(m => m.infantry);
+  const hill = o && o.id === 'hill' ? o.zone : [];
+  const towers = sensorHexes(map);
+  const occupied = pos => livingMechs(state).some(m => sameHex(m.pos, pos));
+  const blocked = occupiedKeys(state, squad.id);
+  const goals = [];
+  const hexesWhere = test => { const out = []; for (let c = 0; c < map.cols; c++) for (let r = 0; r < map.rows; r++) if (canEnter(map, c, r, true) && test(c, r)) out.push([c, r]); return out; };
+
+  // 1. hold
+  if (towers.some(t => sameHex(t, squad.pos))) goals.push({ hexes: [squad.pos], run: false, why: 'holds the sensor tower', intent: `${squad.id} HOLDS THE SENSOR TOWER`, hold: 0 });
+  if (inGroup(hill, squad.pos)) goals.push({ hexes: [squad.pos], run: false, why: 'holds the hill', intent: `${squad.id} HOLDS THE HILL`, hold: 0 });
+  const freeTowers = holdsSensor(state, side) ? [] : towers.filter(t => !occupied(t) && nearestOwn(t).id === squad.id);
+  if (freeTowers.length) goals.push({ hexes: freeTowers, run: false, why: 'goes for the sensor tower', intent: `${squad.id} GOES FOR THE SENSOR TOWER`, hold: 0 });
+  if (hill.length && !ownSquads.some(m => inGroup(hill, m.pos)) && nearestOwn(o.centre || hill[0]).id === squad.id) goals.push({ hexes: hill, run: false, why: 'goes for the hill', intent: `${squad.id} GOES FOR THE HILL`, hold: 0 });
+
+  // 2. clear
+  const threats = enemySquads.filter(e => towers.some(t => sameHex(t, e.pos)) || inGroup(hill, e.pos) || friends.some(f => near(f, e.pos) <= AI_SQUAD_LEASH))
+    .filter(e => nearestOwn(e.pos).id === squad.id).sort((a, b) => near(squad, a.pos) - near(squad, b.pos) || byId(a, b));
+  for (const e of threats) {
+    const reach = SQUAD_RIFLE.range[2];
+    const spots = hexesWhere((c, r) => hexDist(c, r, e.pos[0], e.pos[1]) <= reach && hexDist(c, r, e.pos[0], e.pos[1]) >= 1 && hasLineOfSight(map, [c, r], e.pos));
+    if (spots.some(h => sameHex(h, squad.pos))) goals.push({ hexes: [squad.pos], run: false, why: `fights ${e.id}`, intent: `${squad.id} FIGHTS THEIR SQUAD ${e.id}`, hold: 0 });
+    else goals.push({ hexes: spots, run: false, why: `goes for ${e.id}`, intent: `${squad.id} GOES FOR THEIR SQUAD ${e.id}`, hold: 0 });
+  }
+
+  // 3. spot
+  const lookout = (c, r) => squadCover(terrainAt(map, c, r)) > 0 && friends.some(f => hexDist(c, r, f.pos[0], f.pos[1]) <= AI_SQUAD_LEASH)
+    && enemyMechs.some(e => hexDist(c, r, e.pos[0], e.pos[1]) <= SPOT_RANGE && hasLineOfSight(map, [c, r], e.pos));
+  const where = t => (t.passable === false ? 'A BUILDING' : 'THE ' + t.name.toUpperCase());
+  if (lookout(squad.pos[0], squad.pos[1])) goals.push({ hexes: [squad.pos], run: false, why: 'spots from cover', intent: `${squad.id} SPOTS FROM ${where(terrainAt(map, squad.pos[0], squad.pos[1]))}`, hold: 0 });
+  else goals.push({ hexes: hexesWhere(lookout), run: false, why: 'moves up to spot', intent: `${squad.id} MOVES UP TO SPOT`, hold: 0 });
+
+  // 4. keep close
+  const buddy = friends.slice().sort((a, b) => near(squad, a.pos) - near(squad, b.pos) || byId(a, b))[0];
+  if (buddy) goals.push({ hexes: hexesWhere((c, r) => hexDist(c, r, buddy.pos[0], buddy.pos[1]) <= 2), run: false, why: `keeps close to ${buddy.id}`, intent: `${squad.id} STAYS WITH ${buddy.id}`, hold: 2 });
+
+  for (const goal of goals) {
+    if (!goal.hexes.length) continue;
+    const moved = aiMoveToGoal(state, squad, goal, blocked);
+    if (moved) return moved;
+  }
+  return { plan: { mechId: squad.id, mode: 'stand', path: [] }, note: `${squad.id} stands still: nothing it can do`, intent: null };
+}
+
 // Plans one mech's move. Returns { plan, note }: a move plan the rules accept, and a line of reasoning.
 //
 // A mech that can already shoot something from where it stands fine-tunes its position within this move: the
@@ -188,9 +246,10 @@ function aiMoveFor(state, mechId) {
   const mech = mechById(state, mechId);
   if (!mech.alive) throw new PlanError('dead-mech', `aiMoveFor: ${mechId} is destroyed`);
   const stand = reason => ({ plan: { mechId, mode: 'stand', path: [] }, note: `${mech.id} stands still: ${reason}` });
-  const enemies = livingMechs(state, otherSide(mech.side));
+  const enemies = livingMechs(state, otherSide(mech.side)).filter(m => !m.infantry); // a mech goes after mechs (it shoots a squad only when there is nothing better)
   if (!enemies.length) return stand('no enemies left');
   if (mech.crawler) return crawlerMove(state, mech); // the prison crawler (story) only ever drives along its road
+  if (mech.infantry) return aiSquadMove(state, mech);
   if (mech.shutdown) return stand('shut down');
   if (walkAllowance(mech) === 0) return stand('cannot move');
   if (mech.heat >= AI_STAND_HEAT) return stand(`cooling down at heat ${mech.heat}`);

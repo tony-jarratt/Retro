@@ -245,12 +245,12 @@ const TERRAIN = {
   'H': { name: 'hills',  cost: 2, cover: 0, blocks: false, height: 1, cool: 0 },
   '~': { name: 'water',  cost: 2, cover: 0, blocks: false, height: 0, cool: 5 }, // water is the big cooler: a Jackal sheds 1 from its sinks, 3 standing, 8 in water
   'R': { name: 'rubble', cost: 2, cover: 0, blocks: false, height: 0, cool: 0 },
-  'B': { name: 'building', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false },
+  'B': { name: 'building', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false, squads: true }, // squads: infantry can go in
   'M': { name: 'peak',     cost: 1, cover: 0, blocks: true, height: 2, cool: 0, passable: false },
   // The story's own ground (the freight yard): concrete is clear ground by another look, a container stack is a building by another look,
   // and a landing pad is clear ground marked for a dropship.
   'c': { name: 'concrete',  cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
-  'C': { name: 'containers', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false },
+  'C': { name: 'containers', cost: 1, cover: 2, blocks: true, height: 0, cool: 0, passable: false, squads: true },
   'P': { name: 'landing pad', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },
   'd': { name: 'moon dust', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the depot's moon: clear ground
   'G': { name: 'hangar',    cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },   // the raid's goal hexes
@@ -273,6 +273,20 @@ const REPAIR_CHARGES = 3;
 // Ammo caches (terrain with `resupply`): the same deal for ammunition. A mech that stood still on one has every weapon that uses ammo filled back
 // up to what it carries at the start. RESUPPLY_CHARGES a cache; a mech with nothing to fill uses none.
 const RESUPPLY_CHARGES = 2;
+// Infantry (free play, the INFANTRY switch; see "Infantry" in DESIGN.md). A squad is a unit in state.mechs with `infantry: true`, always moved
+// and fired by the computer, on either side. It has one armour point (any hit destroys it), walks SQUAD_CHASSIS.speed, never runs, and can go
+// into buildings. Its RIFLES fire only at enemy squads within 2 hexes. Mechs can shoot squads: the squad's cover (squadCover in rules.js)
+// takes the place of the size modifier and the terrain's cover. A side's mech shots at an enemy one of its squads can see within SPOT_RANGE
+// are SPOT_HIT_MOD easier, and rockets lose their no-line-of-sight penalty against it. Squads do not count as mechs: a side with only squads
+// left has lost. They are not in CHASSIS or WEAPONS, so the mech bay never offers them.
+const SQUAD_CHASSIS = { id: 90, name: 'INFANTRY', cls: 'infantry', speed: 3, sinks: 0, armourScale: 0, structureScale: 0, cost: 0, capacity: 1 };
+const SQUAD_RIFLE = { id: 90, name: 'RIFLES', kind: 'rifle', size: 1, dmg: 1, heat: 0, ammo: null, range: [2, 2, 2], minRange: 0, cost: 0, squadOnly: true };
+const SQUADS_PER_SIDE = 2;
+const SQUAD_NEED = 11;          // a squad's rifles at another squad: 50% in the open, before its cover
+const SQUAD_COVER = { open: 0, cover: 3, building: 5 }; // added to the number needed to hit a squad: in the open, in woods or reeds, in a building
+const SPOT_RANGE = 6;
+const SPOT_HIT_MOD = -1;
+
 // Sensor towers (terrain with `sensor`): while a living mech of a side stands on one, every shot that side fires is this much easier (a spotter).
 // It does not add up: holding two towers is the same as holding one.
 const SENSOR_HIT_MOD = -1;

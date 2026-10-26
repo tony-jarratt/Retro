@@ -18,7 +18,7 @@ The name is Hexfire. It has not been checked for existing marks yet (milestone 7
 First: **play-test the story for balance** (`index.html?playtest` opens every mission). Then, in no fixed order:
 - **Cut scenes in story mode**: short drawn scenes between missions (the dropship lifting off, the crawler leaving the canyon, the doors), beyond the text briefings and debriefs.
 - **Player v player**: two people on one screen (hot seat), each building a squad in the bay. The turn structure already alternates the sides.
-- **Ground troops, XCOM-style** (a significant change): infantry squads as well as mechs. Two shapes: (a) **on the same hex grid**, small units beside the mechs (cheap, hard to hit, good in cover and buildings, can capture or hold hexes, but a mech shot or a howitzer shell ruins them); or (b) **a zoom-in**: a hex such as a building, a hangar or the core's hall opens into a finer grid where the troops fight it out room by room, and the result feeds back to the mech battle. (a) fits the rules as they are; (b) is close to a second game. **The owner prefers (a), troops on the same grid, as the way to try it; parked until after the play-test.**
+- **Ground troops, XCOM-style** (a significant change): infantry squads as well as mechs. Two shapes: (a) **on the same hex grid**, small units beside the mechs (cheap, hard to hit, good in cover and buildings, can capture or hold hexes, but a mech shot or a howitzer shell ruins them); or (b) **a zoom-in**: a hex such as a building, a hangar or the core's hall opens into a finer grid where the troops fight it out room by room, and the result feeds back to the mech battle. (a) fits the rules as they are; (b) is close to a second game. **The owner prefers (a), troops on the same grid, as the way to try it; parked until after the play-test.** Taken up on 2026-10-26: see **Infantry (proposal)** below.
 - Also raised: **pilot traits** (a small edge per named pilot), and balancing free play's enemy forces and heavies.
 
 ## Status
@@ -40,6 +40,45 @@ Milestones 1 to 3 are written: the rules engine, data, squad code and tests, the
 **Win conditions** (`objectives.js`; last mech standing is always in force, so a wiped-out side loses whatever the goal): **last mech standing** (no round limit); **capture the flag** (a flag on the centre hex; a move that passes through or ends on it picks it up; a carrier cannot run; a destroyed carrier drops it where it died; carry it into your own `bases` hexes to win; limit 20 rounds); **king of the hill** (the 7-hex zone round the centre; at the end of each round the side with more living mechs in it scores a point, level scores nothing; first to `HILL_TARGET` (4) wins; limit 15); **get to the exit** (each side has an `exits` group of hexes, in the far corner of the other half; **the whole living squad has to be inside its exit at once**, so the slowest mech sets the pace and a squad with a heavy loses the race to an all-light one; a destroyed mech need not get out; limit 15; this replaced "any one mech" because the fastest mech won the race in about 3 rounds). **Time limit** ("timed run"): at the limit the battle is decided on hill points (hill only), then total armour left, else a draw, and the result says so. The result screen always gives the **reason** (`state.reason`, from `reasonText`). Move-based wins are checked after every move (`finishIfOver` in main.js `performMove`, and the test runners), the hill and the limit in `endRound`; `objectiveSync` drops the flag when its carrier is destroyed. **AI** (`aiGoalFor` and `aiMoveToGoal` in `ai.js`, with roles): exit, every mech heads for its exit and runs; hill, every mech goes for the hill and a mech on it stays; flag, the carrier walks it home, the nearest mech fetches a loose flag, the nearest other mech escorts a friendly carrier, the slowest spare mech guards its own base (within 4 hexes, when there are enough mechs), and when the enemy has the flag everyone hunts the carrier and shoots it in preference to anything else. **The AI says what it is doing**: when a mech's job changes the combat log gets a line (`E2 HEADS FOR THE EXIT`, `E1 CARRIES THE FLAG HOME`, `E3 GUARDS THE BASE`). The balance report has a `GOALS` section (rounds per map and how each goal ends, AI v AI, every normal enemy force), a `FORCES` section and the `SHOTS` section. Measured on the three small maps (average rounds, AI v AI): last mech standing about 8, flag about 6, hill about 5.5, exit about 5.5 (it was 3 before the whole-squad rule). Backlog, not built: assassination (kill the marked commander), defend or survive N rounds, escort a VIP to an exit, destroy depots, salvage a wreck, waves, an exit that needs only N mechs (for story missions), a scrolling camera for maps bigger than 25 x 16.
 
 **Enemy forces (2026-10-07).** Each difficulty has a pool of five enemy squads (`ENEMY_FORCES` in `data.js`: easy ESCORT, RAIDERS, GUNLINE, ROCKETEERS, BRAWLERS; normal HEAVY SCREEN, SIEGE LINE, STRIKE WING, ROCKET SCREEN, HAMMER WING; hard MONOLITH COLUMN, STEEL WALL, GHOST PACK, ARTILLERY PARK, STORM FRONT), each within 8% of the difficulty's enemy cost (87, 118, 144; checked by a test). The first of each is the squad the game always fought before; `ENEMY_SQUADS` still holds those. **A battle picks its force at random**, the **bay shows it** (an `ENEMY:` button with the name, cost and mechs; click it for a different one, never the same twice running), a new battle after a result picks a fresh one, R (replay) keeps it, and `?enemy=<name or number>` fixes it for tests; `pickEnemyForce(difficulty, seed)` is the seeded pick (its own random stream, so the dice of a seed do not change) used when nothing else chose. The result screen names the force. The `FORCES` report shows how each does against the suggested squads: they are not balanced against each other yet (for example STRIKE WING and ROCKET SCREEN beat the suggested squads 23 times in 24, SIEGE LINE loses most).
+
+## Infantry (2026-10-26; built behind a free play switch, to be play-tested)
+Drafted with the owner and built behind the `INFANTRY` switch to play-test; the open questions are decided after playing. The owner is not yet sure about the idea: it is worth having only if
+infantry have **a distinct role**, and it fails if they just get in the way. So the test is the play-test, not the balance numbers.
+- **No new decisions for the player.** Infantry are always computer-controlled, **on your side too** (like the prison crawler): they move in
+  their side's move step and fire in the fire phase without asking. You never give them orders.
+- **The role: eyes and hands for the mechs.** *Spotting:* your mechs' shots at an enemy one of your squads can see are -1 to hit, and
+  indirect weapons (rockets) lose their no-line-of-sight penalty against it. *Holding:* a squad on a sensor tower holds it (so a mech need
+  not stand still there), and a squad on the hill counts for it. Squads can **enter buildings**, which mechs cannot.
+- **They fight only each other.** A squad fires once per fire phase at the nearest enemy squad within **2 hexes**, with line of sight. They
+  cannot hurt mechs, so the mech balance stays as it is. Squad on squad: a flat 50% (need 11), made harder by the target's cover.
+- **Mechs can shoot infantry,** by the normal to-hit sum, but with **the squad's cover in place of the size modifier**: a squad in the open
+  is easy to hit and dies, a dug-in squad is hard to dig out. Proposed infantry cover (both for mech and squad shots, to tune): open 0,
+  woods (and reeds) +3, building (and containers) +5. So squad on squad: open 50%, woods 35%, building 25%.
+- **Fragile:** any hit destroys a squad. Losing one costs only its spotting.
+- **Not in the way:** a side's squads move first in its move step, one after another with a short beat (`SQUAD_BEAT_SECONDS`), and their
+  shots are short tracers in the volley with one log line each. *Not built:* the proposal had your mechs moving through your own squads'
+  hexes; for now a squad blocks a hex like a mech (they mostly sit in buildings, which mechs cannot enter anyway). Watch for it in play.
+- **AI jobs, in order** (said in the log, `I1 SPOTS FROM THE WOODS`): (1) hold a free sensor tower or the hill if the battle has one;
+  (2) go for an enemy squad that holds one, or that is spotting within 4 hexes of one of your mechs (`I2 GOES FOR THEIR SPOTTER`);
+  (3) take the nearest cover that sees an enemy, within about 4 hexes of a friendly mech; then hold it.
+- **Trying it:** an `INFANTRY: ON / OFF` switch on the free play select screen; two squads a side, free (outside the squad budget). The story
+  later, if it plays well.
+- **It is not working if:** spotting makes the side with squads win nearly always (AI v AI), the enemy wastes its mech shots on squads, or
+  the squads mostly sit somewhere useless (the owner's play-test).
+- **Open:** whether the enemy AI should hunt spotters on purpose; anything else they could do (a demolition charge on an adjacent mech,
+  carrying the flag).
+- **How it is built:** a squad is a unit in `state.mechs` with `infantry: true` (`makeSquad`, `addSquads` in rules.js; ids I1, I2 yours,
+  J1, J2 theirs, starting one hex in from the first and last mech starts), with `SQUAD_CHASSIS` and `SQUAD_RIFLE` (data.js; kept out of
+  `CHASSIS` and `WEAPONS`, so the bay never offers them), armour pool 1 whatever the damage model. So the moves, volleys, log and AI fire
+  plans are the mechs' own. Excluded where a mech is meant: `mechsLeft` (the win check), `sideHealth`, the exit goal's squad, the flag.
+  `canEnter` (map.js) lets a squad into terrain with `squads` (buildings, containers). `targetStatus`: rifles (`squadOnly`) refuse a mech
+  (`not-a-squad`); a mech's shot at a squad has `dug in` (`squadCover`) instead of size and cover; `spotted` from `spotters()`.
+  `defaultTarget` prefers a mech to a squad. AI: `aiSquadMove`; mechs move against mechs only. The player's fire planner skips squads;
+  their shots come from `aiPlanFire` with the enemy's (`game.autoShots`).
+- **First AI v AI numbers** (the large maps, last mech standing, suggested squad v each normal force, 90 fights): squads on neither side:
+  the player side won 11; on both 17; on the player side only 16 (so a useful edge, not a decider); 35% of mech shots were spotted, 2%
+  went at squads; with the features on too, squads fight over the tower and the mechs shoot squads standing on it (8% of shots). Weak
+  spot: squads spend most moves on the fallback job (keeping close to a mech) rather than spotting from cover.
 
 ## Map features in free play (2026-10-26)
 Asked for after the owner played the whole story: the repair bays "really add a dimension to the strategy", so free play gets them to try out, and what works goes into the story (or a new one) afterwards.

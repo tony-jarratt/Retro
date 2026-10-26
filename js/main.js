@@ -25,6 +25,7 @@
 //   ?code=XXXX-...       opens straight on the mech bay with that squad; ?intro plays the story intro
 //   ?map=urban&goal=flag the map (basin, urban, mountains) and win condition; the bay keeps these and ?code in the address
 //   ?features            the free play maps with their repair bays, ammo caches and sensor tower (the select screen's FEATURES button)
+//   ?infantry            two infantry squads a side in free play (the select screen's INFANTRY button)
 //   ?enemy=gunline       a fixed enemy force, by name or number (otherwise a random one each battle, shown in the mech bay)
 //   ?fight               skip every menu and the mech bay and go straight to the battle (every other hook below needs this)
 //   ?code=XXXX-XXXX-...  the squad code (see code.js): the bay opens with this squad (the bay keeps this parameter up to date,
@@ -55,6 +56,7 @@ const DEFAULT_DIFFICULTY = 'normal';
 const STEP_SECONDS = 0.3;           // how long one hex of movement takes on screen
 const BANNER_SECONDS = 0.7;         // how long a new step's banner shows before its first mech acts
 const AI_BEAT_SECONDS = 0.45;       // a short beat before each of the computer's mechs acts, so you can see which one
+const SQUAD_BEAT_SECONDS = 0.1;     // and a shorter one before an infantry squad's move (squads go first in a move step, quickly)
 const AFTER_MOVE_SECONDS = 0.2;     // a pause after a mech has moved
 const NOTHING_SECONDS = 0.9;        // how long to hold when a side has nothing to fire at
 const FAST_FACTOR = 4;              // holding F plays the animations this much faster
@@ -120,7 +122,7 @@ function showTitle() { game.mode = 'title'; game.titleT0 = game.clock; game.titl
 // ---------- the menus: title, select (a map and a win condition), and the story's screens ----------
 const MENU_DEFAULT_SIZE = 'large'; // the select screen starts on the large maps (a battle started some other way, such as ?fight, still defaults to small)
 function menuSelection() { // the map and win condition being chosen
-  if (!game.menuSel) game.menuSel = newMenuSelection(game.scenarioId || DEFAULT_SCENARIO_ID, game.goal || DEFAULT_OBJECTIVE_ID, game.mapSize || MENU_DEFAULT_SIZE, !!game.features);
+  if (!game.menuSel) game.menuSel = newMenuSelection(game.scenarioId || DEFAULT_SCENARIO_ID, game.goal || DEFAULT_OBJECTIVE_ID, game.mapSize || MENU_DEFAULT_SIZE, !!game.features, !!game.infantry);
   return game.menuSel;
 }
 
@@ -167,8 +169,8 @@ function inMenu() { return ['title', 'select', 'story', 'briefing', 'debrief'].i
 
 function continueToBay() {
   const sel = menuSelection();
-  game.scenarioId = sel.map; game.goal = sel.goal; game.mapSize = sel.size; game.features = sel.features;
-  if (game.bay) { game.bay.scenarioId = sel.map; game.bay.goal = sel.goal; game.bay.mapSize = sel.size; game.bay.features = sel.features; }
+  game.scenarioId = sel.map; game.goal = sel.goal; game.mapSize = sel.size; game.features = sel.features; game.infantry = sel.infantry;
+  if (game.bay) { game.bay.scenarioId = sel.map; game.bay.goal = sel.goal; game.bay.mapSize = sel.size; game.bay.features = sel.features; game.bay.infantry = sel.infantry; }
   openBay();
 }
 
@@ -190,7 +192,7 @@ function menuClick(b) {
 function openBay() {
   game.encounter = null;
   if (!game.bay) game.bay = newBay(game.squad || DEFAULT_SQUADS[game.difficulty || DEFAULT_DIFFICULTY] || WARDEN_SQUAD, game.difficulty || DEFAULT_DIFFICULTY);
-  game.bay.scenarioId = game.scenarioId || DEFAULT_SCENARIO_ID; game.bay.goal = game.goal || DEFAULT_OBJECTIVE_ID; game.bay.mapSize = game.mapSize || 'small'; game.bay.features = !!game.features;
+  game.bay.scenarioId = game.scenarioId || DEFAULT_SCENARIO_ID; game.bay.goal = game.goal || DEFAULT_OBJECTIVE_ID; game.bay.mapSize = game.mapSize || 'small'; game.bay.features = !!game.features; game.bay.infantry = !!game.infantry;
   game.bay.enemyIndex = game.fixedEnemy && game.enemyIndex !== undefined ? game.enemyIndex : Math.floor(Math.random() * ENEMY_FORCES[game.bay.difficulty].length); // a fresh enemy each time the bay opens
   game.mode = 'bay';
   game.bayStatus = ''; game.bayStatusBad = false;
@@ -206,11 +208,12 @@ function syncUrl() {
   if (!report.code) return;
   const url = new URL(location.href);
   const same = url.searchParams.get('code') === report.code && url.searchParams.get('map') === game.bay.scenarioId && url.searchParams.get('size') === game.bay.mapSize && url.searchParams.get('goal') === game.bay.goal
-    && url.searchParams.has('features') === game.bay.features;
+    && url.searchParams.has('features') === game.bay.features && url.searchParams.has('infantry') === game.bay.infantry;
   if (same) return;
   url.searchParams.set('code', report.code);
   url.searchParams.set('map', game.bay.scenarioId); url.searchParams.set('size', game.bay.mapSize); url.searchParams.set('goal', game.bay.goal);
   if (game.bay.features) url.searchParams.set('features', ''); else url.searchParams.delete('features');
+  if (game.bay.infantry) url.searchParams.set('infantry', ''); else url.searchParams.delete('infantry');
   try { history.replaceState(null, '', url); } catch (err) { console.warn(`Could not put squad code ${report.code} in the address: ${err.message}`); }
 }
 
@@ -309,11 +312,12 @@ function newGame(seed, keepEnemy) {
   const enc = game.encounter;
   game.state = enc ? encounterBattle(enc, game.damageModel || DEFAULT_DAMAGE_MODEL, enc.first || first, game.holder)
     : battleFor(game.squad || DEFAULT_SQUADS[difficulty] || WARDEN_SQUAD, difficulty, first, game.damageModel || DEFAULT_DAMAGE_MODEL, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small', !!game.features), game.goal || DEFAULT_OBJECTIVE_ID, game.enemyIndex);
+  if (!enc && game.infantry) addSquads(game.state, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small'));
   for (const [id, c, r] of game.placements || []) mechById(game.state, id).pos = [c, r]; // the ?at= test hook
   for (const [c, r] of game.smokeHexes || []) addSmoke(game.state.map, smokeHexes(game.state.map, c, r), SMOKE_ROUNDS); // the ?smoke= test hook
   game.shown = null; game.anim = null; game.volley = null; game.planner = null; game.active = null;
   game.flash.clear(); game.result = null; game.log = []; game.logHeader = ''; game.pauseThen = null;
-  game.moveEndsBattle = false; game.lastIntent = {}; game.enemyShots = [];
+  game.moveEndsBattle = false; game.lastIntent = {}; game.autoShots = [];
   game.scrollCur = { x: 0, y: 0 }; game.scrollTarget = null; game.userScrolled = false; game.drag = null; game.miniDrag = false; game.frameKey = '';
   const goal = OBJECTIVES[game.state.objective.id]; // until the first combat the log panel says what the battle is for
   if (enc) { // a story mission: its own words, and who moves first is part of the mission
@@ -324,6 +328,7 @@ function newGame(seed, keepEnemy) {
     game.logHeader = 'GOAL: ' + goal.name;
     for (const line of wrapText(goal.blurb, 30)) game.log.push(line);
     if (goal.roundLimit) game.log.push(`Time limit: ${goal.roundLimit} rounds.`);
+    if (game.infantry) for (const line of wrapText('INFANTRY: two squads a side, moved by the computer. They spot for your mechs (-1 to hit) and fight only each other.', 30)) game.log.push(line);
     if (game.features) for (const line of wrapText('FEATURES: a repair bay and an ammo cache each side; hold the sensor tower in the middle for -1 to hit.', 30)) game.log.push(line);
     game.log.push(first === 'player' ? 'COIN TOSS: you move first.' : 'COIN TOSS: the enemy moves first.'); // luck of the draw, once, at the start
   }
@@ -396,7 +401,8 @@ function nextStep() {
   const step = currentStep();
   game.status = step.kind === 'fire' ? 'Combat: both sides fire at once.' : `${step.side === 'player' ? 'Your' : 'Enemy'} move.`;
   if (step.kind === 'move') {
-    game.todo = livingMechs(game.state, step.side).filter(m => !m.tower).map(m => m.id); // gun towers never move, so they are not asked
+    const movers = livingMechs(game.state, step.side).filter(m => !m.tower); // gun towers never move, so they are not asked
+    game.todo = [...movers.filter(m => m.infantry), ...movers.filter(m => !m.infantry)].map(m => m.id); // infantry squads first, quickly
     pause(BANNER_SECONDS, nextMover);
   } else {
     pause(BANNER_SECONDS, beginFire);
@@ -411,7 +417,7 @@ function nextMover() {
   const mech = mechById(state, id);
   game.active = id;
   focusOn([mech.pos], true); // the mech whose turn it is comes into view (and a hand-scroll is over)
-  if (step.side === 'player' && !mech.crawler) { // (the prison crawler drives itself: it moves like the computer's mechs, below)
+  if (step.side === 'player' && !mech.crawler && !mech.infantry) { // (the prison crawler and infantry squads move themselves, like the computer's mechs, below)
     if (mech.shutdown || walkAllowance(mech) === 0) {
       logLine(`${id} cannot move: stays put`);
       moveMech(state, { mechId: id, mode: 'stand', path: [] });
@@ -422,7 +428,7 @@ function nextMover() {
     game.status = `${id}: where to?  CLICK a hex, or arrows + ENTER (SPACE = stay put)`;
   } else {
     game.status = `${id} is moving...`;
-    pause(AI_BEAT_SECONDS, () => {
+    pause(mech.infantry ? SQUAD_BEAT_SECONDS : AI_BEAT_SECONDS, () => {
       const r = aiMoveFor(state, id);
       debugNotes([r.note]);
       if (r.intent && game.lastIntent[id] !== r.intent) logLine(r.intent); // say what the enemy is up to, when its job changes
@@ -553,13 +559,13 @@ function beginFire() {
   const state = game.state;
   // Both sides plan on the state as it is now, and everything resolves together: the enemy's shots are chosen first (they do not depend on yours),
   // yours are asked about one weapon at a time, then the two lists are resolved as one volley.
-  const enemy = aiPlanFire(state, 'enemy');
+  const enemy = aiPlanFire(state, 'enemy'), squads = aiPlanFire(state, 'player'); // the computer's shots: the enemy's, and your squads' (never yours to choose)
   debugNotes(enemy.notes);
-  game.enemyShots = enemy.shots;
+  game.autoShots = [...enemy.shots, ...squads.shots.filter(s => mechById(state, s.mechId).infantry)];
   game.planner = newFirePlanner(state, 'player');
   if (plannerDone(game.planner)) { // nothing of yours has a target
     game.planner = null;
-    if (!game.enemyShots.length) { startCombatLog(); logLine('Nothing in range to fire at.'); game.status = 'Nothing in range to fire at.'; pause(NOTHING_SECONDS, nextStep); return; }
+    if (!game.autoShots.length) { startCombatLog(); logLine('Nothing in range to fire at.'); game.status = 'Nothing in range to fire at.'; pause(NOTHING_SECONDS, nextStep); return; }
     startVolley([], 'Nothing of yours is in range to fire.');
     return;
   }
@@ -572,7 +578,7 @@ function afterFireAnswer() {
     const shots = plannerShots(game.planner);
     game.planner = null;
     game.active = null;
-    if (!shots.length && !game.enemyShots.length) { game.status = 'No weapon fired.'; startCombatLog(); logLine('You held your fire.'); pause(NOTHING_SECONDS, nextStep); return; }
+    if (!shots.length && !game.autoShots.length) { game.status = 'No weapon fired.'; startCombatLog(); logLine('You held your fire.'); pause(NOTHING_SECONDS, nextStep); return; }
     startVolley(shots, shots.length ? '' : 'You held your fire.');
     return;
   }
@@ -585,8 +591,8 @@ function afterFireAnswer() {
 // applies all of it at once (updateVolley, settleVolley).
 function startVolley(playerShots, note) {
   const state = game.state;
-  const shots = [...playerShots, ...game.enemyShots];
-  game.enemyShots = [];
+  const shots = [...playerShots, ...game.autoShots];
+  game.autoShots = [];
   startCombatLog(); // this combat replaces the last one in the log
   if (note) logLine(note);
   if (!shots.some(s => mechById(state, s.mechId).side === 'enemy')) logLine('Enemy: nothing to fire.');
@@ -625,7 +631,7 @@ function startShot(shot) {
   const from = muzzlePoint(shooter, shooter.weapons[shot.slot].loc);
   const centre = hexToScreen(target.pos[0], target.pos[1]);
   const salvo = !!def.missiles; // a rocket pod or a laser array: several missiles or beams
-  fxFlash(from[0], from[1], shot.kind === 'missile' ? 9 : 14);
+  fxFlash(from[0], from[1], shot.kind === 'rifle' ? 5 : shot.kind === 'missile' ? 9 : 14);
   fxShake(shot.kind === 'cannon' ? 1.5 : shot.kind === 'howitzer' ? 3 : 1);
   const count = salvo ? (shot.hit ? shot.packets.length : def.missiles) : 1;
   shot.points = [];
@@ -633,7 +639,7 @@ function startShot(shot) {
     const to = shot.hit ? [centre[0] + rand(-10, 10), centre[1] + rand(-10, 10)] : missPoint(from, centre);
     const ctrl = shot.kind === 'missile' || shot.kind === 'smoke' || shot.kind === 'howitzer' ? [(from[0] + to[0]) / 2 + rand(-30, 30), (from[1] + to[1]) / 2 - 80 - k * 6] : null;
     shot.points.push(to);
-    game.volley.projectiles.push({ kind: shot.kind === 'smoke' || shot.kind === 'howitzer' ? 'missile' : shot.kind, t: shot.t0 + (salvo ? k * MISSILE_STAGGER : 0), dur: shot.flight, from, to, ctrl });
+    game.volley.projectiles.push({ kind: shot.kind === 'smoke' || shot.kind === 'howitzer' ? 'missile' : shot.kind === 'rifle' ? 'cannon' : shot.kind, t: shot.t0 + (salvo ? k * MISSILE_STAGGER : 0), dur: shot.flight, from, to, ctrl });
   }
   if (shot.hit && def.splash) { // the howitzer's splash lands on the neighbours: one point for every packet, the first being the shell itself
     shot.points = shot.packets.map((p, i) => (i === 0 ? shot.points[0] : hexToScreen(...mechById(w, p.hit.targetId).pos)));
@@ -696,7 +702,7 @@ function impact(shot, packet) {
     if (heat) logLine(`${shot.targetId} +${heat} HEAT`);
   }
   game.volley.deferred.push(hit, ...packet.extras); // drawn on the mech after the last shot has landed (settleVolley)
-  fxBoom(to[0], to[1], shot.kind === 'missile' ? 0.6 : shot.kind === 'cannon' ? 0.5 : shot.kind === 'howitzer' ? 1.5 : 0.7, game.clock);
+  fxBoom(to[0], to[1], shot.kind === 'rifle' ? 0.3 : shot.kind === 'missile' ? 0.6 : shot.kind === 'cannon' ? 0.5 : shot.kind === 'howitzer' ? 1.5 : 0.7, game.clock);
   fxShake(shot.kind === 'howitzer' ? 4 : 1.5);
   game.flash.set(shot.targetId, game.clock + 0.18);
   if (shot.kind !== 'missile' && !def.missiles || shot.kind === 'howitzer') fxFloat(to[0], to[1] - 12, hit.loc ? `${hit.loc} -${hit.damage}` : `-${hit.damage}`, game.clock);
@@ -1170,7 +1176,7 @@ function frame(t) {
 
     if (game.mode === 'intro' || inMenu()) {
       if (game.mode === 'title') drawTitleCard(ctx, game.clock - game.titleT0, titleImageReady ? titleCanvas : null, menuButtonList(), game.menuHover);
-      else if (game.mode === 'select') drawSelect(ctx, { size: menuSelection().size, features: menuSelection().features, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
+      else if (game.mode === 'select') drawSelect(ctx, { size: menuSelection().size, features: menuSelection().features, infantry: menuSelection().infantry, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
       else if (game.mode === 'story') drawStory(ctx, { buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
       else if (game.mode === 'briefing') drawBriefing(ctx, { enc: game.encounter, holder: game.holder, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus });
       else if (game.mode === 'debrief') drawDebrief(ctx, { enc: game.encounter, lines: game.debriefLines, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover, last: CAMPAIGN.indexOf(game.encounter) === CAMPAIGN.length - 1 });
@@ -1230,6 +1236,7 @@ function applyTestHooks() {
     game.mapSize = 'large';
   }
   game.features = q.has('features');
+  game.infantry = q.has('infantry');
   game.wantIntro = q.has('intro');
   game.wantStory = q.has('story');
   if (q.has('playtest')) game.storyUnlocked = CAMPAIGN.length; // the arcade-wide play-test switch: every story mission is open (nothing is saved anyway) // ?story opens the story screen; ?mission=breakout its briefing (with ?fight, the battle)

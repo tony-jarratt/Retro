@@ -135,6 +135,7 @@ function objectiveAfterMove(state, mech, path, events) {
     if (mech.id === o.escort && sameHex(mech.pos, o.route[o.route.length - 1])) { o.result = { winner: 'player', code: 'escort' }; events.push({ type: 'crawler-out', mechId: mech.id }); }
     return;
   }
+  if (mech.infantry) return; // a squad never carries the flag or needs to get out (it can hold the hill: that is counted at the end of the round)
   if (o.id === 'flag' || (o.id === 'heist' && mech.side === 'player')) { // (in a heist only the player can pick the crate up)
     const f = o.flag;
     if (!f.carrier && f.pos && path.some(h => h[0] === f.pos[0] && h[1] === f.pos[1])) {
@@ -149,7 +150,7 @@ function objectiveAfterMove(state, mech, path, events) {
     if (inGroup(o.exits.player, mech.pos)) events.push({ type: 'exit-reached', mechId: mech.id });
     escapeCheck(state);
   } else if (o.id === 'exit') {
-    const squad = livingMechs(state, mech.side);
+    const squad = livingMechs(state, mech.side).filter(m => !m.infantry); // (infantry need not get out)
     if (inGroup(o.exits[mech.side], mech.pos)) events.push({ type: 'exit-reached', mechId: mech.id });
     if (squad.every(m => inGroup(o.exits[mech.side], m.pos))) o.result = { winner: mech.side, code: 'exit' }; // the whole squad is out
   }
@@ -205,7 +206,7 @@ function objectiveAfterRound(state, events) {
 // The armour points a side has left in total (the pool of each living mech, or its armour and structure in the advanced damage model).
 function sideHealth(state, side) {
   let total = 0;
-  for (const m of livingMechs(state, side)) {
+  for (const m of livingMechs(state, side).filter(x => !x.infantry)) { // (infantry squads are not armour)
     if (m.model === 'pool') total += m.hp;
     else for (const loc of LOCATIONS) total += m.armour[loc] + m.structure[loc];
   }

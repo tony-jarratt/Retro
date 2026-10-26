@@ -11,7 +11,7 @@ const MAP_TOP = VIEWPORT.y;        // room above the map for the header, the ban
 const MECH_SCALE = 1.4;            // sprite pixels to screen pixels (the 40 pixel sprite canvas is about 56 pixels on screen)
 // Per class: how far from the centre a mech's guns sit (sideways and forward, in sprite pixels at the old size) and
 // how much to shrink the biggest sprite so it still fits its hex.
-const CLASS_LOOK = { light: { side: 11, fwd: 16, scale: 1 }, medium: { side: 15, fwd: 20, scale: 1 }, heavy: { side: 18, fwd: 22, scale: 0.97 }, assault: { side: 21, fwd: 24, scale: 0.9 } };
+const CLASS_LOOK = { infantry: { side: 4, fwd: 8, scale: 1 }, light: { side: 11, fwd: 16, scale: 1 }, medium: { side: 15, fwd: 20, scale: 1 }, heavy: { side: 18, fwd: 22, scale: 0.97 }, assault: { side: 21, fwd: 24, scale: 0.9 } };
 function classOf(mech) { return chassisById(mech.chassisId).cls; }
 const FONT = 'bold 13px ui-monospace, Menlo, Consolas, monospace';
 const FONT_SMALL = '11px ui-monospace, Menlo, Consolas, monospace';
@@ -346,11 +346,31 @@ function drawCrawlerAt(g, mech, x, y, facing, alpha, flash) {
   g.restore();
 }
 
+// An infantry squad (free play): four soldiers in their side's colour, facing the way the squad faces; a few still shapes once destroyed.
+function drawSquadAt(g, mech, x, y, facing, alpha, flash) {
+  const k = HEX_SCALE;
+  g.save();
+  g.globalAlpha = alpha === undefined ? 1 : alpha;
+  g.translate(x, y);
+  g.rotate(facing * Math.PI / 3);
+  const colour = mech.side === 'enemy' ? COLOURS.enemy : COLOURS.player;
+  for (const [dx, dy] of [[-9, -6], [7, -8], [-6, 8], [9, 6]]) {
+    if (!mech.alive) { g.fillStyle = '#3a3a3e'; g.fillRect((dx - 4) * k, (dy - 1.5) * k, 8 * k, 3 * k); continue; }
+    g.fillStyle = 'rgba(0,0,0,0.4)'; g.beginPath(); g.arc((dx + 1.5) * k, (dy + 2) * k, 5 * k, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#2b3138'; g.beginPath(); g.arc(dx * k, dy * k, 4.5 * k, 0, Math.PI * 2); g.fill();   // the body
+    g.fillStyle = colour; g.beginPath(); g.arc(dx * k, dy * k, 2.6 * k, 0, Math.PI * 2); g.fill();      // the helmet
+    g.fillStyle = '#c8d2dc'; g.fillRect((dx + 1) * k, (dy - 9) * k, 1.4 * k, 6 * k);                      // the rifle, pointing ahead (direction 0 is up)
+    if (flash) { g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.arc(dx * k, dy * k, 5 * k, 0, Math.PI * 2); g.fill(); }
+  }
+  g.restore();
+}
+
 function drawMechAt(g, mech, x, y, facing, alpha, flash) {
   if (mech.bank) { drawBankAt(g, mech, x, y, alpha, flash); return; }
   if (mech.ship) { drawShipAt(g, mech, x, y, alpha, flash, drawClock); return; }
   if (mech.tower) { drawTowerAt(g, mech, x, y, facing, alpha, flash); return; }
   if (mech.crawler) { drawCrawlerAt(g, mech, x, y, facing, alpha, flash); return; }
+  if (mech.infantry) { drawSquadAt(g, mech, x, y, facing, alpha, flash); return; }
   g.save();
   g.globalAlpha = alpha === undefined ? 1 : alpha;
   g.translate(x, y);
@@ -887,7 +907,7 @@ function drawSelect(g, view) {
   g.textAlign = 'right'; g.fillText('MAP SIZE', 752, 36); g.textAlign = 'left';
   for (const b of view.buttons) {
     const hovered = b.id === view.hover && b.state !== 'disabled';
-    if (b.id === 'back' || b.id === 'continue' || b.id === 'features' || b.id.startsWith('size:')) { drawBayButton(g, b, hovered); continue; }
+    if (b.id === 'back' || b.id === 'continue' || b.id === 'features' || b.id === 'infantry' || b.id.startsWith('size:')) { drawBayButton(g, b, hovered); continue; }
     panel(g, b.x, b.y, b.w, b.h);
     if (b.state === 'selected') { g.fillStyle = 'rgba(79,179,217,0.14)'; g.fillRect(b.x, b.y, b.w, b.h); g.strokeStyle = COLOURS.player; g.lineWidth = 3; g.strokeRect(b.x + 1.5, b.y + 1.5, b.w - 3, b.h - 3); }
     else if (hovered) { g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1); }

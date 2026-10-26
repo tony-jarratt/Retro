@@ -278,3 +278,90 @@ check('features: the select screen turns them on and off, the map cards and the 
     assert(runFight(battleFor(SUGGESTED_SQUADS[0].mechs, 'normal', 'player', 'pool', scenarioFor(s.theme, s.size, true)), new Rng(31), 60).rounds > 0, id);
   }
 });
+
+// ---------- infantry (free play: the INFANTRY switch) ----------
+// A small map with a building at [6, 2] and woods at [6, 6]: P1 and E1 are mechs, I1 ours and J1 theirs are squads.
+function squadState(at) {
+  const rows = Array.from({ length: 9 }, (_, r) => r === 2 ? '......B.......' : r === 6 ? '......T.......' : '..............');
+  const a = at || {};
+  const s = makeState(makeMap('test', rows), [
+    tm('P1', 'player', jackal([2, 0, 0]), a.p1 || [1, 4], { model: 'pool' }), tm('E1', 'enemy', jackal([2, 0, 0]), a.e1 || [12, 4], { model: 'pool' }),
+    makeSquad('I1', 'player', a.i1 || [3, 4], 2), makeSquad('J1', 'enemy', a.j1 || [10, 4], 5),
+  ]);
+  setupObjective(s, {}, 'annihilation');
+  return s;
+}
+
+check('infantry: a squad has one armour point, walks 3, never runs, can go into a building (a mech cannot), and does not count as a mech left', () => {
+  const s = squadState({ i1: [5, 2] });
+  const i1 = mechById(s, 'I1');
+  eq([i1.infantry, i1.hp, i1.maxHp, i1.model, walkAllowance(i1), runAllowance(i1)], [true, 1, 1, 'pool', 3, 0]);
+  assert(reachableFor(s, 'I1', 'walk').has('6,2'), 'the squad can step into the building');
+  mechById(s, 'P1').pos = [7, 2];
+  throwsKind(PlanError, 'impassable', () => moveMech(s, { mechId: 'P1', mode: 'walk', path: [[6, 2]] }));
+  moveMech(s, { mechId: 'I1', mode: 'walk', path: [[6, 2]] });
+  eq(mechById(s, 'I1').pos, [6, 2]);
+  eq(mechsLeft(s, 'player'), 1, 'the squad is not a mech');
+  mechById(s, 'P1').alive = false;
+  eq(checkWinner(s), 'enemy', 'a side with only squads left has lost');
+});
+
+check('infantry: rifles fire only at enemy squads within 2 hexes: 50% in the open, 35% in woods, 25% in a building; one hit destroys', () => {
+  const s = squadState({ i1: [4, 4], j1: [6, 4] });
+  eq(targetStatus(s, 'I1', 0, 'J1').chance, 50);
+  eq(targetStatus(s, 'I1', 0, 'E1').reason, 'out-of-range');
+  mechById(s, 'E1').pos = [5, 5];
+  eq(targetStatus(s, 'I1', 0, 'E1').reason, 'not-a-squad');
+  mechById(s, 'J1').pos = [6, 6]; mechById(s, 'I1').pos = [5, 5]; mechById(s, 'E1').pos = [12, 4];
+  eq(targetStatus(s, 'I1', 0, 'J1').chance, 35, 'in the woods');
+  mechById(s, 'J1').pos = [6, 2]; mechById(s, 'I1').pos = [5, 2];
+  eq(targetStatus(s, 'I1', 0, 'J1').chance, 25, 'in a building');
+  mechById(s, 'J1').pos = [6, 4]; mechById(s, 'I1').pos = [4, 4];
+  const events = resolveFirePhase(s, [{ mechId: 'I1', weaponSlot: 0, targetId: 'J1' }], fakeRng([15], []));
+  eq(events.some(e => e.type === 'killed' && e.mechId === 'J1'), true);
+});
+
+check('infantry: a mech shooting a squad uses its cover in place of size and cover; a mech prefers a mech target; spotting is -1 and guides rockets', () => {
+  const s = squadState({ p1: [2, 4], j1: [6, 4], e1: [6, 7] });
+  const open = targetStatus(s, 'P1', 0, 'J1');
+  eq(open.mods.some(m => m.name === 'target size' || m.name === 'dug in'), false, 'in the open: no size bonus, no cover');
+  mechById(s, 'J1').pos = [6, 6];
+  eq(targetStatus(s, 'P1', 0, 'J1').mods.find(m => m.name === 'dug in').value, 3);
+  eq(defaultTarget(s, 'P1', 0).targetId, 'E1', 'the mech before the squad');
+  mechById(s, 'I1').pos = [10, 7]; // out of sight of E1? within 6 and clear: it spots
+  const spotted = targetStatus(s, 'P1', 0, 'E1');
+  eq(spotted.mods.find(m => m.name === 'spotted').value, -1);
+  mechById(s, 'I1').alive = false;
+  eq(targetStatus(s, 'P1', 0, 'E1').need, spotted.need + 1, 'no spotter, no bonus');
+});
+
+check('infantry: the AI takes a free sensor tower with a squad, spots from cover near its mechs, and goes for an enemy squad spotting by its mechs', () => {
+  const rows = Array.from({ length: 9 }, (_, r) => r === 4 ? '.......S......' : r === 6 ? '...T..........' : '..............');
+  const s = makeState(makeMap('test', rows), [
+    tm('P1', 'player', jackal([2, 0, 0]), [1, 6], { model: 'pool' }), tm('E1', 'enemy', jackal([2, 0, 0]), [9, 6], { model: 'pool' }),
+    makeSquad('I1', 'player', [5, 4], 2), makeSquad('I2', 'player', [1, 7], 2),
+  ]);
+  setupObjective(s, {}, 'annihilation');
+  eq(aiMoveFor(s, 'I1').intent, 'I1 GOES FOR THE SENSOR TOWER');
+  eq(aiMoveFor(s, 'I2').intent, 'I2 MOVES UP TO SPOT', 'the other squad makes for the woods beside P1');
+  mechById(s, 'I2').pos = [3, 6];
+  eq(aiMoveFor(s, 'I2').intent, 'I2 SPOTS FROM THE WOODS');
+  eq(aiMoveFor(s, 'I2').plan.mode, 'stand');
+  s.mechs.push(makeSquad('J1', 'enemy', [0, 4], 5)); // an enemy squad within 4 of P1, nearer I2 than I1
+  eq(aiMoveFor(s, 'I2').intent, 'I2 GOES FOR THEIR SQUAD J1');
+  eq(aiMoveFor(s, 'E1').plan.mechId, 'E1', 'a mech still plans its own move');
+});
+
+check('infantry: the select screen switch adds two squads a side, and whole AI fights with them run on every map without a rules error', () => {
+  const sel = newMenuSelection('basin', 'annihilation', 'large');
+  eq(selectButtons(sel).find(b => b.id === 'infantry').label, 'INFANTRY: OFF');
+  selectPress(sel, selectButtons(sel).find(b => b.id === 'infantry'));
+  eq([sel.infantry, selectButtons(sel).find(b => b.id === 'infantry').label], [true, 'INFANTRY: ON']);
+  for (const id of SCENARIO_IDS) for (const goal of ['annihilation', 'flag', 'hill', 'exit']) {
+    const sc = SCENARIOS[id];
+    if (!goalAllowsSize(goal, sc.size)) continue;
+    const st = addSquads(battleFor(SUGGESTED_SQUADS[0].mechs, 'normal', 'player', 'pool', scenarioFor(sc.theme, sc.size, true), goal), sc);
+    eq(st.mechs.filter(m => m.infantry).map(m => m.id), ['I1', 'I2', 'J1', 'J2'], id);
+    assert(runFight(st, new Rng(11), 60).rounds > 0, `${id} ${goal}`);
+  }
+});

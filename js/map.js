@@ -42,6 +42,8 @@ function inMap(map, c, r) { return c >= 0 && r >= 0 && c < map.cols && r < map.r
 
 // Can a mech ever stand on this hex? (Buildings and peaks cannot be entered.)
 function isPassable(map, c, r) { return terrainAt(map, c, r).passable !== false; }
+// Can this unit enter the hex? An infantry squad can also go into buildings (terrain with `squads`).
+function canEnter(map, c, r, infantry) { return isPassable(map, c, r) || (!!infantry && !!terrainAt(map, c, r).squads); }
 
 function terrainAt(map, c, r) {
   if (!inMap(map, c, r)) throw new MapError('off-map', `Map ${map.name}: hex ${hexKey(c, r)} is off the map`);
@@ -134,8 +136,8 @@ function hasLineOfSight(map, a, b) {
 
 // ---- movement ----
 // Every hex a mech can reach from `from` with `allowance` movement points. `blocked` is a Set of hex keys it
-// cannot enter. Returns a Map of key -> { c, r, cost, prev } (prev is the key it came from, null at the start).
-function reachableHexes(map, from, allowance, blocked) {
+// cannot enter; `infantry` lets it into buildings too. Returns a Map of key -> { c, r, cost, prev } (prev is the key it came from, null at the start).
+function reachableHexes(map, from, allowance, blocked, infantry = false) {
   const best = new Map();
   best.set(hexKey(from[0], from[1]), { c: from[0], r: from[1], cost: 0, prev: null });
   const done = new Set();
@@ -150,7 +152,7 @@ function reachableHexes(map, from, allowance, blocked) {
     for (const n of neighbours(map, cur.node.c, cur.node.r)) {
       const key = hexKey(n.c, n.r);
       if (blocked.has(key)) continue;
-      if (!isPassable(map, n.c, n.r)) continue;
+      if (!canEnter(map, n.c, n.r, infantry)) continue;
       const cost = cur.node.cost + terrainAt(map, n.c, n.r).cost;
       if (cost > allowance) continue;
       const old = best.get(key);

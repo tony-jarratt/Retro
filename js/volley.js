@@ -7,7 +7,7 @@
 const VOLLEY_GAP = 0.16;          // seconds between the starts of two shots
 const VOLLEY_MAX_SPAN = 2.8;      // but the starts never spread over more than this
 const VOLLEY_SETTLE = 0.9;        // seconds to let the last explosion play out
-const SHOT_FLIGHT = { laser: 0.12, cannon: 0.35, missile: 0.8, smoke: 0.8, blast: 0.5, howitzer: 1.1 }; // launch to impact, by weapon kind
+const SHOT_FLIGHT = { laser: 0.12, cannon: 0.35, missile: 0.8, smoke: 0.8, blast: 0.5, howitzer: 1.1, rifle: 0.2 }; // launch to impact, by weapon kind
 const MISSILE_STAGGER = 0.07;     // seconds between the missiles of one pod
 const VOLLEY_ORDER_GAP = 0.01;    // hits on one target keep the rules' order, at least this far apart
 
