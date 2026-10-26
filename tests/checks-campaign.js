@@ -89,6 +89,27 @@ check('escape: the whole living squad on the pad wins; the enemy on the pad does
   assert(!OBJECTIVE_IDS.includes('escape'), 'escape is not offered in free play');
 });
 
+check('escape: fewer than two left alive has lost, even with the survivor on the pad; a straggler dying with the rest on the pad wins', () => {
+  const s = goalState('escape', { p1: [11, 1], e1: [2, 7], e2: [4, 7] });
+  s.mechs.push(tm('P3', 'player', jackal([2, 0, 0]), [1, 2], { model: 'pool' }));
+  eq(objectiveStatus(s).lines, ['ROUND 1 OF 10', 'SQUAD: 3 LEFT, 2 MUST GET OUT']);
+  mechById(s, 'P2').alive = false;
+  objectiveSync(s, []);
+  eq(finishIfOver(s), false, 'two left is still enough');
+  walkTo(s, 'P1', [[12, 1], [12, 0]]);
+  mechById(s, 'P3').alive = false;
+  objectiveSync(s, []);
+  assert(finishIfOver(s));
+  eq([s.winner, s.reason], ['enemy', 'Only 1 of you left: it takes 2 to get out']);
+  const t = goalState('escape', { p1: [11, 1], p2: [1, 6] });
+  walkTo(t, 'P1', [[12, 1], [12, 0]]);
+  t.mechs.push(tm('P3', 'player', jackal([2, 0, 0]), [13, 0], { model: 'pool' }));
+  mechById(t, 'P2').alive = false;
+  objectiveSync(t, []);
+  assert(finishIfOver(t));
+  eq([t.winner, t.reason], ['player', 'Your whole squad got out']);
+});
+
 check('reinforcements: they arrive at the start of their round, on their hex or the nearest free one, and a side waiting for them is not beaten yet', () => {
   const s = goalState('annihilation');
   const spare = (id, pos) => ({ round: 3, mech: tm(id, 'enemy', jackal([2, 0, 0]), pos, { model: 'pool' }) });

@@ -44,7 +44,7 @@ commanders are **partners**. Use the jargon sparingly: one phrase in a briefing 
 
 ## 1. BREAKOUT
 **Map:** the freight yard at Tollan spaceport (container stacks as blocks, landing pads, rubble).
-**Goal:** get the whole squad to the dropship pad (exit) by the end of round 10. **Enemy:** two unarmoured compliance lights; a Ranger and a Jackal arrive at the gates on round 4.
+**Goal:** get the whole squad to the dropship pad (exit) by the end of round 10; at least two have to make it (fewer than two left alive and the mission is lost). **Enemy:** two unarmoured compliance lights; a Ranger and a Jackal arrive at the gates on round 4.
 **Squad:** VOSS Jackal (Bolt, Flicker), WREN Skitter (Flicker, Flicker), OKAFOR Jackal (Rattler), all at armour 2.
 
 > They found us at Tollan. Someone sold us for the price of a meal.

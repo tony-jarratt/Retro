@@ -174,7 +174,7 @@ const CAMPAIGN = [
       'The dropship is fueled, and the pad is four hundred metres of open yard away.',
       "Don't fight them. Run.",
     ],
-    job: 'Get the whole squad onto the landing pad on the far side of the yard. The dropship leaves after round 10. More of them will come.',
+    job: 'Get the whole squad onto the landing pad on the far side of the yard. The dropship leaves after round 10, and it will not leave with fewer than two of you. More of them will come.',
     debrief: [
       'The dropship clears the atmosphere with rounds still rattling off the hull.',
       'VOSS counts heads twice. "Everyone here? Good. Now we need better iron."',

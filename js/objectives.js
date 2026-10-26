@@ -18,8 +18,9 @@
 //                 It destroyed and the player has lost
 //   escort        (story only) the prison crawler (`escort`, one of the player's units, no guns) drives itself along `route` (a list of road hexes)
 //                 and has to reach its end. It destroyed, or the round limit, and the player has lost
-//   escape        (story only) the player's whole living squad has to reach its exit before the round limit; the enemy only hunts. At the limit the
-//                 player has lost (the dropship has gone), whatever the armour
+//   escape        (story only) the player's whole living squad has to reach its exit before the round limit, and at least `minOut` of them
+//                 have to be alive to do it: once fewer are left the player has lost. The enemy only hunts. At the limit the player has lost
+//                 (the dropship has gone), whatever the armour
 // Every goal but annihilation has a round limit; at the limit the battle is decided on points (hill), then armour left, else a draw.
 // The goal's own rules run from three hooks the rules call: objectiveAfterMove, objectiveSync (a carrier destroyed) and objectiveAfterRound.
 
@@ -43,8 +44,8 @@ const OBJECTIVES = {
     blurb: 'Get your whole squad into your exit hexes before the enemy gets theirs into theirs. The slowest mech sets the pace.',
   },
   escape: { // a story goal: not offered in free play (story: true keeps it out of OBJECTIVE_IDS)
-    id: 'escape', name: 'ESCAPE', ready: true, roundLimit: 10, sizes: ['small', 'large'], story: true,
-    blurb: 'Get your whole squad to the exit before time runs out. The enemy only has to stop you.',
+    id: 'escape', name: 'ESCAPE', ready: true, roundLimit: 10, sizes: ['small', 'large'], story: true, minOut: 2,
+    blurb: 'Get your whole squad to the exit before time runs out, at least two of you. The enemy only has to stop you.',
   },
 };
 OBJECTIVES.raid = { // a story goal
@@ -91,6 +92,7 @@ function setupObjective(state, scenario, goalId) {
     o.target = HILL_TARGET;
   } else if (goalId === 'exit' || goalId === 'escape') {
     o.exits = scenario.exits;
+    if (goalId === 'escape') o.minOut = def.minOut;
   } else if (goalId === 'core') {
     o.targets = scenario.targets.slice(); o.gate = scenario.gate; o.holder = scenario.holder;
   } else if (goalId === 'hunt') {
@@ -115,6 +117,14 @@ function raidCheck(state, events) {
   if (targetsLeft(state) === 0 && inGroup(o.hangar, runner.pos)) { o.result = { winner: 'player', code: 'raid' }; events.push({ type: 'hangar', mechId: runner.id }); }
 }
 
+// The escape: too few left alive to get out loses; every survivor on the pad wins. Checked after moves and after every fire phase, so the
+// last straggler dying with the rest already on the pad wins too.
+function escapeCheck(state) {
+  const o = state.objective, squad = livingMechs(state, 'player');
+  if (squad.length < o.minOut) { o.result = { winner: 'enemy', code: 'escape-lost' }; return; }
+  if (squad.every(m => inGroup(o.exits.player, m.pos))) o.result = { winner: 'player', code: 'escape' }; // the whole squad is out
+}
+
 // ---------- the hooks ----------
 // Called by moveMech after a mech has moved along `path`. May start the flag moving with the mech, and may decide the battle.
 function objectiveAfterMove(state, mech, path, events) {
@@ -135,10 +145,13 @@ function objectiveAfterMove(state, mech, path, events) {
       o.result = { winner: mech.side, code: o.id };
       events.push({ type: 'flag-captured', mechId: mech.id });
     }
-  } else if (o.id === 'exit' || (o.id === 'escape' && mech.side === 'player')) {
+  } else if (o.id === 'escape' && mech.side === 'player') {
+    if (inGroup(o.exits.player, mech.pos)) events.push({ type: 'exit-reached', mechId: mech.id });
+    escapeCheck(state);
+  } else if (o.id === 'exit') {
     const squad = livingMechs(state, mech.side);
     if (inGroup(o.exits[mech.side], mech.pos)) events.push({ type: 'exit-reached', mechId: mech.id });
-    if (squad.every(m => inGroup(o.exits[mech.side], m.pos))) o.result = { winner: mech.side, code: o.id === 'escape' ? 'escape' : 'exit' }; // the whole squad is out
+    if (squad.every(m => inGroup(o.exits[mech.side], m.pos))) o.result = { winner: mech.side, code: 'exit' }; // the whole squad is out
   }
 }
 
@@ -146,6 +159,7 @@ function objectiveAfterMove(state, mech, path, events) {
 function objectiveSync(state, events) {
   const o = state.objective;
   if (o && o.id === 'raid' && !o.result) { raidCheck(state, events); return; }
+  if (o && o.id === 'escape' && !o.result) { escapeCheck(state); return; }
   if (o && o.id === 'core' && !o.result) { if (targetsLeft(state) === 0) o.result = { winner: 'player', code: 'core' }; return; }
   if (o && o.id === 'hunt' && !o.result) { if (!mechById(state, o.mark).alive) o.result = { winner: 'player', code: 'hunt' }; return; }
   if (o && o.id === 'defend' && !o.result) { if (!mechById(state, o.protect).alive) o.result = { winner: 'enemy', code: 'defend-lost' }; return; }
@@ -252,6 +266,7 @@ function reasonText(state, code, winner) {
     case 'raid': return `The towers are down and ${runnerName(state)} is in the hangar`;
     case 'raid-runner': return `${runnerName(state)} was destroyed: nobody else can start the heavy`;
     case 'raid-late': return `Time ran out after round ${o.roundLimit}: the garrison held the depot`;
+    case 'escape-lost': { const n = livingMechs(state, 'player').length; return n ? `Only ${n} of you left: it takes ${o.minOut} to get out` : 'All your mechs were destroyed'; }
     case 'escape-late': return `Time ran out after round ${o.roundLimit}: not everyone got out`;
     case 'hill': return `${you ? 'You' : 'The enemy'} held the hill: ${o.score.player} points to ${o.score.enemy}`;
     case 'time-points': return `Time up: ${you ? 'you' : 'the enemy'} led on hill points, ${o.score.player} to ${o.score.enemy}`;
@@ -268,6 +283,7 @@ function objectiveStatus(state) {
   const lines = [];
   if (o.roundLimit) lines.push(`ROUND ${state.round} OF ${o.roundLimit}`);
   if (o.id === 'hill') lines.push(`HILL  YOU ${o.score.player}  ENEMY ${o.score.enemy}  (FIRST TO ${o.target})`);
+  if (o.id === 'escape') lines.push(`SQUAD: ${livingMechs(state, 'player').length} LEFT, ${o.minOut} MUST GET OUT`);
   if (o.id === 'defend') lines.push(`REFUELLING: ROUND ${state.round} OF ${o.rounds}`);
   if (o.id === 'escort') lines.push(`CRAWLER: ${crawlerToGo(state)} HEXES TO GO`);
   if (o.id === 'raid') lines.push(targetsLeft(state) ? `TOWERS STANDING ${targetsLeft(state)} OF ${o.targets.length}` : `TOWERS DOWN: ${runnerName(state)} TO THE HANGAR`);
