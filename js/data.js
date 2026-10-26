@@ -262,6 +262,7 @@ const TERRAIN = {
   'k': { name: 'hall floor', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 },  // the core's great hall: clear ground
   'D': { name: 'great doors', cost: 1, cover: 0, blocks: false, height: 0, cool: 0 }, // the one way into the hall (clear: whoever stands in it blocks it)
   'A': { name: 'ammo cache', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, resupply: true }, // see RESUPPLY_CHARGES
+  'S': { name: 'sensor tower', cost: 1, cover: 0, blocks: false, height: 0, cool: 0, sensor: true }, // see SENSOR_HIT_MOD
 };
 
 // Repair bays (terrain with `repair`): a mech that stood still on one for the round (it may fire) is repaired at the end of the round: up to
@@ -272,6 +273,9 @@ const REPAIR_CHARGES = 3;
 // Ammo caches (terrain with `resupply`): the same deal for ammunition. A mech that stood still on one has every weapon that uses ammo filled back
 // up to what it carries at the start. RESUPPLY_CHARGES a cache; a mech with nothing to fill uses none.
 const RESUPPLY_CHARGES = 2;
+// Sensor towers (terrain with `sensor`): while a living mech of a side stands on one, every shot that side fires is this much easier (a spotter).
+// It does not add up: holding two towers is the same as holding one.
+const SENSOR_HIT_MOD = -1;
 
 // The prison crawler (story, the escort goal): it drives this many hexes along its road in its side's move step, stopping short of anything on it.
 const CRAWLER_SPEED = 3;

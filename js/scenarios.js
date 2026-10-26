@@ -196,6 +196,20 @@ const SCENARIOS = {
   },
 };
 
+// The map features (free play, when the select screen turns them on): a repair bay and an ammo cache for each side and one sensor tower in the
+// middle to fight over. The player's bay and cache are placed by hand on clear ground about a quarter of the way in, and the enemy's are their
+// mirror image (the column mirrored, the row the same: the maps are an odd number of columns wide, so the mirror hex sits the same way), so
+// both sides have the same walk to theirs. The tower stands on the middle column, the same distance from both, off the hill and the flag (on
+// the basins it is an island in the lake). Every feature replaces the terrain under it.
+const MAP_FEATURES = {
+  basin:             { bay: [4, 4], cache: [3, 8],  sensor: [9, 5] },
+  urban:             { bay: [4, 4], cache: [3, 8],  sensor: [9, 2] },
+  mountains:         { bay: [3, 3], cache: [3, 9],  sensor: [9, 3] },
+  'basin-large':     { bay: [6, 7], cache: [7, 14], sensor: [15, 8] },
+  'urban-large':     { bay: [6, 6], cache: [6, 14], sensor: [15, 5] },
+  'mountains-large': { bay: [7, 6], cache: [6, 14], sensor: [15, 6] },
+};
+
 // The hex groups: the flag and the hill at the centre, a base round each side's starts, and an exit in the far corner of the other side's
 // half (the player's in the north east, the enemy's in the south west). A map may name its own.
 for (const scenario of Object.values(SCENARIOS)) {
@@ -205,17 +219,38 @@ for (const scenario of Object.values(SCENARIOS)) {
   scenario.zone = [centre.slice(), ...[0, 1, 2, 3, 4, 5].map(dir => neighbour(centre[0], centre[1], dir))];
   if (!scenario.bases) scenario.bases = { player: [[0, 4], [0, 5], [0, 6], [1, 4], [1, 5]], enemy: [[18, 5], [18, 6], [18, 7], [17, 5], [17, 6]] };
   if (!scenario.exits) scenario.exits = { player: [[18, 0], [17, 0], [16, 0], [18, 1], [17, 1]], enemy: [[0, 11], [1, 11], [2, 11], [0, 10], [1, 10]] };
+  scenario.features = featureHexes(scenario);
+  scenario.featureRows = scenario.rows.map((row, r) => row.split('').map((t, c) => (scenario.features.find(f => f[0] === c && f[1] === r) || [0, 0, t])[2]).join(''));
+}
+
+// A map's features as [c, r, terrain letter]: its bay and cache, their mirror images for the enemy, and the tower. Each has to stand on ground
+// a mech can enter, clear of the starts and the goals' hexes, and the tower on the middle column.
+function featureHexes(scenario) {
+  const spots = MAP_FEATURES[scenario.id];
+  if (!spots) throw new MapError('features', `Map ${scenario.id} has no features placed (MAP_FEATURES)`);
+  const cols = scenario.rows[0].length, mirror = ([c, r]) => [cols - 1 - c, r];
+  const out = [[...spots.bay, 'W'], [...mirror(spots.bay), 'W'], [...spots.cache, 'A'], [...mirror(spots.cache), 'A'], [...spots.sensor, 'S']];
+  if (spots.sensor[0] !== (cols - 1) / 2) throw new MapError('features', `Map ${scenario.id}: the sensor tower at ${hexKey(...spots.sensor)} is not on the middle column ${(cols - 1) / 2}`);
+  const taken = [...scenario.playerStarts, ...scenario.enemyStarts, ...scenario.zone, scenario.flag, ...scenario.bases.player, ...scenario.bases.enemy, ...scenario.exits.player, ...scenario.exits.enemy];
+  for (const [c, r, t] of out) {
+    const under = TERRAIN[scenario.rows[r][c]];
+    if (under.passable === false) throw new MapError('features', `Map ${scenario.id}: the ${TERRAIN[t].name} at ${hexKey(c, r)} is on ${under.name}, which cannot be entered`);
+    if (taken.some(h => h[0] === c && h[1] === r)) throw new MapError('features', `Map ${scenario.id}: the ${TERRAIN[t].name} at ${hexKey(c, r)} is on a start or a goal hex`);
+  }
+  return out;
 }
 
 const SCENARIO_IDS = Object.keys(SCENARIOS);      // every map, in both sizes
 const MAP_THEMES = ['basin', 'urban', 'mountains']; // what the menu offers; each comes in a small and a large size
 const MAP_SIZES = ['small', 'large'];
 
-// The map of a theme in a size: the small one is the theme's own id, the large one has '-large' after it.
-function scenarioFor(theme, size) {
+// The map of a theme in a size: the small one is the theme's own id, the large one has '-large' after it. With `features` it is a copy whose
+// rows have the bays, caches and the sensor tower in them.
+function scenarioFor(theme, size, features = false) {
   if (!MAP_THEMES.includes(theme)) throw new BuildError('map', `Unknown map "${theme}" (the maps are ${MAP_THEMES.join(', ')})`);
   if (!MAP_SIZES.includes(size)) throw new BuildError('size', `Unknown map size "${size}" (small or large)`);
-  return SCENARIOS[size === 'large' ? theme + '-large' : theme];
+  const s = SCENARIOS[size === 'large' ? theme + '-large' : theme];
+  return features ? { ...s, rows: s.featureRows, withFeatures: true } : s;
 }
 const DEFAULT_SCENARIO_ID = 'basin';
 const SCENARIO = SCENARIOS[DEFAULT_SCENARIO_ID]; // what a battle uses when it is not told which map to play

@@ -31,6 +31,13 @@ function makeMap(name, rows) {
   return { name, cols, rows: rows.length, tiles: rows.slice(), charges };
 }
 
+// The sensor towers on a map, as [c, r].
+function sensorHexes(map) {
+  const out = [];
+  map.tiles.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (TERRAIN[row[c]].sensor) out.push([c, r]); });
+  return out;
+}
+
 function inMap(map, c, r) { return c >= 0 && r >= 0 && c < map.cols && r < map.rows; }
 
 // Can a mech ever stand on this hex? (Buildings and peaks cannot be entered.)

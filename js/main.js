@@ -24,6 +24,7 @@
 //   ?story               opens on the story screen; ?mission=breakout on that mission's briefing (with ?fight, straight into its battle)
 //   ?code=XXXX-...       opens straight on the mech bay with that squad; ?intro plays the story intro
 //   ?map=urban&goal=flag the map (basin, urban, mountains) and win condition; the bay keeps these and ?code in the address
+//   ?features            the free play maps with their repair bays, ammo caches and sensor tower (the select screen's FEATURES button)
 //   ?enemy=gunline       a fixed enemy force, by name or number (otherwise a random one each battle, shown in the mech bay)
 //   ?fight               skip every menu and the mech bay and go straight to the battle (every other hook below needs this)
 //   ?code=XXXX-XXXX-...  the squad code (see code.js): the bay opens with this squad (the bay keeps this parameter up to date,
@@ -119,7 +120,7 @@ function showTitle() { game.mode = 'title'; game.titleT0 = game.clock; game.titl
 // ---------- the menus: title, select (a map and a win condition), and the story's screens ----------
 const MENU_DEFAULT_SIZE = 'large'; // the select screen starts on the large maps (a battle started some other way, such as ?fight, still defaults to small)
 function menuSelection() { // the map and win condition being chosen
-  if (!game.menuSel) game.menuSel = newMenuSelection(game.scenarioId || DEFAULT_SCENARIO_ID, game.goal || DEFAULT_OBJECTIVE_ID, game.mapSize || MENU_DEFAULT_SIZE);
+  if (!game.menuSel) game.menuSel = newMenuSelection(game.scenarioId || DEFAULT_SCENARIO_ID, game.goal || DEFAULT_OBJECTIVE_ID, game.mapSize || MENU_DEFAULT_SIZE, !!game.features);
   return game.menuSel;
 }
 
@@ -166,8 +167,8 @@ function inMenu() { return ['title', 'select', 'story', 'briefing', 'debrief'].i
 
 function continueToBay() {
   const sel = menuSelection();
-  game.scenarioId = sel.map; game.goal = sel.goal; game.mapSize = sel.size;
-  if (game.bay) { game.bay.scenarioId = sel.map; game.bay.goal = sel.goal; game.bay.mapSize = sel.size; }
+  game.scenarioId = sel.map; game.goal = sel.goal; game.mapSize = sel.size; game.features = sel.features;
+  if (game.bay) { game.bay.scenarioId = sel.map; game.bay.goal = sel.goal; game.bay.mapSize = sel.size; game.bay.features = sel.features; }
   openBay();
 }
 
@@ -189,7 +190,7 @@ function menuClick(b) {
 function openBay() {
   game.encounter = null;
   if (!game.bay) game.bay = newBay(game.squad || DEFAULT_SQUADS[game.difficulty || DEFAULT_DIFFICULTY] || WARDEN_SQUAD, game.difficulty || DEFAULT_DIFFICULTY);
-  game.bay.scenarioId = game.scenarioId || DEFAULT_SCENARIO_ID; game.bay.goal = game.goal || DEFAULT_OBJECTIVE_ID; game.bay.mapSize = game.mapSize || 'small';
+  game.bay.scenarioId = game.scenarioId || DEFAULT_SCENARIO_ID; game.bay.goal = game.goal || DEFAULT_OBJECTIVE_ID; game.bay.mapSize = game.mapSize || 'small'; game.bay.features = !!game.features;
   game.bay.enemyIndex = game.fixedEnemy && game.enemyIndex !== undefined ? game.enemyIndex : Math.floor(Math.random() * ENEMY_FORCES[game.bay.difficulty].length); // a fresh enemy each time the bay opens
   game.mode = 'bay';
   game.bayStatus = ''; game.bayStatusBad = false;
@@ -204,10 +205,12 @@ function syncUrl() {
   const report = bayReport(game.bay);
   if (!report.code) return;
   const url = new URL(location.href);
-  const same = url.searchParams.get('code') === report.code && url.searchParams.get('map') === game.bay.scenarioId && url.searchParams.get('size') === game.bay.mapSize && url.searchParams.get('goal') === game.bay.goal;
+  const same = url.searchParams.get('code') === report.code && url.searchParams.get('map') === game.bay.scenarioId && url.searchParams.get('size') === game.bay.mapSize && url.searchParams.get('goal') === game.bay.goal
+    && url.searchParams.has('features') === game.bay.features;
   if (same) return;
   url.searchParams.set('code', report.code);
   url.searchParams.set('map', game.bay.scenarioId); url.searchParams.set('size', game.bay.mapSize); url.searchParams.set('goal', game.bay.goal);
+  if (game.bay.features) url.searchParams.set('features', ''); else url.searchParams.delete('features');
   try { history.replaceState(null, '', url); } catch (err) { console.warn(`Could not put squad code ${report.code} in the address: ${err.message}`); }
 }
 
@@ -305,7 +308,7 @@ function newGame(seed, keepEnemy) {
   if (game.enemyIndex === undefined) game.enemyIndex = pickEnemyForce(difficulty, game.seed);
   const enc = game.encounter;
   game.state = enc ? encounterBattle(enc, game.damageModel || DEFAULT_DAMAGE_MODEL, enc.first || first, game.holder)
-    : battleFor(game.squad || DEFAULT_SQUADS[difficulty] || WARDEN_SQUAD, difficulty, first, game.damageModel || DEFAULT_DAMAGE_MODEL, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small'), game.goal || DEFAULT_OBJECTIVE_ID, game.enemyIndex);
+    : battleFor(game.squad || DEFAULT_SQUADS[difficulty] || WARDEN_SQUAD, difficulty, first, game.damageModel || DEFAULT_DAMAGE_MODEL, scenarioFor(game.scenarioId || DEFAULT_SCENARIO_ID, game.mapSize || 'small', !!game.features), game.goal || DEFAULT_OBJECTIVE_ID, game.enemyIndex);
   for (const [id, c, r] of game.placements || []) mechById(game.state, id).pos = [c, r]; // the ?at= test hook
   for (const [c, r] of game.smokeHexes || []) addSmoke(game.state.map, smokeHexes(game.state.map, c, r), SMOKE_ROUNDS); // the ?smoke= test hook
   game.shown = null; game.anim = null; game.volley = null; game.planner = null; game.active = null;
@@ -321,6 +324,7 @@ function newGame(seed, keepEnemy) {
     game.logHeader = 'GOAL: ' + goal.name;
     for (const line of wrapText(goal.blurb, 30)) game.log.push(line);
     if (goal.roundLimit) game.log.push(`Time limit: ${goal.roundLimit} rounds.`);
+    if (game.features) for (const line of wrapText('FEATURES: a repair bay and an ammo cache each side; hold the sensor tower in the middle for -1 to hit.', 30)) game.log.push(line);
     game.log.push(first === 'player' ? 'COIN TOSS: you move first.' : 'COIN TOSS: the enemy moves first.'); // luck of the draw, once, at the start
   }
   fxReset();
@@ -445,6 +449,12 @@ function mechAtHex(c, r) {
   return livingMechs(world()).find(m => m.pos[0] === c && m.pos[1] === r) || null;
 }
 
+// What a sensor tower at the end of this move would do: a line for the range finder (none off a tower).
+function sensorLines(at) {
+  if (!terrainAt(game.state.map, at[0], at[1]).sensor) return [];
+  return [{ t: 'SENSOR TOWER: your side -1 to hit', style: 'good' }, { t: 'while a mech of yours stands here', style: 'dim' }];
+}
+
 // The range finder for a move: what it would cost, in movement and in heat, and what the heat would do.
 // What a repair bay at the end of this move would do for the mech: lines for the range finder (none off a bay).
 function repairLines(mech, at, standing) {
@@ -461,7 +471,7 @@ function repairLines(mech, at, standing) {
 }
 
 function finderFor(mech, move) {
-  if (move.mode === 'stand') return { mechId: mech.id, mode: 'stand', path: [], lines: [{ t: 'STAY PUT', style: 'title' }, { t: 'no heat from moving', style: 'dim' }, ...repairLines(mech, mech.pos, true)] };
+  if (move.mode === 'stand') return { mechId: mech.id, mode: 'stand', path: [], lines: [{ t: 'STAY PUT', style: 'title' }, { t: 'no heat from moving', style: 'dim' }, ...repairLines(mech, mech.pos, true), ...sensorLines(mech.pos)] };
   const cost = pathCost(game.state.map, move.path), allowance = allowanceFor(mech, move.mode);
   const now = mech.heat, after = Math.min(HEAT_MAX, now + MOVE_HEAT[move.mode]);
   const before = heatStep({ heat: now }), next = heatStep({ heat: after });
@@ -475,7 +485,7 @@ function finderFor(mech, move) {
   if (after >= COOKOFF_HEAT && now < COOKOFF_HEAT) lines.push({ t: `heat ${COOKOFF_HEAT}+: ammo can explode`, style: 'warn' });
   if (after >= HEAT_MAX) lines.push({ t: 'SHUTDOWN at the end of the round', style: 'warn' });
   lines.push({ t: `+${MOVED_HIT_MOD[move.mode]} to hit you, +${MOVED_HIT_MOD[move.mode]} on your shots`, style: 'dim' });
-  lines.push(...repairLines(mech, move.path[move.path.length - 1], false));
+  lines.push(...repairLines(mech, move.path[move.path.length - 1], false), ...sensorLines(move.path[move.path.length - 1]));
   return { mechId: mech.id, mode: move.mode, path: move.path, lines };
 }
 
@@ -1160,7 +1170,7 @@ function frame(t) {
 
     if (game.mode === 'intro' || inMenu()) {
       if (game.mode === 'title') drawTitleCard(ctx, game.clock - game.titleT0, titleImageReady ? titleCanvas : null, menuButtonList(), game.menuHover);
-      else if (game.mode === 'select') drawSelect(ctx, { size: menuSelection().size, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
+      else if (game.mode === 'select') drawSelect(ctx, { size: menuSelection().size, features: menuSelection().features, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
       else if (game.mode === 'story') drawStory(ctx, { buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus, statusBad: game.menuStatusBad });
       else if (game.mode === 'briefing') drawBriefing(ctx, { enc: game.encounter, holder: game.holder, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover, status: game.menuStatus });
       else if (game.mode === 'debrief') drawDebrief(ctx, { enc: game.encounter, lines: game.debriefLines, ms: (game.clock - game.briefT0) * 1000, buttons: menuButtonList(), hover: game.menuHover, last: CAMPAIGN.indexOf(game.encounter) === CAMPAIGN.length - 1 });
@@ -1219,6 +1229,7 @@ function applyTestHooks() {
     console.warn(`${OBJECTIVES[game.goal].name} needs a large map, so the address's map is used at the large size.`);
     game.mapSize = 'large';
   }
+  game.features = q.has('features');
   game.wantIntro = q.has('intro');
   game.wantStory = q.has('story');
   if (q.has('playtest')) game.storyUnlocked = CAMPAIGN.length; // the arcade-wide play-test switch: every story mission is open (nothing is saved anyway) // ?story opens the story screen; ?mission=breakout its briefing (with ?fight, the battle)

@@ -407,11 +407,15 @@ function targetStatus(state, attackerId, slot, targetId) {
     { name: 'cover', value: terrainAt(state.map, target.pos[0], target.pos[1]).cover },
     { name: 'target shut down', value: target.shutdown ? SHUTDOWN_TARGET_MOD : 0 },
     { name: 'no line of sight', value: sees ? 0 : INDIRECT_NO_LOS_MOD },
+    { name: 'sensor tower', value: holdsSensor(state, attacker.side) ? SENSOR_HIT_MOD : 0 },
   ].filter(m => m.value !== 0 || m.name === 'base to-hit');
   const raw = mods.reduce((sum, m) => sum + m.value, 0);
   const need = Math.min(NEED_MAX, Math.max(NEED_MIN, raw));
   return { valid: true, reason: 'ok', targetId, dist, band: BAND_NAMES[band], need, chance: (21 - need) * 5, mods };
 }
+
+// Does this side have a living mech standing on a sensor tower? (Then its shots are SENSOR_HIT_MOD easier.)
+function holdsSensor(state, side) { return livingMechs(state, side).some(m => terrainAt(state.map, m.pos[0], m.pos[1]).sensor); }
 
 // The enemies this weapon can fire at, nearest first (ties by id), each with its targetStatus.
 function validTargets(state, attackerId, slot) {

@@ -873,6 +873,8 @@ function drawMapThumb(g, scenario, x, y, maxW, maxH) {
     const [ux, uy] = hexCentre(pos[0], pos[1]);
     g.fillStyle = colour; g.beginPath(); g.arc(ox + ux * r, oy + uy * r, r * 0.55, 0, Math.PI * 2); g.fill();
   };
+  const FEATURE_DOT = { W: '#7ee08a', A: '#d8b13a', S: '#7fd0ff' }; // the features stand out from the terrain colours
+  if (scenario.withFeatures) scenario.features.forEach(([c, r, t]) => dot([c, r], FEATURE_DOT[t]));
   scenario.playerStarts.forEach(p => dot(p, COLOURS.player));
   scenario.enemyStarts.forEach(p => dot(p, COLOURS.enemy));
 }
@@ -885,14 +887,14 @@ function drawSelect(g, view) {
   g.textAlign = 'right'; g.fillText('MAP SIZE', 752, 36); g.textAlign = 'left';
   for (const b of view.buttons) {
     const hovered = b.id === view.hover && b.state !== 'disabled';
-    if (b.id === 'back' || b.id === 'continue' || b.id.startsWith('size:')) { drawBayButton(g, b, hovered); continue; }
+    if (b.id === 'back' || b.id === 'continue' || b.id === 'features' || b.id.startsWith('size:')) { drawBayButton(g, b, hovered); continue; }
     panel(g, b.x, b.y, b.w, b.h);
     if (b.state === 'selected') { g.fillStyle = 'rgba(79,179,217,0.14)'; g.fillRect(b.x, b.y, b.w, b.h); g.strokeStyle = COLOURS.player; g.lineWidth = 3; g.strokeRect(b.x + 1.5, b.y + 1.5, b.w - 3, b.h - 3); }
     else if (hovered) { g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1); }
     const off = b.state === 'disabled';
     let top = b.y + 22;
     if (b.id.startsWith('map:')) {
-      drawMapThumb(g, scenarioFor(b.id.slice(4), view.size || 'small'), b.x + b.w / 2, b.y + 10, b.w - 16, 176);
+      drawMapThumb(g, scenarioFor(b.id.slice(4), view.size || 'small', !!view.features), b.x + b.w / 2, b.y + 10, b.w - 16, 176);
       top = b.y + 208;
     }
     g.font = 'bold 14px ' + MONO; g.fillStyle = off ? '#66738a' : b.state === 'selected' ? COLOURS.player : COLOURS.text; g.fillText(b.label, b.x + 12, top);

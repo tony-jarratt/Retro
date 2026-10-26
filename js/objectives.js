@@ -291,5 +291,9 @@ function objectiveStatus(state) {
   if (o.id === 'hunt') { const m = mechById(state, o.mark); lines.push(`TARGET: ${m.name} ${m.alive ? `ARMOUR ${m.hp} / ${m.maxHp}` : 'DOWN'}`); }
   if (o.id === 'heist') lines.push(o.flag.carrier ? `CRATE: ${callSignOf(state, o.flag.carrier)} CARRIES IT` : 'CRATE: ON THE GROUND');
   if (o.id === 'flag') lines.push(o.flag.carrier ? `FLAG: ${o.flag.carrier} CARRIES IT` : o.flag.pos ? 'FLAG: ON THE GROUND' : 'FLAG: LOST');
+  if (sensorHexes(state.map).length) { // (not the goal, but the header is where the battle's standing is told)
+    const you = holdsSensor(state, 'player'), them = holdsSensor(state, 'enemy');
+    lines.push(`SENSOR TOWER: ${you && them ? 'BOTH SIDES' : you ? 'YOURS (-1 TO HIT)' : them ? 'THEIRS (-1 TO HIT)' : 'NOBODY'}`);
+  }
   return { name: def.name, lines };
 }

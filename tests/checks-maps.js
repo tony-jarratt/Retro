@@ -196,3 +196,85 @@ check('menu: the small maps are only for last mech standing: other goals need a 
   selectPress(sel, selectButtons(sel).find(b => b.id === 'size:small'));
   eq(sel.size, 'small', 'and small is available again');
 });
+
+// ---------- map features (free play: repair bays, ammo caches, a sensor tower) ----------
+check('features: every map has a bay and a cache a side, mirrored, and one sensor tower on the middle column, on ground a mech can stand on and reach', () => {
+  for (const id of SCENARIO_IDS) {
+    const s = SCENARIOS[id], cols = s.rows[0].length;
+    const f = scenarioFor(s.theme, s.size, true);
+    eq(f.withFeatures, true, id);
+    eq(f.features.map(x => x[2]).sort().join(''), 'AASWW', `${id}: two bays, two caches, one tower`);
+    for (const t of ['W', 'A']) {
+      const [a, b] = f.features.filter(x => x[2] === t);
+      eq([b[0], b[1]], [cols - 1 - a[0], a[1]], `${id}: the enemy's ${TERRAIN[t].name} is the mirror of the player's`);
+      assert(a[0] < cols / 2, `${id}: the first ${TERRAIN[t].name} is on the player's half`);
+    }
+    const map = makeMap(f.name, f.rows);
+    for (const [c, r, t] of f.features) {
+      eq(map.tiles[r][c], t, `${id}: ${hexKey(c, r)}`);
+      const pr = reachableHexes(map, s.playerStarts[0], 999, new Set()), er = reachableHexes(map, s.enemyStarts[0], 999, new Set());
+      assert(pr.has(hexKey(c, r)) && er.has(hexKey(c, r)), `${id}: both sides can reach the ${TERRAIN[t].name} at ${hexKey(c, r)}`);
+    }
+    eq(sensorHexes(map), [f.features.find(x => x[2] === 'S').slice(0, 2)]);
+    eq(Object.keys(map.charges).length, 4, `${id}: the bays and caches have charges`);
+    eq(scenarioFor(s.theme, s.size).rows, s.rows, `${id}: without features the map is unchanged`);
+    eq(sensorHexes(makeMap(s.name, s.rows)).length, 0);
+  }
+});
+
+check('features: a side with a living mech on the sensor tower gets -1 on every shot; the other side does not; a destroyed holder gives nothing', () => {
+  const rows = Array.from({ length: 9 }, (_, r) => r === 7 ? '.S............' : '..............');
+  const s = makeState(makeMap('test', rows), [
+    tm('P1', 'player', jackal([2, 0, 0]), [4, 4], { model: 'pool' }), tm('P2', 'player', jackal([2, 0, 0]), [1, 5], { model: 'pool' }),
+    tm('E1', 'enemy', jackal([2, 0, 0]), [7, 4], { model: 'pool' }),
+  ]);
+  const shot = (a, t) => targetStatus(s, a, 0, t);
+  const before = { p: shot('P1', 'E1'), e: shot('E1', 'P1') };
+  eq([holdsSensor(s, 'player'), before.p.mods.some(m => m.name === 'sensor tower')], [false, false], 'nobody on the tower: no bonus');
+  mechById(s, 'P2').pos = [1, 7];
+  eq(holdsSensor(s, 'player'), true);
+  const held = shot('P1', 'E1');
+  eq(held.need, before.p.need - 1);
+  const mod = held.mods.find(m => m.name === 'sensor tower');
+  eq(mod && mod.value, -1, 'the shot breakdown names it');
+  eq(shot('E1', 'P1').need, before.e.need, 'the enemy does not get it');
+  mechById(s, 'P2').alive = false;
+  eq(shot('P1', 'E1').need, before.p.need, 'the holder destroyed: the bonus is gone');
+  mechById(s, 'P2').alive = true;
+  eq(objectiveStatus(s).lines.slice(-1), ['SENSOR TOWER: YOURS (-1 TO HIT)']);
+});
+
+check('features: the AI sends its one mech nearest a free sensor tower (in range) and that mech stays on it; the rest fight', () => {
+  const rows = Array.from({ length: 9 }, (_, r) => r === 4 ? '......S.......' : '..............');
+  const s = makeState(makeMap('test', rows), [
+    tm('P1', 'player', jackal([2, 0, 0]), [1, 2], { model: 'pool' }),
+    tm('E1', 'enemy', jackal([2, 0, 0]), [10, 4], { model: 'pool' }), tm('E2', 'enemy', jackal([2, 0, 0]), [12, 7], { model: 'pool' }),
+  ]);
+  setupObjective(s, {}, 'annihilation');
+  eq(aiSensorGoal(s, mechById(s, 'E1')).intent, 'E1 GOES FOR THE SENSOR TOWER');
+  eq(aiSensorGoal(s, mechById(s, 'E2')), null, 'only the nearest one goes');
+  mechById(s, 'E1').pos = [6, 4];
+  eq(aiSensorGoal(s, mechById(s, 'E1')).intent, 'E1 HOLDS THE SENSOR TOWER');
+  eq(aiMoveFor(s, 'E1').plan.mode, 'stand', 'the holder stays put');
+  eq(aiSensorGoal(s, mechById(s, 'E2')), null, 'the side holds it: nobody else goes');
+});
+
+check('features: the select screen turns them on and off, the map cards and the bay say so, and a battle with them has the bays and the tower', () => {
+  const sel = newMenuSelection('basin', 'annihilation', 'large');
+  eq(sel.features, false, 'off to start with');
+  let b = selectButtons(sel).find(x => x.id === 'features');
+  eq([b.label, b.state], ['FEATURES: OFF', 'normal']);
+  selectPress(sel, b);
+  b = selectButtons(sel).find(x => x.id === 'features');
+  eq([sel.features, b.label, b.state], [true, 'FEATURES: ON', 'selected']);
+  const bay = newBay(BAY_SQUAD, 'normal');
+  bay.scenarioId = 'urban'; bay.goal = 'annihilation'; bay.features = true;
+  eq(bayButtons(bay).find(x => x.id === 'change').sub, 'LAST MECH STANDING + FEATURES');
+  const state = battleFor(SUGGESTED_SQUADS[0].mechs, 'normal', 'player', 'pool', scenarioFor('urban', 'large', true));
+  eq(sensorHexes(state.map).length, 1);
+  eq(Object.keys(state.map.charges).length, 4);
+  for (const id of SCENARIO_IDS) { // whole fights on every map with features, without a rules error
+    const s = SCENARIOS[id];
+    assert(runFight(battleFor(SUGGESTED_SQUADS[0].mechs, 'normal', 'player', 'pool', scenarioFor(s.theme, s.size, true)), new Rng(31), 60).rounds > 0, id);
+  }
+});

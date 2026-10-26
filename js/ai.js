@@ -16,6 +16,7 @@ const AI_HEAT_CAP = 26;      // it holds a weapon rather than go above this heat
 const AI_NO_VIEW_PENALTY = 3;
 const AI_REPAIR_BELOW = 0.5;  // a mech below this share of its armour, or with a weapon knocked out, goes to a repair bay...
 const AI_REPAIR_RANGE = 8;
+const AI_SENSOR_RANGE = 10; // a side that holds no sensor tower sends the mech nearest a free one, if it is within this many hexes
 const AI_RAID_RANGE = 3;      // the defend goal: a raider closes to this many hexes of the dropship
 
 // The defend goal (story): the enemy's lights are raiders, sent for the thing the player is protecting.
@@ -132,6 +133,26 @@ function aiRepairGoal(state, mech) {
   return null;
 }
 
+// A sensor tower as a goal: a mech standing on one stays there (spotting for its side); a side that holds none sends its one mech nearest a free
+// tower within AI_SENSOR_RANGE (one mech, so the rest still fight). Otherwise null. It comes after the battle's goal, so a mech with a job to do
+// (the flag, the hill, the exit) does that instead.
+function aiSensorGoal(state, mech) {
+  const towers = sensorHexes(state.map);
+  if (!towers.length) return null;
+  if (towers.some(t => sameHex(t, mech.pos))) return { hexes: [mech.pos], run: false, why: 'spots from the sensor tower', intent: `${mech.id} HOLDS THE SENSOR TOWER`, hold: 0 };
+  if (holdsSensor(state, mech.side)) return null;
+  const free = towers.filter(t => !livingMechs(state).some(m => sameHex(m.pos, t)));
+  const near = (m, t) => hexDist(m.pos[0], m.pos[1], t[0], t[1]);
+  const mobile = livingMechs(state, mech.side).filter(m => !m.shutdown && walkAllowance(m) > 0 && !m.crawler);
+  let best = null; // the side's mech nearest any free tower in range
+  for (const t of free) for (const m of mobile) {
+    const d = near(m, t);
+    if (d <= AI_SENSOR_RANGE && (!best || d < best.d || (d === best.d && m.id < best.m.id))) best = { m, t, d };
+  }
+  if (!best || best.m.id !== mech.id) return null;
+  return { hexes: [best.t], run: false, why: 'goes for the sensor tower', intent: `${mech.id} GOES FOR THE SENSOR TOWER`, hold: 0 };
+}
+
 // Moves toward a goal along the cheapest route across the whole map, as far as one move allows (a run if it should run and can). Returns
 // a plan, a note and the goal's intent line, or null if no goal hex can be reached (then the mech just fights). A mech within `hold` hexes of
 // the goal stays where it is, so a guard does not walk into the hexes it is guarding.
@@ -179,6 +200,8 @@ function aiMoveFor(state, mechId) {
   if (repair) { const moved = aiMoveToGoal(state, mech, repair, blocked); if (moved) return moved; } // (a bay someone stands on cannot be reached)
   const goal = aiGoalFor(state, mech);
   if (goal) { const moved = aiMoveToGoal(state, mech, goal, blocked); if (moved) return moved; }
+  const sensor = goal ? null : aiSensorGoal(state, mech);
+  if (sensor) { const moved = aiMoveToGoal(state, mech, sensor, blocked); if (moved) return moved; }
 
   let nearest = null;
   for (const e of enemies) {

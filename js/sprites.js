@@ -115,7 +115,7 @@ function hashHex(c, r, k) {
   return v - Math.floor(v);
 }
 
-const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c', A: '#4a3f2a', k: '#2c3140', D: '#3a3f4c', s: '#6e6470', Q: '#7f735f', f: '#8a8c84', r: '#4d5a3a' };
+const TERRAIN_FILL = { '.': '#66764a', T: '#35603a', H: '#8c7248', '~': '#2d5d8c', R: '#6d6a62', B: '#3e4047', M: '#5b5750', c: '#5d6066', C: '#33363c', P: '#4a4d52', d: '#77736c', G: '#3b3530', W: '#2f4a3c', A: '#4a3f2a', k: '#2c3140', D: '#3a3f4c', s: '#6e6470', Q: '#7f735f', f: '#8a8c84', r: '#4d5a3a', S: '#2f3d4a' };
 const CONTAINER_COLOURS = ['#a8432f', '#2f6e8f', '#c08a2a', '#3f7a4f', '#7a4f8f', '#8f8a80']; // painted freight containers
 
 // Draws one hex of terrain centred on (x, y). `size` is the hex radius in pixels; the scatter was designed for a
@@ -227,6 +227,13 @@ function drawTerrainHex(g, hexPath, kind, c, r, x, y, size) {
     g.beginPath(); g.arc(0, -8 * k, 7 * k, 0, Math.PI * 2); g.fill();             // the head
     g.fillStyle = '#2f4a3c'; g.fillRect(-2.5 * k, -16 * k, 5 * k, 9 * k);           // the jaw
     g.restore();
+  } else if (kind === 'S') { // a sensor tower: a lattice mast with a dish and a blinking-blue tip, on a lit ring
+    g.strokeStyle = '#7fd0ff'; g.lineWidth = 2; hexPath(g, x, y, size * 0.72); g.stroke();
+    g.strokeStyle = '#c8d2dc'; g.lineWidth = Math.max(1, 1.5 * k);
+    g.beginPath(); g.moveTo(x - 8 * k, y + 14 * k); g.lineTo(x, y - 14 * k); g.lineTo(x + 8 * k, y + 14 * k);
+    g.moveTo(x - 5 * k, y + 4 * k); g.lineTo(x + 5 * k, y + 4 * k); g.moveTo(x - 3 * k, y - 4 * k); g.lineTo(x + 3 * k, y - 4 * k); g.stroke();
+    g.fillStyle = '#c8d2dc'; g.beginPath(); g.ellipse(x + 7 * k, y - 8 * k, 6 * k, 3 * k, -0.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#7fd0ff'; g.beginPath(); g.arc(x, y - 15 * k, 2.5 * k, 0, Math.PI * 2); g.fill();
   } else if (kind === 'P') { // a landing pad: a painted ring and hazard marks
     g.strokeStyle = '#d8b13a'; g.lineWidth = 2;
     g.beginPath(); g.arc(x, y, 15 * k, 0, Math.PI * 2); g.stroke();
