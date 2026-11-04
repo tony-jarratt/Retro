@@ -36,12 +36,14 @@ function isWall(x, y) {
   return MAP[Math.floor(y)][Math.floor(x)] !== 0;
 }
 
-// Would a square of half-width PLAYER_RADIUS centred on (x, y) overlap a wall?
-// Checking the four corners is enough because the square is smaller than a cell.
+// Would a square of half-width PLAYER_RADIUS centred on (x, y) overlap a wall
+// or a solid sprite? For walls, checking the four corners is enough because
+// the square is smaller than a cell.
 function blocked(x, y) {
   const r = PLAYER_RADIUS;
   return isWall(x - r, y - r) || isWall(x + r, y - r) ||
-         isWall(x - r, y + r) || isWall(x + r, y + r);
+         isWall(x - r, y + r) || isWall(x + r, y + r) ||
+         hitsSolidSprite(x, y, r);
 }
 
 function updatePlayer(dt) {

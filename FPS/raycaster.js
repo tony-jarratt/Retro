@@ -1,6 +1,6 @@
 // The raycaster: one ray per screen column, walked through the grid with DDA,
 // then turned into a vertical textured wall strip in the pixel buffer.
-// Floor and ceiling are drawn first, row by row, and the walls go on top.
+// Floor and ceiling are drawn first, row by row, then walls, then sprites.
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
@@ -116,7 +116,7 @@ function castRays(player) {
 }
 
 // Draw the whole 3D view into the ImageData: floor and ceiling first, then
-// a textured wall strip for every column on top of them.
+// a textured wall strip for every column on top of them, then sprites.
 function renderView(image, hits, player) {
   const pixels = image.data; // flat RGBA bytes: 4 per pixel, row after row
 
@@ -149,6 +149,10 @@ function renderView(image, hits, player) {
       copyTexel(pixels, col, row, tex, texX, texY, shade);
     }
   }
+
+  // Each column's wall distance is the depth buffer that lets walls hide sprites.
+  const depth = hits.map((hit) => hit.perpDist);
+  renderSprites(pixels, depth, player);
 }
 
 // FLOOR AND CEILING CASTING
@@ -199,8 +203,8 @@ function renderFloorCeiling(pixels, player) {
 
 // Copy one texel of `tex`, scaled by `shade`, to screen pixel (x, y).
 function copyTexel(pixels, x, y, tex, texX, texY, shade) {
-  const t = (texY * TEX_SIZE + texX) * 3; // 3 bytes per texel (RGB)
-  const i = (y * SCREEN_W + x) * 4;       // 4 bytes per screen pixel (RGBA)
+  const t = (texY * TEX_SIZE + texX) * 4; // 4 bytes per texel (RGBA)...
+  const i = (y * SCREEN_W + x) * 4;       // ...and 4 per screen pixel
   pixels[i] = tex.pixels[t] * shade;
   pixels[i + 1] = tex.pixels[t + 1] * shade;
   pixels[i + 2] = tex.pixels[t + 2] * shade;

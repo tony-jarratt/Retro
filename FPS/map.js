@@ -28,6 +28,24 @@ const MAP = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
+// Objects standing in the level. type is a key of SPRITE_TYPES in sprites.js.
+// x and y are positions like the player's: (4.5, 4.5) is the middle of MAP[4][4].
+const SPRITES = [
+  // Top-left room, among the green pillars, and the corridor east of it
+  { type: 'lamp',   x: 4.5,  y: 4.5 },
+  { type: 'lamp',   x: 8.5,  y: 2.5 },
+  { type: 'barrel', x: 8.5,  y: 1.5 },
+  { type: 'barrel', x: 9.5,  y: 1.5 },
+  { type: 'barrel', x: 14.5, y: 1.5 },
+  // Bottom-left room
+  { type: 'column', x: 4.5,  y: 11.5 },
+  { type: 'column', x: 4.5,  y: 13.5 },
+  { type: 'barrel', x: 1.5,  y: 13.5 },
+  // Bottom-right room
+  { type: 'lamp',   x: 11.5, y: 11.5 },
+  { type: 'barrel', x: 14.5, y: 8.5 },
+];
+
 // Where the player starts. angle is in radians: 0 faces +x (east), and
 // because y points down, increasing the angle turns clockwise (to the right).
 const PLAYER_START = { x: 2.5, y: 2.5, angle: 0 };

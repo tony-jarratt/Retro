@@ -34,6 +34,15 @@ function drawDebug(ctx, player, hits) {
     line(ctx, player.x * s, player.y * s, hit.hitX * s, hit.hitY * s);
   }
 
+  // Sprites: solid ones filled (at their collision size), others as rings.
+  ctx.strokeStyle = ctx.fillStyle = '#eee';
+  for (const sprite of SPRITES) {
+    ctx.beginPath();
+    ctx.arc(sprite.x * s, sprite.y * s, SOLID_SPRITE_RADIUS * s, 0, Math.PI * 2);
+    if (SPRITE_TYPES[sprite.type].solid) ctx.fill();
+    else ctx.stroke();
+  }
+
   // The player: a dot showing the collision box size.
   ctx.fillStyle = '#4cf';
   ctx.beginPath();

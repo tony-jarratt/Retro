@@ -33,8 +33,21 @@ function checkMap() {
       }
     });
   });
-  if (MAP[Math.floor(PLAYER_START.y)][Math.floor(PLAYER_START.x)] !== 0) {
-    throw new Error(`PLAYER_START (${PLAYER_START.x}, ${PLAYER_START.y}) is inside a wall.`);
+  SPRITES.forEach((s, n) => {
+    if (!SPRITE_TYPES[s.type]) {
+      throw new Error(`SPRITES[${n}] has type "${s.type}", which is not in SPRITE_TYPES.`);
+    }
+    const cell = MAP[Math.floor(s.y)]?.[Math.floor(s.x)];
+    if (cell !== 0) {
+      const where = cell === undefined ? 'outside the map' : 'inside a wall';
+      throw new Error(`SPRITES[${n}] (${s.type} at ${s.x}, ${s.y}) is ${where}.`);
+    }
+  });
+  if (MAP[Math.floor(PLAYER_START.y)]?.[Math.floor(PLAYER_START.x)] !== 0) {
+    throw new Error(`PLAYER_START (${PLAYER_START.x}, ${PLAYER_START.y}) is outside the map or inside a wall.`);
+  }
+  if (blocked(PLAYER_START.x, PLAYER_START.y)) {
+    throw new Error(`PLAYER_START (${PLAYER_START.x}, ${PLAYER_START.y}) is too close to a wall or solid sprite to move.`);
   }
 }
 
