@@ -199,10 +199,29 @@ const LAMP_TEXTURE = makeLamp();
 const FLOOR_TEXTURE = makeFloor();
 const CEILING_TEXTURE = makeCeiling();
 
-// Map cell value -> wall texture. Every non-zero number used in MAP needs an entry.
+// A steel sliding door: frame, two recessed panels, and a handle at the
+// left edge, which is the edge that leads as the door slides open.
+function makeDoor() {
+  const base = [95, 110, 125];
+  return makeTexture(base, (x, y) => {
+    let f = 0.95 + 0.1 * noise(x, y, 10);
+    if (x < 3 || y < 3 || x >= TEX_SIZE - 3 || y >= TEX_SIZE - 3) f = 0.6; // frame
+    const inPanel = x >= 12 && x < 52 && ((y >= 8 && y < 28) || (y >= 36 && y < 56));
+    if (inPanel) {
+      f = 0.8;                                         // recessed panel...
+      if (y === 8 || y === 36 || x === 12) f = 0.55;   // ...shadowed top/left inner edge
+      if (y === 27 || y === 55 || x === 51) f = 1.2;   // ...lit bottom/right inner edge
+    }
+    if (x >= 5 && x < 8 && y >= 28 && y < 36) return [210, 190, 90]; // brass handle
+    return brighten(base, f);
+  });
+}
+
+// Map cell value -> texture. Every non-zero number used in MAP needs an entry.
 const TEXTURES = {
   1: makeStone(),
   2: makeBrick(),
   3: makePanel(),
   4: makeWood(),
+  [DOOR_CELL]: makeDoor(),
 };

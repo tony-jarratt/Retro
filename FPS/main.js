@@ -1,4 +1,4 @@
-// Startup and the main loop: input -> move -> cast rays -> draw -> repeat.
+// Startup and the main loop: input -> doors -> move -> cast rays -> draw -> repeat.
 
 const screenCanvas = document.getElementById('screen');
 screenCanvas.width = SCREEN_W;   // the canvas really is 320x200 pixels;
@@ -55,7 +55,7 @@ checkMap();
 setupInput(screenCanvas, () => {
   debugOn = !debugOn;
   debugCanvas.style.display = debugOn ? 'block' : 'none';
-});
+}, useDoor);
 
 let lastTime = performance.now();
 
@@ -66,6 +66,7 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
+  updateDoors(dt);
   updatePlayer(dt);
   const hits = castRays(player);
   renderView(frameImage, hits, player);

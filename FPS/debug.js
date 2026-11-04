@@ -15,10 +15,20 @@ function drawDebug(ctx, player, hits) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const cell = MAP[y][x];
-      ctx.fillStyle = cell === 0 ? 'rgba(0, 0, 0, 0.85)' : `rgb(${TEXTURES[cell].colour.join(',')})`;
+      const empty = cell === 0 || cell === DOOR_CELL;
+      ctx.fillStyle = empty ? 'rgba(0, 0, 0, 0.85)' : `rgb(${TEXTURES[cell].colour.join(',')})`;
       ctx.fillRect(x * s, y * s, s, s);
     }
   }
+
+  // Doors: a thick line across the middle of the cell, for the part not yet slid away.
+  ctx.strokeStyle = `rgb(${TEXTURES[DOOR_CELL].colour.join(',')})`;
+  ctx.lineWidth = 3;
+  for (const door of DOORS) {
+    if (door.horizontal) line(ctx, (door.x + door.open) * s, (door.y + 0.5) * s, (door.x + 1) * s, (door.y + 0.5) * s);
+    else line(ctx, (door.x + 0.5) * s, (door.y + door.open) * s, (door.x + 0.5) * s, (door.y + 1) * s);
+  }
+  ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 1;
   for (let x = 0; x <= cols; x++) line(ctx, x * s, 0, x * s, rows * s);

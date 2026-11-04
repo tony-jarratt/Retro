@@ -64,6 +64,11 @@ function castRay(px, py, rayX, rayY) {
       throw new Error(`Ray left the map at cell (${mapX}, ${mapY}), cast from ` +
         `(${px.toFixed(2)}, ${py.toFixed(2)}); the map border must be solid walls`);
     }
+    if (cell === DOOR_CELL) {
+      const doorHit = hitDoor(doorAt(mapX, mapY), px, py, rayX, rayY);
+      if (doorHit) return doorHit;
+      continue; // passed through the open part: carry on walking the grid
+    }
     if (cell !== 0) {
       const hitX = px + rayX * dist;
       const hitY = py + rayY * dist;
@@ -82,6 +87,38 @@ function castRay(px, py, rayX, rayY) {
       return { dist, side, cell, hitX, hitY, wallX };
     }
   }
+}
+
+// DOORS. A door is a thin slab across the MIDDLE of its cell, not a whole
+// block, so the DDA's "stop at the cell edge" answer is wrong for it. When the
+// walk steps into a door cell, we work out where the ray crosses the door's
+// centre line directly. It's a hit if that crossing is inside this cell AND on
+// the part of the door that hasn't slid away; otherwise the ray carries on.
+//
+// The door slides towards +x (or +y) into the wall beside it, so the solid
+// part covers `along` from door.open to 1, and the gap is 0 to door.open.
+function hitDoor(door, px, py, rayX, rayY) {
+  // A horizontal door lies along y = door.y + 0.5; a vertical one along
+  // x = door.x + 0.5. Distance along the (unit) ray to reach that line:
+  const dist = door.horizontal ? (door.y + 0.5 - py) / rayY : (door.x + 0.5 - px) / rayX;
+  const hitX = px + rayX * dist;
+  const hitY = py + rayY * dist;
+
+  // How far across the cell the crossing is, 0 to 1. Outside that range the
+  // ray reaches the centre line only after leaving the cell (it clips the
+  // corner of the doorway and goes on to hit the wall beside it). If the ray
+  // runs parallel to the door, dist is Infinity and `along` is NaN; the
+  // comparison is false for NaN too, so that also counts as a miss.
+  const along = door.horizontal ? hitX - door.x : hitY - door.y;
+  if (!(along >= 0 && along < 1)) return null;
+  if (along < door.open) return null; // went through the gap
+
+  // Texture column: measured from the door's leading edge, so the picture
+  // slides along with the door instead of the door sliding over the picture.
+  // No mirror flip here (unlike walls): seen from either side, the handle
+  // drawn at the leading edge stays at the edge that moves, as a real one would.
+  const wallX = along - door.open;
+  return { dist, side: door.horizontal ? 1 : 0, cell: DOOR_CELL, hitX, hitY, wallX };
 }
 
 // Cast one ray per screen column and return the hits (also used by the

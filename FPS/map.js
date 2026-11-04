@@ -1,5 +1,6 @@
 // The level: a plain 2D array, indexed MAP[row][col], i.e. MAP[y][x].
 //   0          = empty floor
+//   9          = a sliding door (DOOR_CELL); must sit in a gap in a straight wall
 //   any other  = solid wall; the number picks its texture (TEXTURES in textures.js)
 //
 // Coordinates: x grows to the right, y grows DOWN (like screen pixels).
@@ -9,6 +10,8 @@
 // The outer border must be solid walls, so every ray is guaranteed to hit
 // something. main.js checks this at startup.
 
+const DOOR_CELL = 9;
+
 const MAP = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -17,11 +20,11 @@ const MAP = [
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 1],
   [1, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-  [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+  [1, 1, 1, 1, 9, 1, 1, 1, 1, 1, 1, 9, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 4, 4, 4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 4, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 2, 0, 1],
-  [1, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 4, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 2, 0, 2, 0, 1],
   [1, 0, 0, 0, 0, 0, 4, 0, 1, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],

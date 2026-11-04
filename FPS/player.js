@@ -10,11 +10,12 @@ const player = { x: PLAYER_START.x, y: PLAYER_START.y, angle: PLAYER_START.angle
 const keys = {};   // e.code -> true while that key is held, e.g. keys.KeyW
 let mouseTurn = 0; // mouse pixels moved since the last frame
 
-function setupInput(canvas, onToggleDebug) {
+function setupInput(canvas, onToggleDebug, onUse) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'KeyM' && !e.repeat) onToggleDebug();
-    if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
+    if ((e.code === 'KeyE' || e.code === 'Space') && !e.repeat) onUse();
+    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); // stop the page scrolling
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
@@ -33,7 +34,11 @@ function setupInput(canvas, onToggleDebug) {
 }
 
 function isWall(x, y) {
-  return MAP[Math.floor(y)][Math.floor(x)] !== 0;
+  const cell = MAP[Math.floor(y)][Math.floor(x)];
+  // A door cell blocks until its door is fully open. (Simpler than colliding
+  // with the moving slab itself, and it means you can't get clipped by it.)
+  if (cell === DOOR_CELL) return doorAt(Math.floor(x), Math.floor(y)).open < 1;
+  return cell !== 0;
 }
 
 // Would a square of half-width PLAYER_RADIUS centred on (x, y) overlap a wall
