@@ -58,6 +58,7 @@ function drawSprite(pixels, depth, { sprite, forward, across }) {
   const centreX = SCREEN_W / 2 + across * PROJ_DIST / forward;
   const left = centreX - size / 2;
   const top = (SCREEN_H - size) / 2; // same vertical span as a wall at this distance
+  const fog = fogAmount(forward);    // a billboard is flat, so one distance for all of it
 
   // As for walls: the columns and rows whose pixel centres fall on the sprite.
   const colStart = Math.max(0, Math.ceil(left - 0.5));
@@ -75,7 +76,7 @@ function drawSprite(pixels, depth, { sprite, forward, across }) {
     for (let row = rowStart; row < rowEnd; row++) {
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - top) / size * TEX_SIZE));
       if (isTransparent(tex, texX, texY)) continue; // see-through: keep what's behind
-      copyTexel(pixels, col, row, tex, texX, texY, 1);
+      copyTexel(pixels, col, row, tex, texX, texY, 1, fog);
     }
   }
 }

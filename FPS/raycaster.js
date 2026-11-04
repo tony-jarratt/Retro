@@ -8,6 +8,19 @@ const FOV = 66 * Math.PI / 180; // horizontal field of view, in radians
 
 const SIDE_SHADE = 0.6; // north/south-facing walls are drawn at 60% brightness
 
+// DISTANCE FOG. Every pixel is blended towards FOG_COLOUR according to how far
+// away the thing it shows is: untouched up to FOG_START, fully fog colour from
+// FOG_END on, and a straight-line blend in between. Black reads as darkness
+// ("light diminishing"); try a grey like [150, 150, 160] for mist.
+const FOG_COLOUR = [0, 0, 0];
+const FOG_START = 1.5; // cells
+const FOG_END = 11;    // cells
+
+// How much fog at this distance: 0 = none, 1 = all fog.
+function fogAmount(dist) {
+  return Math.min(1, Math.max(0, (dist - FOG_START) / (FOG_END - FOG_START)));
+}
+
 // Distance from the eye to an imaginary flat screen, measured in pixels,
 // chosen so that SCREEN_W pixels span exactly FOV. A wall 1 unit tall at
 // distance d then appears PROJ_DIST / d pixels tall (similar triangles).
@@ -177,13 +190,14 @@ function renderView(image, hits, player) {
     // index one column past the edge of the texture.
     const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
     const shade = hit.side === 1 ? SIDE_SHADE : 1;
+    const fog = fogAmount(hit.perpDist); // the whole strip is at one distance
 
     for (let row = top; row < bottom; row++) {
       // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
       // scaled to a texture row. This one division stretches or squashes the
       // 64-texel column to fit however tall the strip is on screen.
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
-      copyTexel(pixels, col, row, tex, texX, texY, shade);
+      copyTexel(pixels, col, row, tex, texX, texY, shade, fog);
     }
   }
 
@@ -219,6 +233,7 @@ function renderFloorCeiling(pixels, player) {
   for (let row = horizon; row < SCREEN_H; row++) {
     const d = 0.5 * PROJ_DIST / (row + 0.5 - horizon);
     const ceilingRow = SCREEN_H - 1 - row;
+    const fog = fogAmount(d); // the whole row is at one distance, so one fog value
 
     for (let col = 0; col < SCREEN_W; col++) {
       const screenX = 2 * (col + 0.5) / SCREEN_W - 1; // same as in castRays
@@ -232,18 +247,21 @@ function renderFloorCeiling(pixels, player) {
       // so the texture repeats once per grid cell.
       const texX = Math.min(TEX_SIZE - 1, Math.floor((floorX - Math.floor(floorX)) * TEX_SIZE));
       const texY = Math.min(TEX_SIZE - 1, Math.floor((floorY - Math.floor(floorY)) * TEX_SIZE));
-      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1);
-      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1);
+      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1, fog);
+      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1, fog);
     }
   }
 }
 
-// Copy one texel of `tex`, scaled by `shade`, to screen pixel (x, y).
-function copyTexel(pixels, x, y, tex, texX, texY, shade) {
+// Copy one texel of `tex` to screen pixel (x, y): darkened by `shade`, then
+// blended with FOG_COLOUR by `fog` (0 = pure texel, 1 = pure fog). The blend is
+// the usual "lerp", a + (b - a) * t, done separately for red, green and blue.
+function copyTexel(pixels, x, y, tex, texX, texY, shade, fog) {
   const t = (texY * TEX_SIZE + texX) * 4; // 4 bytes per texel (RGBA)...
   const i = (y * SCREEN_W + x) * 4;       // ...and 4 per screen pixel
-  pixels[i] = tex.pixels[t] * shade;
-  pixels[i + 1] = tex.pixels[t + 1] * shade;
-  pixels[i + 2] = tex.pixels[t + 2] * shade;
+  for (let c = 0; c < 3; c++) {
+    const lit = tex.pixels[t + c] * shade;
+    pixels[i + c] = lit + (FOG_COLOUR[c] - lit) * fog;
+  }
   pixels[i + 3] = 255; // alpha: fully opaque
 }
