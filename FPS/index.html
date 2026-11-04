@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raycaster</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #888;
+    font: 13px monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #wrap { position: relative; margin-top: 16px; }
+  /* The canvas is 320x200 real pixels. CSS draws it 3x bigger, and
+     "pixelated" means each pixel becomes a crisp block instead of a blur. */
+  #screen {
+    display: block;
+    width: min(960px, 100vw);
+    aspect-ratio: 320 / 200;
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+  #debug { position: absolute; left: 8px; top: 8px; display: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="screen"></canvas>
+  <canvas id="debug"></canvas>
+</div>
+<p>Click the view to capture the mouse (Esc releases) · WASD move · ←/→ turn · M map</p>
+
+<!-- Plain scripts, not ES modules: browsers refuse to load modules from
+     file:// URLs, and we want "just open index.html" to work. Classic scripts
+     share one global scope, so order matters: each file may only use names
+     defined by the files above it (at load time). -->
+<script src="map.js"></script>
+<script src="player.js"></script>
+<script src="raycaster.js"></script>
+<script src="debug.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
