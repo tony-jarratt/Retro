@@ -44,12 +44,14 @@ function drawDebug(ctx, player, hits) {
     line(ctx, player.x * s, player.y * s, hit.hitX * s, hit.hitY * s);
   }
 
-  // Sprites: solid ones filled (at their collision size), others as rings.
-  ctx.strokeStyle = ctx.fillStyle = '#eee';
-  for (const sprite of SPRITES) {
+  // Props: solid ones filled (at their collision size), others as rings.
+  // Explosive drums are orange until they blow, then a dim ring.
+  for (const p of props) {
+    const solid = SPRITE_TYPES[p.type].solid && p.state !== 'exploded';
+    ctx.strokeStyle = ctx.fillStyle = p.state === 'exploded' ? '#666' : SPRITE_TYPES[p.type].explosive ? '#f84' : '#eee';
     ctx.beginPath();
-    ctx.arc(sprite.x * s, sprite.y * s, SOLID_SPRITE_RADIUS * s, 0, Math.PI * 2);
-    if (SPRITE_TYPES[sprite.type].solid) ctx.fill();
+    ctx.arc(p.x * s, p.y * s, SOLID_SPRITE_RADIUS * s, 0, Math.PI * 2);
+    if (solid) ctx.fill();
     else ctx.stroke();
   }
 

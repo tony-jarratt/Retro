@@ -4,41 +4,53 @@
 // column by column, and are hidden wherever a wall is nearer. Where the
 // static ones stand is listed in map.js.
 
-// What each kind of sprite looks like, and whether it blocks movement.
+// What each kind of sprite looks like, whether it blocks movement, and
+// whether shooting it sets it off (explosions.js).
 const SPRITE_TYPES = {
-  drum:   { texture: DRUM_TEXTURE,   solid: true },
-  strut:  { texture: STRUT_TEXTURE,  solid: true },
-  lamp:   { texture: LAMP_TEXTURE,   solid: false },
+  drum:   { texture: DRUM_TEXTURE,   solid: true,  explosive: true },
+  strut:  { texture: STRUT_TEXTURE,  solid: true,  explosive: false },
+  lamp:   { texture: LAMP_TEXTURE,   solid: false, explosive: false },
 };
 
 const SOLID_SPRITE_RADIUS = 0.3; // half-width of a solid sprite's collision box, in cells
 
+// The objects actually standing in the level: a copy of the map's SPRITES,
+// so that blowing up a drum never changes the map data itself.
+//   state   'intact', 'fuse' (caught in a blast, about to go off), or 'exploded'
+//   fuse    seconds until a 'fuse' drum explodes
+const props = SPRITES.map((s) => ({ type: s.type, x: s.x, y: s.y, flicker: s.flicker === true, state: 'intact', fuse: 0 }));
+
 // Does a box of half-width r centred on (x, y) overlap any solid sprite?
+// An exploded drum's remains aren't solid.
 function hitsSolidSprite(x, y, r) {
-  return SPRITES.some((s) => SPRITE_TYPES[s.type].solid &&
-    boxesOverlap(x, y, r, s.x, s.y, SOLID_SPRITE_RADIUS));
+  return props.some((p) => SPRITE_TYPES[p.type].solid && p.state !== 'exploded' &&
+    boxesOverlap(x, y, r, p.x, p.y, SOLID_SPRITE_RADIUS));
 }
 
-// Everything drawn as a billboard this frame, as seen by `viewer`. Static
-// sprites, robots (wrecks included) and pickups go into one list, so they sort
-// together: a robot walking behind a drum is hidden by it, in front it isn't.
+// Everything drawn as a billboard this frame, as seen by `viewer`. Props,
+// robots (wrecks included), pickups and explosions go into one list, so they
+// sort together: a robot walking behind a drum is hidden by it, in front it isn't.
 //   tex        the picture to draw
 //   shade      brightness multiplier (a robot flashes white when you hit it)
 //   glowShade  brightness of glowing texels (a robot's eye brightens as it
 //              charges; a flickering lamp's bulb dims with its light)
 //   enemy      the robot this is, or null
+//   prop       the prop (drum, strut, lamp) this is, or null
+//   effect     true for an explosion: you can see it, but shots pass through it
 function spriteThings(viewer) {
+  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, effect: false, ...extra });
   return [
-    ...SPRITES.map((s) => ({ x: s.x, y: s.y, tex: SPRITE_TYPES[s.type].texture, shade: 1, glowShade: spriteGlow(s), enemy: null })),
-    ...enemies.map((e) => ({
-      x: e.x,
-      y: e.y,
-      tex: enemyTexture(e, viewer),
+    ...props.map((p) => thing(p.x, p.y, p.state === 'exploded' ? DRUM_WRECK_TEXTURE : SPRITE_TYPES[p.type].texture,
+      { glowShade: spriteGlow(p), prop: p })),
+    ...enemies.map((e) => thing(e.x, e.y, enemyTexture(e, viewer), {
       shade: e.hurtTime > 0 ? 3 : 1,
       glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ROBOT_CHARGE_TIME : 1,
       enemy: e,
     })),
-    ...pickups.map((p) => ({ x: p.x, y: p.y, tex: PICKUP_TYPES[p.type].texture, shade: 1, glowShade: 1, enemy: null })),
+    ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
+    // Explosions come last: one drawn at the same spot as its drum's remains
+    // ties on distance, and ties keep list order, so the fireball goes on top.
+    ...explosions.map((b) => thing(b.x, b.y, explosionTexture(b), { effect: true })),
   ];
 }
 

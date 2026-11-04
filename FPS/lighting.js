@@ -98,7 +98,7 @@ function dilateIntoWalls(grid) {
 }
 
 // Every static light in the level, gathered from the map data. `kind` says where it came from:
-//   'lamp'      a lamp sprite (SPRITES entries with type 'lamp'); `sprite` points back to it
+//   'lamp'      a lamp (props with type 'lamp', from SPRITES); `sprite` points back to it
 //   'ceiling'   a strip light in one of the CEILING_LIGHTS cells
 //   'screen'    a computer bank (MAP value 3), spilling a little green light
 // Each gets its own pre-shadowed contribution grid. `flicker` lights stutter;
@@ -112,7 +112,7 @@ function buildLights() {
     addLight(contribution, x, y, settings.colour, settings.radius, 1);
     lights.push({ x, y, kind, colour: settings.colour, radius: settings.radius, flicker, sprite, contribution, level: 1 });
   };
-  for (const s of SPRITES) if (s.type === 'lamp') add(s.x, s.y, 'lamp', LAMP_LIGHT, s.flicker === true, s);
+  for (const p of props) if (p.type === 'lamp') add(p.x, p.y, 'lamp', LAMP_LIGHT, p.flicker, p);
   for (const c of CEILING_LIGHTS) add(c.x + 0.5, c.y + 0.5, 'ceiling', CEILING_LIGHT, c.flicker === true, null);
   MAP.forEach((row, y) => row.forEach((cell, x) => {
     if (cell === 3) add(x + 0.5, y + 0.5, 'screen', SCREEN_LIGHT, false, null);
@@ -182,6 +182,10 @@ function updateLighting() {
   }
   for (const e of enemies) {
     if (e.firedTime > 0) addLight(lightGrid, e.x, e.y, ROBOT_FLASH.colour, ROBOT_FLASH.radius, e.firedTime / ROBOT_FIRE_FLASH);
+  }
+  // Exploding drums: a big orange light that dies away with the fireball.
+  for (const b of explosions) {
+    addLight(lightGrid, b.x, b.y, BLAST_LIGHT.colour, BLAST_LIGHT.radius, 1 - b.time / EXPLOSION_TIME);
   }
 
   dilateIntoWalls(lightGrid);

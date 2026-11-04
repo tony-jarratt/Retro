@@ -277,6 +277,40 @@ function makeDrum() {
   });
 }
 
+// What's left of a drum after it explodes: the bottom of the shell, torn open
+// with a ragged top edge, blackened, with a few embers still glowing.
+function makeDrumWreck() {
+  return makeTexture([60, 30, 22], (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (Math.abs(dx) > 12) return null;
+    const top = 48 + Math.floor(noise(x >> 1, 0, 47) * 8); // ragged, torn edge
+    if (y < top) return null;
+    if (y < top + 2) return [24, 20, 18];                   // the torn lip, seen from inside
+    if (noise(x, y, 48) > 0.96) return glowing(SODIUM);     // embers
+    const soot = 0.45 + 0.4 * noise(x >> 1, y >> 1, 49);
+    return brighten([150, 60, 36], roundShade(dx / 12) * soot);
+  });
+}
+
+// The fireball when a drum goes up, as frames shown one after another.
+// Each frame is a ragged ball: a white-hot core, orange fire, a red edge.
+// As it ages it grows, and more of it turns from fire to dark smoke. The
+// fire is glowing, so neither fog nor the light map dims it.
+function makeFireball(frame) {
+  const radius = [9, 15, 19, 21, 22][frame];
+  const heat = [1, 1, 0.75, 0.45, 0.15][frame]; // how much of the ball is still fire, not smoke
+  return makeTexture(SODIUM, (x, y) => {
+    // Distance from the centre, roughened by noise so the edge isn't a perfect circle.
+    const d = Math.hypot(x + 0.5 - 32, y + 0.5 - 42) + 5 * noise(x >> 1, y >> 1, 50 + frame);
+    if (d > radius) return null;
+    const t = d / radius; // 0 at the centre, 1 at the edge
+    if (t < heat * 0.45) return glowing([255, 245, 200]);
+    if (t < heat * 0.75) return glowing([255, 170, 50]);
+    if (t < heat) return glowing([220, 70, 20]);
+    return brighten([70, 64, 58], 0.8 + 0.4 * noise(x, y, 55)); // smoke
+  });
+}
+
 // A hydraulic support strut, floor to ceiling: a painted housing at the top,
 // a chrome piston, and a hazard-striped foot.
 function makeStrut() {
@@ -570,6 +604,8 @@ const GUN_TEXTURE = makeGun(false);
 const GUN_FLASH_TEXTURE = makeGun(true);
 
 const DRUM_TEXTURE = makeDrum();
+const DRUM_WRECK_TEXTURE = makeDrumWreck();
+const FIREBALL_FRAMES = [0, 1, 2, 3, 4].map(makeFireball);
 const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
 

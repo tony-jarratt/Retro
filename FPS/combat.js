@@ -38,6 +38,7 @@ function thingUnderCrosshair() {
   const wall = castRay(player.x, player.y, Math.cos(player.angle), Math.sin(player.angle));
   let best = null;
   for (const thing of spriteThings(player)) {
+    if (thing.effect) continue; // a fireball is just light and smoke: shots go straight through
     const spot = placeOnScreen(thing, player);
     if (!spot || spot.forward > wall.dist) continue; // behind us, or behind the wall
     const texX = Math.floor((SCREEN_W / 2 - spot.left) / spot.size * TEX_SIZE);
@@ -56,8 +57,12 @@ function playerFire() {
   gun.cooldown = FIRE_COOLDOWN;
   gun.flash = GUN_FLASH_TIME;
   const target = thingUnderCrosshair();
-  // A drum or strut in the way soaks up the shot: only robots take damage.
-  if (target && target.enemy && target.enemy.state !== 'dead') damageEnemy(target.enemy);
+  if (!target) return;
+  if (target.enemy && target.enemy.state !== 'dead') damageEnemy(target.enemy);
+  // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
+  if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
+    explodeDrum(target.prop);
+  }
 }
 
 function damageEnemy(enemy) {
