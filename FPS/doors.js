@@ -1,10 +1,11 @@
-// Doors: where they are, their open/close state machine, and the "use" key.
-// How rays see a door (a thin slab across the middle of its cell) is in
-// raycaster.js, hitDoor.
+// Doors: where they are, and their open/close state machine. They open by
+// themselves when you come near. How rays see a door (a thin slab across the
+// middle of its cell) is in raycaster.js, hitDoor; how light gets through as
+// one opens is in lighting.js, updateDoorLights.
 
-const DOOR_SPEED = 1.0;     // fraction of the doorway per second: 1s to open or close
-const DOOR_OPEN_TIME = 3.0; // seconds a door stays open before closing by itself
-const USE_REACH = 1.5;      // how far ahead, in cells, you can reach to open a door
+const DOOR_SPEED = 1.0;          // fraction of the doorway per second: 1s to open or close
+const DOOR_OPEN_TIME = 2.0;      // seconds a door stays open after you've moved away
+const DOOR_TRIGGER_RANGE = 1.3;  // cells from the door's centre: about one cell away, head-on
 
 // One entry per door cell in MAP, built once at startup:
 //   x, y        the door's cell
@@ -48,10 +49,24 @@ function doorwayOccupied(door) {
            boxesOverlap(enemy.x, enemy.y, ENEMY_RADIUS, cx, cy, 0.5));
 }
 
-// The door state machine. Each state only ever moves to the next one, apart
-// from 'closing', which useDoor can send back to 'opening'.
+// Is the player close enough to set the door off? Measured from the middle
+// of the door's cell, so standing in the next cell along, facing it, counts,
+// but brushing past diagonally (1.41 away) doesn't.
+function playerNearDoor(door) {
+  return Math.hypot(player.x - (door.x + 0.5), player.y - (door.y + 0.5)) <= DOOR_TRIGGER_RANGE;
+}
+
+// The door state machine:
+//   closed   -> opening  when you come near
+//   opening  -> open     once fully slid away
+//   open     -> closing  DOOR_OPEN_TIME after you've moved away, if the doorway is clear
+//   closing  -> opening  if you come back near before it shuts
+//   closing  -> closed   once shut
 function updateDoors(dt) {
   for (const door of DOORS) {
+    const near = playerNearDoor(door);
+    if (near && (door.state === 'closed' || door.state === 'closing')) door.state = 'opening';
+
     if (door.state === 'opening') {
       door.open = Math.min(1, door.open + DOOR_SPEED * dt);
       if (door.open === 1) {
@@ -59,31 +74,14 @@ function updateDoors(dt) {
         door.timer = DOOR_OPEN_TIME;
       }
     } else if (door.state === 'open') {
-      door.timer -= dt;
+      // The countdown only runs once you've walked away; while you're near
+      // it's held at full.
+      door.timer = near ? DOOR_OPEN_TIME : door.timer - dt;
       // Time's up, but never shut on anyone: wait until the doorway is clear.
       if (door.timer <= 0 && !doorwayOccupied(door)) door.state = 'closing';
     } else if (door.state === 'closing') {
       door.open = Math.max(0, door.open - DOOR_SPEED * dt);
       if (door.open === 0) door.state = 'closed';
     }
-  }
-}
-
-// The "use" key (E or Space). Step forward from the player along the view
-// direction, a quarter cell at a time, to the first cell that isn't floor.
-// If that's a door within reach, open it. A wall in the way means nothing to use.
-function useDoor() {
-  const dirX = Math.cos(player.angle);
-  const dirY = Math.sin(player.angle);
-  for (let d = 0.25; d <= USE_REACH; d += 0.25) {
-    const x = Math.floor(player.x + dirX * d);
-    const y = Math.floor(player.y + dirY * d);
-    const cell = MAP[y][x];
-    if (cell === 0) continue;
-    if (cell === DOOR_CELL) {
-      const door = doorAt(x, y);
-      if (door.state === 'closed' || door.state === 'closing') door.state = 'opening';
-    }
-    return;
   }
 }

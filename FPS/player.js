@@ -20,18 +20,17 @@ const player = {
 const keys = {};   // e.code -> true while that key is held, e.g. keys.KeyW
 let mouseTurn = 0; // mouse pixels moved since the last frame
 
-// on: the functions to call for one-off actions: { toggleDebug, use, fire, restart, toggleFilter }.
+// on: the functions to call for one-off actions: { toggleDebug, fire, restart, toggleFilter }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (!e.repeat) {
       if (e.code === 'KeyM') on.toggleDebug();
-      if (e.code === 'KeyE' || e.code === 'Space') on.use();
       if (e.code === 'ArrowUp') on.fire(); // one shot per press: held keys repeat, hence !e.repeat
       if (e.code === 'KeyR') on.restart();
       if (e.code === 'KeyC') on.toggleFilter();
     }
-    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); // stop the page scrolling
+    if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 

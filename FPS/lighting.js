@@ -3,9 +3,10 @@
 // is multiplied by the light at its spot in the world, so walls, floor,
 // ceiling and sprites are all bright near a lamp and dim away from one.
 //
-// Each light's contribution is worked out ONCE at startup, with shadows: for
+// Each light's contribution is worked out at startup, with shadows: for
 // every sample, castRay checks whether a wall stands between it and the light
-// (the same line-of-sight test the robots use to see you). Every frame the
+// (the same line-of-sight test the robots use to see you). It's only redone
+// when a nearby door moves (updateDoorLights). Every frame the
 // contributions are added up, each scaled by how bright its light is right
 // now, which is what lets a lamp flicker without redoing the shadow work.
 // Muzzle flashes are added on top while they last.
@@ -109,7 +110,7 @@ function buildLights() {
   const add = (x, y, kind, settings, flicker, sprite) => {
     const contribution = newLightGrid();
     addLight(contribution, x, y, settings.colour, settings.radius, 1);
-    lights.push({ x, y, kind, flicker, sprite, contribution, level: 1 });
+    lights.push({ x, y, kind, colour: settings.colour, radius: settings.radius, flicker, sprite, contribution, level: 1 });
   };
   for (const s of SPRITES) if (s.type === 'lamp') add(s.x, s.y, 'lamp', LAMP_LIGHT, s.flicker === true, s);
   for (const c of CEILING_LIGHTS) add(c.x + 0.5, c.y + 0.5, 'ceiling', CEILING_LIGHT, c.flicker === true, null);
@@ -131,10 +132,35 @@ function flickerLevel(lightIndex, time) {
   return n < 0.18 ? 0.1 : 0.85 + 0.15 * n;
 }
 
+// LIGHT THROUGH DOORS. Each light's shadows were worked out with every door
+// shut. When a door moves, any light close enough to reach it is redone from
+// scratch: castRay already knows how far each door has slid (hitDoor), so
+// the redone shadows let light through exactly the gap that's open. As a door
+// slides, a shaft of light widens through it into the room beyond.
+// Redoing a light is the expensive part of lighting, but it only happens
+// while a door is actually moving.
+const doorOpenLastLit = DOORS.map((door) => door.open); // each door's position when its lights were last done
+
+function updateDoorLights() {
+  DOORS.forEach((door, n) => {
+    if (door.open === doorOpenLastLit[n]) return;
+    doorOpenLastLit[n] = door.open;
+    for (const light of LIGHTS) {
+      // Too far away for its light to reach this door's cell at all? Then
+      // the door can't change its shadows. (0.75 covers the cell's corners.)
+      if (Math.hypot(light.x - (door.x + 0.5), light.y - (door.y + 0.5)) > light.radius + 0.75) continue;
+      light.contribution.fill(0);
+      addLight(light.contribution, light.x, light.y, light.colour, light.radius, 1);
+    }
+  });
+}
+
 // The light map actually used for drawing this frame.
 const lightGrid = newLightGrid();
 
 function updateLighting() {
+  updateDoorLights();
+
   for (let i = 0; i < lightGrid.length; i += 3) {
     lightGrid[i] = AMBIENT[0];
     lightGrid[i + 1] = AMBIENT[1];

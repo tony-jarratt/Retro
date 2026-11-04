@@ -56,6 +56,7 @@ const SPRITES = [
 const CEILING_LIGHTS = [
   { x: 2,  y: 2 },               // over the start
   { x: 9,  y: 5 },               // first room, east side
+  { x: 11, y: 6 },               // just inside the door down to the bottom-right room: spills through it when it opens
   { x: 13, y: 2 },               // first room, top-right corner
   { x: 6,  y: 9 },               // bottom-left room
   { x: 2,  y: 13 },              // bottom-left room, far corner

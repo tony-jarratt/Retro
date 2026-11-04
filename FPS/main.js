@@ -79,7 +79,6 @@ setupInput(screenCanvas, {
     debugOn = !debugOn;
     debugCanvas.style.display = debugOn ? 'block' : 'none';
   },
-  use: useDoor,
   fire: playerFire,
   restart: restartGame,
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
