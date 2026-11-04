@@ -13,10 +13,11 @@ const HIT_CHANCE_FAR = 0.3;     // ...falling in a straight line to this at AIM_
 const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hit
 
 // The whole game's state:
-//   state       'playing', then 'dead' or 'clear'
-//   hurtFlash   seconds of red flash left
-//   endTime     seconds since the game ended (for the slow fade)
-const game = { state: 'playing', hurtFlash: 0, endTime: 0 };
+//   state        'playing', then 'dead' or 'clear'
+//   hurtFlash    seconds of red flash left
+//   pickupFlash  seconds of gold flash left (pickups.js)
+//   endTime      seconds since the game ended (for the slow fade)
+const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0 };
 
 // cooldown: seconds until you can fire again; flash: seconds of muzzle flash left.
 const gun = { cooldown: 0, flash: 0 };
@@ -49,6 +50,8 @@ function thingUnderCrosshair() {
 
 function playerFire() {
   if (game.state !== 'playing' || gun.cooldown > 0) return;
+  if (player.ammo === 0) return; // empty: nothing happens (the HUD shows the count in red)
+  player.ammo -= 1;
   gun.cooldown = FIRE_COOLDOWN;
   gun.flash = GUN_FLASH_TIME;
   const target = thingUnderCrosshair();
@@ -62,6 +65,7 @@ function damageEnemy(enemy) {
   if (enemy.health <= 0) {
     enemy.state = 'dead';
     enemy.moving = false;
+    dropClip(enemy);
   } else if (enemy.state === 'idle' || enemy.state === 'search') {
     // Shot from somewhere it wasn't watching: it now knows where you are.
     enemy.state = 'chase';
@@ -95,6 +99,7 @@ function updateCombat(dt) {
   gun.cooldown = Math.max(0, gun.cooldown - dt);
   gun.flash = Math.max(0, gun.flash - dt);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
+  game.pickupFlash = Math.max(0, game.pickupFlash - dt);
   if (game.state === 'playing' && enemies.every((e) => e.state === 'dead')) game.state = 'clear';
   if (game.state !== 'playing') game.endTime += dt;
 }

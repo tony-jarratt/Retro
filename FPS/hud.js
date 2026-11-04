@@ -23,6 +23,7 @@ const FONT = {
   'E': ['###', '#..', '##.', '#..', '###'],
   'H': ['#.#', '#.#', '###', '#.#', '#.#'],
   'L': ['#..', '#..', '#..', '#..', '###'],
+  'M': ['#.#', '###', '###', '#.#', '#.#'],
   'O': ['.#.', '#.#', '#.#', '#.#', '.#.'],
   'P': ['##.', '#.#', '##.', '#..', '#..'],
   'R': ['##.', '#.#', '##.', '#.#', '#.#'],
@@ -129,6 +130,13 @@ function drawHealth(pixels) {
   fillRect(pixels, x + 1, y + 1, filled, 4, colour);
 }
 
+// Bottom right, level with the HP label; red when you're out.
+function drawAmmo(pixels) {
+  const text = 'AMMO ' + player.ammo;
+  const colour = player.ammo === 0 ? [255, 70, 50] : [230, 230, 230];
+  drawText(pixels, text, SCREEN_W - 6 - textWidth(text, 1), SCREEN_H - 20, colour, 1);
+}
+
 function drawHud(pixels) {
   if (game.state !== 'dead') {
     drawGun(pixels);
@@ -137,10 +145,13 @@ function drawHud(pixels) {
 
   // Red damage flash, fading out over PLAYER_HURT_FLASH seconds.
   if (game.hurtFlash > 0) tintScreen(pixels, [200, 0, 0], 0.45 * game.hurtFlash / PLAYER_HURT_FLASH);
+  // Gold flash for collecting something.
+  if (game.pickupFlash > 0) tintScreen(pixels, [255, 210, 90], 0.3 * game.pickupFlash / PICKUP_FLASH_TIME);
   // Dead: the view slowly fills with dark red.
   if (game.state === 'dead') tintScreen(pixels, [90, 0, 0], Math.min(0.75, game.endTime * 0.6));
 
   drawHealth(pixels);
+  drawAmmo(pixels);
   const left = enemies.filter((e) => e.state !== 'dead').length;
   const counter = 'ROBOTS ' + left;
   drawText(pixels, counter, SCREEN_W - 6 - textWidth(counter, 1), 6, [230, 230, 230], 1);

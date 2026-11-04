@@ -53,6 +53,12 @@ function drawDebug(ctx, player, hits) {
     else ctx.stroke();
   }
 
+  // Pickups: small squares, gold for ammo, white for health.
+  for (const p of pickups) {
+    ctx.fillStyle = p.type === 'health' ? '#fff' : '#fc4';
+    ctx.fillRect((p.x - 0.15) * s, (p.y - 0.15) * s, 0.3 * s, 0.3 * s);
+  }
+
   // Robots: a dot coloured by state, with a line showing which way each faces.
   const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555' };
   for (const enemy of enemies) {

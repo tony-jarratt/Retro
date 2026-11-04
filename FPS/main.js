@@ -44,6 +44,14 @@ function checkMap() {
       throw new Error(`SPRITES[${n}] (${s.type} at ${s.x}, ${s.y}) is ${where}.`);
     }
   });
+  PICKUPS.forEach((p, n) => {
+    if (!PICKUP_TYPES[p.type]) {
+      throw new Error(`PICKUPS[${n}] has type "${p.type}", which is not in PICKUP_TYPES.`);
+    }
+    if (MAP[Math.floor(p.y)]?.[Math.floor(p.x)] !== 0) {
+      throw new Error(`PICKUPS[${n}] (${p.type} at ${p.x}, ${p.y}) is outside the map or not on a floor cell.`);
+    }
+  });
   enemies.forEach((enemy, n) => {
     if (MAP[Math.floor(enemy.y)]?.[Math.floor(enemy.x)] !== 0) {
       throw new Error(`ENEMIES[${n}] at (${enemy.x}, ${enemy.y}) is outside the map or not on a floor cell.`);
@@ -83,6 +91,7 @@ function frame(now) {
   updateDoors(dt);
   if (game.state === 'playing') { // once you've won or died, everyone stops
     updatePlayer(dt);
+    updatePickups();
     updateEnemies(dt);
   }
   updateCombat(dt);

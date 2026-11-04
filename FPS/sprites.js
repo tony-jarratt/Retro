@@ -20,7 +20,7 @@ function hitsSolidSprite(x, y, r) {
 }
 
 // Everything drawn as a billboard this frame, as seen by `viewer`. Static
-// sprites and robots (wrecks included) go into one list, so they sort
+// sprites, robots (wrecks included) and pickups go into one list, so they sort
 // together: a robot walking behind a barrel is hidden by it, in front it isn't.
 //   tex        the picture to draw
 //   shade      brightness multiplier (a robot flashes white when you hit it)
@@ -37,6 +37,7 @@ function spriteThings(viewer) {
       glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ROBOT_CHARGE_TIME : 1,
       enemy: e,
     })),
+    ...pickups.map((p) => ({ x: p.x, y: p.y, tex: PICKUP_TYPES[p.type].texture, shade: 1, glowShade: 1, enemy: null })),
   ];
 }
 

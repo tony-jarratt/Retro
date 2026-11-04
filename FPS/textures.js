@@ -362,6 +362,50 @@ function makeGun(flash) {
   });
 }
 
+// PICKUPS: small things lying on the floor, so drawn in the bottom rows.
+
+// An olive ammo crate with a yellow stripe.
+function makeAmmoBox() {
+  const olive = [95, 105, 60];
+  return makeTexture(olive, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y < 48 || Math.abs(dx) > 12) return null;
+    if (y < 51) return brighten(olive, 1.3);                          // lid, lit from above
+    if (Math.abs(dx) > 11 || y === 51) return brighten(olive, 0.55);  // edges
+    if (y >= 55 && y < 58) return [210, 180, 50];                     // stripe
+    return brighten(olive, 0.9 + 0.15 * noise(x, y, 18));
+  });
+}
+
+// A single magazine, dropped by a destroyed robot.
+function makeClip() {
+  const steel = [60, 62, 70];
+  return makeTexture(steel, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y >= 50 && y < 53 && Math.abs(dx) < 2.5) return [220, 180, 80]; // brass rounds on top
+    if (y >= 53 && Math.abs(dx) < 4) return brighten(steel, 1.1 - 0.4 * Math.abs(dx / 4 + 0.25));
+    return null;
+  });
+}
+
+// A white medical kit with a red cross.
+function makeMedkit() {
+  const white = [215, 215, 210];
+  return makeTexture(white, (x, y) => {
+    const dx = x + 0.5 - 32;
+    const dy = y - 56; // the cross is centred on row 56
+    if (y < 48 || Math.abs(dx) > 11) return null;
+    if ((Math.abs(dx) < 2 && Math.abs(dy) < 5) || (Math.abs(dx) < 5 && Math.abs(dy) < 2)) return [200, 30, 30];
+    if (y < 50) return brighten(white, 1.1);               // lid
+    if (Math.abs(dx) > 10) return brighten(white, 0.6);    // edges
+    return brighten(white, 0.9 + 0.1 * noise(x, y, 19));
+  });
+}
+
+const AMMO_BOX_TEXTURE = makeAmmoBox();
+const CLIP_TEXTURE = makeClip();
+const MEDKIT_TEXTURE = makeMedkit();
+
 const WRECK_TEXTURE = makeWreck();
 const GUN_TEXTURE = makeGun(false);
 const GUN_FLASH_TEXTURE = makeGun(true);

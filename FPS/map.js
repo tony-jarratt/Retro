@@ -58,6 +58,15 @@ const ENEMIES = [
   { x: 11.5, y: 13.5, angle: -Math.PI / 2 }, // bottom-right room, watching north
 ];
 
+// Things to collect (pickups.js): 'ammo' (+8 bullets) or 'health' (+25).
+// Destroyed robots also drop a 'clip' (+4) where they fall.
+const PICKUPS = [
+  { type: 'ammo',   x: 1.5,  y: 6.5 },  // first room, bottom-left corner, by the door
+  { type: 'ammo',   x: 3.5,  y: 10.5 }, // bottom-left room, tucked inside the wooden L
+  { type: 'ammo',   x: 14.5, y: 13.5 }, // bottom-right room, far corner past its robot
+  { type: 'health', x: 13.5, y: 1.5 },  // first room, top-right, behind the first robot's back
+];
+
 // Where the player starts. angle is in radians: 0 faces +x (east), and
 // because y points down, increasing the angle turns clockwise (to the right).
 const PLAYER_START = { x: 2.5, y: 2.5, angle: 0 };
