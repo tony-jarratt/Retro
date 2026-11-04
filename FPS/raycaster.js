@@ -1,12 +1,11 @@
 // The raycaster: one ray per screen column, walked through the grid with DDA,
 // then turned into a vertical textured wall strip in the pixel buffer.
+// Floor and ceiling are drawn first, row by row, and the walls go on top.
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
 const FOV = 66 * Math.PI / 180; // horizontal field of view, in radians
 
-const CEILING_COLOUR = [56, 56, 56];
-const FLOOR_COLOUR = [112, 112, 112];
 const SIDE_SHADE = 0.6; // north/south-facing walls are drawn at 60% brightness
 
 // Distance from the eye to an imaginary flat screen, measured in pixels,
@@ -116,9 +115,12 @@ function castRays(player) {
   return hits;
 }
 
-// Draw ceiling, textured wall strip and floor for every column into the ImageData.
-function renderView(image, hits) {
+// Draw the whole 3D view into the ImageData: floor and ceiling first, then
+// a textured wall strip for every column on top of them.
+function renderView(image, hits, player) {
   const pixels = image.data; // flat RGBA bytes: 4 per pixel, row after row
+
+  renderFloorCeiling(pixels, player);
 
   for (let col = 0; col < SCREEN_W; col++) {
     const hit = hits[col];
@@ -139,29 +141,68 @@ function renderView(image, hits) {
     const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
     const shade = hit.side === 1 ? SIDE_SHADE : 1;
 
-    for (let row = 0; row < top; row++) setPixel(pixels, col, row, CEILING_COLOUR);
-
     for (let row = top; row < bottom; row++) {
       // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
       // scaled to a texture row. This one division stretches or squashes the
       // 64-texel column to fit however tall the strip is on screen.
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
-      const t = (texY * TEX_SIZE + texX) * 3;
-      const i = (row * SCREEN_W + col) * 4;
-      pixels[i] = tex.pixels[t] * shade;
-      pixels[i + 1] = tex.pixels[t + 1] * shade;
-      pixels[i + 2] = tex.pixels[t + 2] * shade;
-      pixels[i + 3] = 255;
+      copyTexel(pixels, col, row, tex, texX, texY, shade);
     }
-
-    for (let row = bottom; row < SCREEN_H; row++) setPixel(pixels, col, row, FLOOR_COLOUR);
   }
 }
 
-function setPixel(pixels, x, y, colour) {
-  const i = (y * SCREEN_W + x) * 4;
-  pixels[i] = colour[0];
-  pixels[i + 1] = colour[1];
-  pixels[i + 2] = colour[2];
+// FLOOR AND CEILING CASTING
+// The eye is at height 0.5, halfway up a wall that is 1 tall. By the same
+// similar triangles as the wall height, a floor point at perpendicular
+// distance d appears (0.5 * PROJ_DIST / d) pixels below the horizon.
+// Turn that round, and each screen row below the horizon shows the floor at
+// one fixed distance:
+//     d = 0.5 * PROJ_DIST / (pixels below the horizon)
+// A screen row is a line across the floor parallel to the screen, so d is
+// already a perpendicular distance and there's no fisheye to correct here.
+// The ceiling is the floor's mirror image: the row the same number of pixels
+// ABOVE the horizon looks at the same (x, y) spot, just on the ceiling.
+//
+// This also fills in the pixels that walls will cover. That's wasted work,
+// but it keeps the two passes independent.
+function renderFloorCeiling(pixels, player) {
+  const dirX = Math.cos(player.angle);
+  const dirY = Math.sin(player.angle);
+  // The vector from the centre of the screen to its right edge, for a screen
+  // 1 unit in front of the eye (same "right" as in player.js).
+  const halfWidth = Math.tan(FOV / 2);
+  const planeX = -dirY * halfWidth;
+  const planeY = dirX * halfWidth;
+  const horizon = SCREEN_H / 2;
+
+  for (let row = horizon; row < SCREEN_H; row++) {
+    const d = 0.5 * PROJ_DIST / (row + 0.5 - horizon);
+    const ceilingRow = SCREEN_H - 1 - row;
+
+    for (let col = 0; col < SCREEN_W; col++) {
+      const screenX = 2 * (col + 0.5) / SCREEN_W - 1; // same as in castRays
+      // The floor point under this pixel. The direction (dir + plane * screenX)
+      // goes exactly 1 unit forward for any screenX, so scaling it by d lands
+      // at perpendicular distance d, under this column.
+      const floorX = player.x + d * (dirX + planeX * screenX);
+      const floorY = player.y + d * (dirY + planeY * screenX);
+
+      // As with walls: the fractional part of the position picks the texel,
+      // so the texture repeats once per grid cell.
+      const texX = Math.min(TEX_SIZE - 1, Math.floor((floorX - Math.floor(floorX)) * TEX_SIZE));
+      const texY = Math.min(TEX_SIZE - 1, Math.floor((floorY - Math.floor(floorY)) * TEX_SIZE));
+      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1);
+      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1);
+    }
+  }
+}
+
+// Copy one texel of `tex`, scaled by `shade`, to screen pixel (x, y).
+function copyTexel(pixels, x, y, tex, texX, texY, shade) {
+  const t = (texY * TEX_SIZE + texX) * 3; // 3 bytes per texel (RGB)
+  const i = (y * SCREEN_W + x) * 4;       // 4 bytes per screen pixel (RGBA)
+  pixels[i] = tex.pixels[t] * shade;
+  pixels[i + 1] = tex.pixels[t + 1] * shade;
+  pixels[i + 2] = tex.pixels[t + 2] * shade;
   pixels[i + 3] = 255; // alpha: fully opaque
 }

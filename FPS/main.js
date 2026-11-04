@@ -55,7 +55,7 @@ function frame(now) {
 
   updatePlayer(dt);
   const hits = castRays(player);
-  renderView(frameImage, hits);
+  renderView(frameImage, hits, player);
   screenCtx.putImageData(frameImage, 0, 0);
   if (debugOn) drawDebug(debugCtx, player, hits);
 

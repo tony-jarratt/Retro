@@ -100,7 +100,32 @@ function makeWood() {
   });
 }
 
-// Map cell value -> texture. Every non-zero number used in MAP needs an entry.
+// Floor: big square tiles in two shades, chequerboard style, with dark grout.
+function makeFloor() {
+  const light = [120, 110, 95];
+  const dark = [88, 80, 70];
+  return makeTexture(light, (x, y) => {
+    if (x % 32 === 0 || y % 32 === 0) return [40, 36, 32]; // grout
+    const tile = (Math.floor(x / 32) + Math.floor(y / 32)) % 2;
+    return brighten(tile === 0 ? light : dark, 0.9 + 0.2 * noise(x, y, 6));
+  });
+}
+
+// Ceiling: dim plaster panels with a darker frame round each one.
+function makeCeiling() {
+  const base = [72, 72, 78];
+  return makeTexture(base, (x, y) => {
+    const px = x % 32;
+    const py = y % 32;
+    if (px < 2 || py < 2) return brighten(base, 0.55); // frame
+    return brighten(base, 0.9 + 0.15 * noise(x, y, 7));
+  });
+}
+
+const FLOOR_TEXTURE = makeFloor();
+const CEILING_TEXTURE = makeCeiling();
+
+// Map cell value -> wall texture. Every non-zero number used in MAP needs an entry.
 const TEXTURES = {
   1: makeStone(),
   2: makeBrick(),
