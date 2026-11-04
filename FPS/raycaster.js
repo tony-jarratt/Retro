@@ -1,5 +1,5 @@
 // The raycaster: one ray per screen column, walked through the grid with DDA,
-// then turned into a vertical wall strip in the pixel buffer.
+// then turned into a vertical textured wall strip in the pixel buffer.
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
@@ -7,12 +7,6 @@ const FOV = 66 * Math.PI / 180; // horizontal field of view, in radians
 
 const CEILING_COLOUR = [56, 56, 56];
 const FLOOR_COLOUR = [112, 112, 112];
-const WALL_COLOURS = {
-  1: [110, 110, 150], // blue-grey stone
-  2: [170, 60, 50],   // red brick
-  3: [60, 140, 70],   // green
-  4: [150, 110, 60],  // wood
-};
 const SIDE_SHADE = 0.6; // north/south-facing walls are drawn at 60% brightness
 
 // Distance from the eye to an imaginary flat screen, measured in pixels,
@@ -72,7 +66,21 @@ function castRay(px, py, rayX, rayY) {
         `(${px.toFixed(2)}, ${py.toFixed(2)}); the map border must be solid walls`);
     }
     if (cell !== 0) {
-      return { dist, side, cell, hitX: px + rayX * dist, hitY: py + rayY * dist };
+      const hitX = px + rayX * dist;
+      const hitY = py + rayY * dist;
+
+      // Where along the wall face the ray hit, from 0 to 1. This picks the
+      // texture column. On a vertical line (side 0) x is a whole number, so
+      // the position along the wall is the fractional part of y, and vice versa.
+      let wallX = side === 0 ? hitY - Math.floor(hitY) : hitX - Math.floor(hitX);
+
+      // Without this, textures come out mirrored on two of the four wall
+      // directions. Example: facing east (rayX > 0), your right is +y, so wallX
+      // grows from left to right as you look along the wall, which is correct.
+      // Facing west, your right is -y, so wallX shrinks left to right; flip it.
+      if ((side === 0 && rayX < 0) || (side === 1 && rayY > 0)) wallX = 1 - wallX;
+
+      return { dist, side, cell, hitX, hitY, wallX };
     }
   }
 }
@@ -108,27 +116,52 @@ function castRays(player) {
   return hits;
 }
 
-// Draw ceiling, wall strip and floor for every column into the ImageData.
+// Draw ceiling, textured wall strip and floor for every column into the ImageData.
 function renderView(image, hits) {
   const pixels = image.data; // flat RGBA bytes: 4 per pixel, row after row
 
   for (let col = 0; col < SCREEN_W; col++) {
     const hit = hits[col];
     const wallHeight = PROJ_DIST / hit.perpDist;
-    const top = Math.max(0, Math.floor((SCREEN_H - wallHeight) / 2));
-    const bottom = Math.min(SCREEN_H, Math.floor((SCREEN_H + wallHeight) / 2));
 
-    const base = WALL_COLOURS[hit.cell];
+    // The wall's true top edge on screen. When you stand close it is taller
+    // than the screen and wallTop goes negative; the texture maths below
+    // still uses the true edge, so the visible slice comes from the middle.
+    const wallTop = (SCREEN_H - wallHeight) / 2;
+
+    // Draw the rows whose pixel centre (row + 0.5) lies on the wall.
+    const top = Math.max(0, Math.ceil(wallTop - 0.5));
+    const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
+
+    const tex = TEXTURES[hit.cell];
+    // The Math.min guards against wallX rounding to exactly 1.0, which would
+    // index one column past the edge of the texture.
+    const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
     const shade = hit.side === 1 ? SIDE_SHADE : 1;
-    const wall = [base[0] * shade, base[1] * shade, base[2] * shade];
 
-    for (let row = 0; row < SCREEN_H; row++) {
-      const colour = row < top ? CEILING_COLOUR : row < bottom ? wall : FLOOR_COLOUR;
+    for (let row = 0; row < top; row++) setPixel(pixels, col, row, CEILING_COLOUR);
+
+    for (let row = top; row < bottom; row++) {
+      // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
+      // scaled to a texture row. This one division stretches or squashes the
+      // 64-texel column to fit however tall the strip is on screen.
+      const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
+      const t = (texY * TEX_SIZE + texX) * 3;
       const i = (row * SCREEN_W + col) * 4;
-      pixels[i] = colour[0];
-      pixels[i + 1] = colour[1];
-      pixels[i + 2] = colour[2];
-      pixels[i + 3] = 255; // alpha: fully opaque
+      pixels[i] = tex.pixels[t] * shade;
+      pixels[i + 1] = tex.pixels[t + 1] * shade;
+      pixels[i + 2] = tex.pixels[t + 2] * shade;
+      pixels[i + 3] = 255;
     }
+
+    for (let row = bottom; row < SCREEN_H; row++) setPixel(pixels, col, row, FLOOR_COLOUR);
   }
+}
+
+function setPixel(pixels, x, y, colour) {
+  const i = (y * SCREEN_W + x) * 4;
+  pixels[i] = colour[0];
+  pixels[i + 1] = colour[1];
+  pixels[i + 2] = colour[2];
+  pixels[i + 3] = 255; // alpha: fully opaque
 }

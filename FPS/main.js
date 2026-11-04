@@ -24,8 +24,8 @@ function checkMap() {
       throw new Error(`MAP row ${y} has ${row.length} cells; row 0 has ${width}. All rows must be the same length.`);
     }
     row.forEach((cell, x) => {
-      if (cell !== 0 && !WALL_COLOURS[cell]) {
-        throw new Error(`MAP[${y}][${x}] is ${cell}, which has no entry in WALL_COLOURS.`);
+      if (cell !== 0 && !TEXTURES[cell]) {
+        throw new Error(`MAP[${y}][${x}] is ${cell}, which has no entry in TEXTURES.`);
       }
       const onBorder = y === 0 || y === MAP.length - 1 || x === 0 || x === width - 1;
       if (onBorder && cell === 0) {

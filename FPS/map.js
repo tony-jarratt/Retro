@@ -1,6 +1,6 @@
 // The level: a plain 2D array, indexed MAP[row][col], i.e. MAP[y][x].
 //   0          = empty floor
-//   any other  = solid wall; the number picks its colour (WALL_COLOURS in raycaster.js)
+//   any other  = solid wall; the number picks its texture (TEXTURES in textures.js)
 //
 // Coordinates: x grows to the right, y grows DOWN (like screen pixels).
 // One grid cell is 1 unit wide, so the player at (2.5, 2.5) stands in the

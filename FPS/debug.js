@@ -15,7 +15,7 @@ function drawDebug(ctx, player, hits) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const cell = MAP[y][x];
-      ctx.fillStyle = cell === 0 ? 'rgba(0, 0, 0, 0.85)' : `rgb(${WALL_COLOURS[cell].join(',')})`;
+      ctx.fillStyle = cell === 0 ? 'rgba(0, 0, 0, 0.85)' : `rgb(${TEXTURES[cell].colour.join(',')})`;
       ctx.fillRect(x * s, y * s, s, s);
     }
   }
