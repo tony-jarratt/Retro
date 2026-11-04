@@ -198,8 +198,9 @@ function makeLamp() {
 
 // THE ROBOT ENEMY. A squat sentry robot with one glowing eye, drawn from
 // four sides so it can face different ways (see enemyTexture in enemies.js).
-// Poses: 'stand', 'walk1' and 'walk2' (alternate feet lifted), and 'aim'
-// (front only: a robot aiming at you is always facing you).
+// Poses: 'stand', 'walk1' and 'walk2' (alternate feet lifted), 'aim', and
+// 'fire' (aim plus a muzzle flash). Aim and fire are front only: a robot
+// aiming at you is always facing you.
 const ROBOT_METAL = [105, 112, 125];
 const ROBOT_LEGS = [80, 85, 95];
 const ROBOT_DARK = [50, 52, 58];
@@ -219,8 +220,11 @@ function makeRobotFrontBack(view, pose) {
     if (antenna) return antenna;
 
     // Arms. Aiming: a gun held out in front of the body, muzzle towards you.
-    if (pose === 'aim') {
-      if (dx * dx + (y - 34) * (y - 34) <= 5) return [15, 15, 15];          // muzzle
+    if (pose === 'aim' || pose === 'fire') {
+      const muzzle = dx * dx + (y - 34) * (y - 34); // squared distance from the muzzle
+      if (pose === 'fire' && muzzle <= 5) return [255, 255, 230, true];      // flash: white core...
+      if (pose === 'fire' && muzzle <= 14) return [255, 220, 110, true];     // ...yellow edge
+      if (muzzle <= 5) return [15, 15, 15];                                  // muzzle
       if (adx < 7 && y >= 29 && y < 39) return brighten(ROBOT_DARK, 1.2 - 0.4 * adx / 7); // gun
       if (adx >= 7 && adx < 12 && y >= 27 && y < 33) return brighten(ROBOT_METAL, 0.8); // forearms
     } else if (adx >= 14 && adx < 19 && y >= 18 && y < 41) {
@@ -291,11 +295,76 @@ const robotPoses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk
 
 // ROBOT_FRAMES[view][pose]. The view is which side of the robot you can see.
 const ROBOT_FRAMES = {
-  front: { ...robotPoses((pose) => makeRobotFrontBack('front', pose)), aim: makeRobotFrontBack('front', 'aim') },
+  front: {
+    ...robotPoses((pose) => makeRobotFrontBack('front', pose)),
+    aim: makeRobotFrontBack('front', 'aim'),
+    fire: makeRobotFrontBack('front', 'fire'),
+  },
   back:  robotPoses((pose) => makeRobotFrontBack('back', pose)),
   right: robotPoses((pose) => makeRobotSide(pose, false)), // its right side: it faces your right
   left:  robotPoses((pose) => makeRobotSide(pose, true)),  // its left side: it faces your left
 };
+
+// A destroyed robot: a low heap of scrap with a dead eye and a bent antenna.
+function makeWreck() {
+  return makeTexture(ROBOT_METAL, (x, y) => {
+    const dx = x + 0.5 - 32;
+    // Bent antenna sticking up out of the heap, leaning right.
+    if (y >= 42 && y < 50 && Math.abs((x - 38) - (50 - y) * 0.75) < 1) return [60, 60, 65];
+    if (y >= 46) {
+      const halfW = 8 + (y - 46) * 0.8; // the heap widens towards the floor
+      if (Math.abs(dx) <= halfW) {
+        const eye = (x - 26) * (x - 26) + (y - 54) * (y - 54);
+        if (eye <= 9) return [90, 20, 15]; // the eye, gone dark
+        const f = 0.55 + 0.35 * noise(Math.floor(x / 4), Math.floor(y / 3), 15) + 0.1 * noise(x, y, 16);
+        return brighten(ROBOT_METAL, f); // jumbled panels
+      }
+      if (y >= 58 && y < 61 && x >= 48 && x < 57) return ROBOT_LEGS; // a leg poking out
+    }
+    return null;
+  });
+}
+
+// THE PLAYER'S GUN, seen from behind as you hold it. This isn't drawn in
+// the world: hud.js stamps it onto the bottom of the screen at 2x size.
+// GUN_FLASH is the same gun with a muzzle flash above the barrel.
+function makeGun(flash) {
+  return makeTexture([70, 74, 82], (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (flash && y >= 2 && y < 21) {
+      // A spiky starburst: its radius varies with the angle around the centre.
+      const fx = dx;
+      const fy = y - 12;
+      const r = 5 + 4 * Math.abs(Math.cos(4 * Math.atan2(fy, fx)));
+      const d = Math.hypot(fx, fy);
+      if (d <= r * 0.5) return [255, 255, 225];
+      if (d <= r) return [255, 215, 110];
+    }
+    if (y >= 21 && y < 24 && Math.abs(dx) < 1.5) return [40, 40, 45]; // front sight
+    if (y >= 24 && y < 46) {
+      const halfW = 5 + (y - 24) * 0.15; // the slide, wider nearer to you
+      if (Math.abs(dx) <= halfW) {
+        const u = dx / halfW;
+        let f = 1.15 - 0.5 * Math.abs(u + 0.4); // lit from the upper left
+        if (y >= 41 && y < 44 && Math.abs(dx) < 2) f = 0.4; // rear sight notch
+        return brighten([70, 74, 82], f);
+      }
+    }
+    if (y >= 46) {
+      const halfW = 9 + (y - 46) * 0.25; // a gloved hand round the grip
+      if (Math.abs(dx) <= halfW) {
+        let f = 0.9 + 0.15 * noise(x, y, 17) - 0.3 * Math.abs(dx / halfW);
+        if ((y - 46) % 5 === 0 && dx > -4) f *= 0.65; // creases between the fingers
+        return brighten([92, 70, 55], f);
+      }
+    }
+    return null;
+  });
+}
+
+const WRECK_TEXTURE = makeWreck();
+const GUN_TEXTURE = makeGun(false);
+const GUN_FLASH_TEXTURE = makeGun(true);
 
 const BARREL_TEXTURE = makeBarrel();
 const COLUMN_TEXTURE = makeColumn();

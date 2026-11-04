@@ -1,4 +1,5 @@
-// Startup and the main loop: input -> doors -> move -> robots -> cast rays -> draw -> repeat.
+// Startup and the main loop:
+// input -> doors -> move -> robots -> combat -> cast rays -> draw -> HUD -> repeat.
 
 const screenCanvas = document.getElementById('screen');
 screenCanvas.width = SCREEN_W;   // the canvas really is 320x200 pixels;
@@ -60,10 +61,15 @@ function checkMap() {
 }
 
 checkMap();
-setupInput(screenCanvas, () => {
-  debugOn = !debugOn;
-  debugCanvas.style.display = debugOn ? 'block' : 'none';
-}, useDoor);
+setupInput(screenCanvas, {
+  toggleDebug: () => {
+    debugOn = !debugOn;
+    debugCanvas.style.display = debugOn ? 'block' : 'none';
+  },
+  use: useDoor,
+  fire: playerFire,
+  restart: restartGame,
+});
 
 let lastTime = performance.now();
 
@@ -75,10 +81,14 @@ function frame(now) {
   lastTime = now;
 
   updateDoors(dt);
-  updatePlayer(dt);
-  updateEnemies(dt);
+  if (game.state === 'playing') { // once you've won or died, everyone stops
+    updatePlayer(dt);
+    updateEnemies(dt);
+  }
+  updateCombat(dt);
   const hits = castRays(player);
   renderView(frameImage, hits, player);
+  drawHud(frameImage.data); // flat on top of the 3D view, same buffer
   screenCtx.putImageData(frameImage, 0, 0);
   if (debugOn) drawDebug(debugCtx, player, hits);
 

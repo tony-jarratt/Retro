@@ -37,13 +37,15 @@ function doorAt(x, y) {
   return DOORS.find((door) => door.x === x && door.y === y);
 }
 
-// Is the player or a robot standing (even partly) in this door's cell? The
-// cell is a box of half-width 0.5 centred on (door.x + 0.5, door.y + 0.5).
+// Is the player or a working robot standing (even partly) in this door's
+// cell? The cell is a box of half-width 0.5 centred on (door.x + 0.5,
+// door.y + 0.5). A wreck doesn't count, or the door would never close again.
 function doorwayOccupied(door) {
   const cx = door.x + 0.5;
   const cy = door.y + 0.5;
   return boxesOverlap(player.x, player.y, PLAYER_RADIUS, cx, cy, 0.5) ||
-         enemies.some((enemy) => boxesOverlap(enemy.x, enemy.y, ENEMY_RADIUS, cx, cy, 0.5));
+         enemies.some((enemy) => enemy.state !== 'dead' &&
+           boxesOverlap(enemy.x, enemy.y, ENEMY_RADIUS, cx, cy, 0.5));
 }
 
 // The door state machine. Each state only ever moves to the next one, apart

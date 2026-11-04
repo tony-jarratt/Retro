@@ -4,17 +4,30 @@ const MOVE_SPEED = 3.0;           // cells per second
 const TURN_SPEED = 2.5;           // radians per second (arrow keys)
 const MOUSE_SENSITIVITY = 0.0025; // radians per pixel of mouse movement
 const PLAYER_RADIUS = 0.2;        // half-width of the player's collision box, in cells
+const PLAYER_MAX_HEALTH = 100;
 
-const player = { x: PLAYER_START.x, y: PLAYER_START.y, angle: PLAYER_START.angle };
+// walkTime counts up while you're moving; the HUD uses it to bob the gun.
+const player = {
+  x: PLAYER_START.x,
+  y: PLAYER_START.y,
+  angle: PLAYER_START.angle,
+  health: PLAYER_MAX_HEALTH,
+  walkTime: 0,
+};
 
 const keys = {};   // e.code -> true while that key is held, e.g. keys.KeyW
 let mouseTurn = 0; // mouse pixels moved since the last frame
 
-function setupInput(canvas, onToggleDebug, onUse) {
+// on: the functions to call for one-off actions: { toggleDebug, use, fire, restart }.
+function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
-    if (e.code === 'KeyM' && !e.repeat) onToggleDebug();
-    if ((e.code === 'KeyE' || e.code === 'Space') && !e.repeat) onUse();
+    if (!e.repeat) {
+      if (e.code === 'KeyM') on.toggleDebug();
+      if (e.code === 'KeyE' || e.code === 'Space') on.use();
+      if (e.code === 'KeyF') on.fire();
+      if (e.code === 'KeyR') on.restart();
+    }
     if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); // stop the page scrolling
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -30,6 +43,12 @@ function setupInput(canvas, onToggleDebug, onUse) {
   canvas.addEventListener('click', () => canvas.requestPointerLock());
   document.addEventListener('mousemove', (e) => {
     if (document.pointerLockElement === canvas) mouseTurn += e.movementX;
+  });
+
+  // Left click fires, but only once the mouse is captured: the first click
+  // just captures it, so it doesn't waste a shot.
+  document.addEventListener('mousedown', (e) => {
+    if (document.pointerLockElement === canvas && e.button === 0) on.fire();
   });
 }
 
@@ -60,7 +79,7 @@ function blocked(x, y) {
   const r = PLAYER_RADIUS;
   return boxHitsWall(x, y, r) ||
          hitsSolidSprite(x, y, r) ||
-         enemies.some((enemy) => boxesOverlap(x, y, r, enemy.x, enemy.y, ENEMY_RADIUS));
+         enemies.some((enemy) => enemy.state !== 'dead' && boxesOverlap(x, y, r, enemy.x, enemy.y, ENEMY_RADIUS));
 }
 
 function updatePlayer(dt) {
@@ -88,6 +107,7 @@ function updatePlayer(dt) {
   let moveY = dirY * forward + rightY * strafe;
   const len = Math.hypot(moveX, moveY);
   if (len === 0) return;
+  player.walkTime += dt;
   moveX /= len; // normalise, so moving diagonally isn't ~1.4x faster
   moveY /= len;
 

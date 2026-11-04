@@ -13,9 +13,13 @@ const WALK_FPS = 4;                         // walk animation frames per second
 
 // The live robots, built once from the starting positions in map.js:
 //   x, y, angle            position and facing (radians, same convention as the player)
-//   state                  'idle' -> 'chase' <-> 'aim' -> 'search' -> 'idle'
+//   state                  'idle' -> 'chase' <-> 'aim' -> 'search' -> 'idle',
+//                          or 'dead' (a wreck) from any of them
 //   lastSeenX, lastSeenY   where it last saw the player; 'search' walks there
 //   moving, walkTime       for the walk animation
+//   health                 hits left (combat.js)
+//   charge                 seconds spent charging its shot while aiming
+//   hurtTime, firedTime    seconds left of its white hit flash / muzzle flash
 const enemies = ENEMIES.map((start) => ({
   x: start.x,
   y: start.y,
@@ -25,6 +29,10 @@ const enemies = ENEMIES.map((start) => ({
   lastSeenY: start.y,
   moving: false,
   walkTime: 0,
+  health: ROBOT_HEALTH,
+  charge: 0,
+  hurtTime: 0,
+  firedTime: 0,
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -34,13 +42,14 @@ function angleDiff(a, b) {
 }
 
 // Would a robot standing at (x, y) collide with a wall, closed door, solid
-// sprite, the player, or another robot?
+// sprite, the player, or another robot? (Wrecks aren't solid.)
 function enemyBlocked(enemy, x, y) {
   const r = ENEMY_RADIUS;
   return boxHitsWall(x, y, r) ||
          hitsSolidSprite(x, y, r) ||
          boxesOverlap(x, y, r, player.x, player.y, PLAYER_RADIUS) ||
-         enemies.some((other) => other !== enemy && boxesOverlap(x, y, r, other.x, other.y, ENEMY_RADIUS));
+         enemies.some((other) => other !== enemy && other.state !== 'dead' &&
+           boxesOverlap(x, y, r, other.x, other.y, ENEMY_RADIUS));
 }
 
 // Can this robot see the player?
@@ -79,9 +88,14 @@ function stepTowards(enemy, targetX, targetY, dt) {
 // THE ROBOT STATE MACHINE.
 //   idle   stand still, facing a fixed way, watching the cone in front
 //   chase  saw you: walk straight at you (no pathfinding, so it can snag on corners)
-//   aim    within AIM_RANGE and in sight: stop, face you, raise the gun
+//   aim    within AIM_RANGE and in sight: stop, face you, charge, fire
 //   search lost sight of you: walk to where you were last seen, then go idle
+//   dead   a wreck on the floor; does nothing ever again
 function updateEnemy(enemy, dt) {
+  enemy.hurtTime = Math.max(0, enemy.hurtTime - dt);
+  enemy.firedTime = Math.max(0, enemy.firedTime - dt);
+  if (enemy.state === 'dead') return;
+
   const sees = canSee(enemy);
   if (sees) {
     enemy.lastSeenX = player.x;
@@ -92,9 +106,18 @@ function updateEnemy(enemy, dt) {
     enemy.state = 'search';
   }
 
+  // Charging only happens while aiming. Leaving 'aim' (you duck out of sight,
+  // or back off out of range) throws the charge away: that's your counterplay.
+  if (enemy.state !== 'aim') enemy.charge = 0;
+
   enemy.moving = false;
   if (enemy.state === 'aim') {
     enemy.angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+    enemy.charge += dt;
+    if (enemy.charge >= ROBOT_CHARGE_TIME) {
+      enemy.charge = 0;
+      robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
+    }
   } else if (enemy.state === 'chase') {
     // Blocked while chasing (snagged on a corner)? Keep trying: you might move.
     enemy.moving = stepTowards(enemy, player.x, player.y, dt);
@@ -117,7 +140,11 @@ function updateEnemies(dt) {
 // is facing: viewer straight ahead of it sees its front, straight behind sees
 // its back, and in between sees a side. The circle is cut into four 90° slices.
 function enemyTexture(enemy, viewer) {
-  if (enemy.state === 'aim') return ROBOT_FRAMES.front.aim; // it always faces you while aiming
+  if (enemy.state === 'dead') return WRECK_TEXTURE; // a heap looks the same from every side
+  if (enemy.state === 'aim') {
+    // It always faces you while aiming, so only the front is ever needed.
+    return enemy.firedTime > 0 ? ROBOT_FRAMES.front.fire : ROBOT_FRAMES.front.aim;
+  }
 
   const toViewer = Math.atan2(viewer.y - enemy.y, viewer.x - enemy.x);
   const off = angleDiff(toViewer, enemy.angle); // 0 = viewer dead ahead of the robot

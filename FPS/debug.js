@@ -54,7 +54,7 @@ function drawDebug(ctx, player, hits) {
   }
 
   // Robots: a dot coloured by state, with a line showing which way each faces.
-  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80' };
+  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555' };
   for (const enemy of enemies) {
     ctx.fillStyle = ctx.strokeStyle = STATE_COLOURS[enemy.state];
     ctx.beginPath();
