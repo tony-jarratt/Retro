@@ -1,7 +1,8 @@
-// Sprites: flat pictures standing in the world (barrels, columns, lamps).
-// A sprite is a 1x1-unit picture that always turns to face the camera (a
-// "billboard"). Sprites are drawn after the walls, column by column, and are
-// hidden wherever a wall is nearer. Where they stand is listed in map.js.
+// Sprites: flat pictures standing in the world (barrels, columns, lamps, and
+// the robots from enemies.js). A sprite is a 1x1-unit picture that always
+// turns to face the camera (a "billboard"). Sprites are drawn after the walls,
+// column by column, and are hidden wherever a wall is nearer. Where the
+// static ones stand is listed in map.js.
 
 // What each kind of sprite looks like, and whether it blocks movement.
 const SPRITE_TYPES = {
@@ -13,11 +14,9 @@ const SPRITE_TYPES = {
 const SOLID_SPRITE_RADIUS = 0.3; // half-width of a solid sprite's collision box, in cells
 
 // Does a box of half-width r centred on (x, y) overlap any solid sprite?
-// Two boxes overlap when they're closer than their two half-widths on both axes.
 function hitsSolidSprite(x, y, r) {
   return SPRITES.some((s) => SPRITE_TYPES[s.type].solid &&
-    Math.abs(x - s.x) < r + SOLID_SPRITE_RADIUS &&
-    Math.abs(y - s.y) < r + SOLID_SPRITE_RADIUS);
+    boxesOverlap(x, y, r, s.x, s.y, SOLID_SPRITE_RADIUS));
 }
 
 // depth[col] is the perpendicular distance to the wall drawn in that column.
@@ -33,14 +32,21 @@ function renderSprites(pixels, depth, player) {
   // Each is a dot product of the offset with a unit direction: the same
   // "project onto the view direction" idea as the fisheye fix. So `forward`
   // is a perpendicular distance, directly comparable with the wall depths.
+  //
+  // Static sprites and robots go into one list, so they sort together: a
+  // robot walking behind a barrel is hidden by it, and in front it isn't.
+  const things = [
+    ...SPRITES.map((s) => ({ x: s.x, y: s.y, tex: SPRITE_TYPES[s.type].texture })),
+    ...enemies.map((e) => ({ x: e.x, y: e.y, tex: enemyTexture(e, player) })),
+  ];
   const visible = [];
-  for (const sprite of SPRITES) {
-    const dx = sprite.x - player.x;
-    const dy = sprite.y - player.y;
+  for (const thing of things) {
+    const dx = thing.x - player.x;
+    const dy = thing.y - player.y;
     const forward = dx * dirX + dy * dirY;
     const across = dx * rightX + dy * rightY;
     if (forward < 0.1) continue; // behind us, or so close we're standing in it
-    visible.push({ sprite, forward, across });
+    visible.push({ tex: thing.tex, forward, across });
   }
 
   // Painter's algorithm: draw the farthest first so nearer ones paint over it.
@@ -48,9 +54,7 @@ function renderSprites(pixels, depth, player) {
   for (const v of visible) drawSprite(pixels, depth, v);
 }
 
-function drawSprite(pixels, depth, { sprite, forward, across }) {
-  const tex = SPRITE_TYPES[sprite.type].texture;
-
+function drawSprite(pixels, depth, { tex, forward, across }) {
   // Same similar triangles as the walls: something 1 unit across at distance
   // `forward` is PROJ_DIST / forward pixels wide, and a point `across` units
   // to the right appears across * PROJ_DIST / forward pixels right of centre.
@@ -76,7 +80,10 @@ function drawSprite(pixels, depth, { sprite, forward, across }) {
     for (let row = rowStart; row < rowEnd; row++) {
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - top) / size * TEX_SIZE));
       if (isTransparent(tex, texX, texY)) continue; // see-through: keep what's behind
-      copyTexel(pixels, col, row, tex, texX, texY, 1, fog);
+      // Glowing texels make their own light, so the fog doesn't dim them:
+      // a robot's eye shows in the dark before its body does.
+      const glows = tex.glow[texY * TEX_SIZE + texX] === 1;
+      copyTexel(pixels, col, row, tex, texX, texY, 1, glows ? 0 : fog);
     }
   }
 }

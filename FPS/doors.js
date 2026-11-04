@@ -37,11 +37,13 @@ function doorAt(x, y) {
   return DOORS.find((door) => door.x === x && door.y === y);
 }
 
-// Does the player's collision box overlap this door's cell?
-function playerInDoorway(door) {
-  const r = PLAYER_RADIUS;
-  return player.x + r > door.x && player.x - r < door.x + 1 &&
-         player.y + r > door.y && player.y - r < door.y + 1;
+// Is the player or a robot standing (even partly) in this door's cell? The
+// cell is a box of half-width 0.5 centred on (door.x + 0.5, door.y + 0.5).
+function doorwayOccupied(door) {
+  const cx = door.x + 0.5;
+  const cy = door.y + 0.5;
+  return boxesOverlap(player.x, player.y, PLAYER_RADIUS, cx, cy, 0.5) ||
+         enemies.some((enemy) => boxesOverlap(enemy.x, enemy.y, ENEMY_RADIUS, cx, cy, 0.5));
 }
 
 // The door state machine. Each state only ever moves to the next one, apart
@@ -56,8 +58,8 @@ function updateDoors(dt) {
       }
     } else if (door.state === 'open') {
       door.timer -= dt;
-      // Time's up, but never shut on the player: wait until the doorway is clear.
-      if (door.timer <= 0 && !playerInDoorway(door)) door.state = 'closing';
+      // Time's up, but never shut on anyone: wait until the doorway is clear.
+      if (door.timer <= 0 && !doorwayOccupied(door)) door.state = 'closing';
     } else if (door.state === 'closing') {
       door.open = Math.max(0, door.open - DOOR_SPEED * dt);
       if (door.open === 0) door.state = 'closed';

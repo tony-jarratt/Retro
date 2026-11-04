@@ -49,6 +49,15 @@ const SPRITES = [
   { type: 'barrel', x: 14.5, y: 8.5 },
 ];
 
+// Sentry robots (enemies.js): where each starts and which way it faces.
+// angle uses the player's convention: 0 = east, PI/2 = south, -PI/2 = north.
+const ENEMIES = [
+  { x: 13.5, y: 5.5,  angle: Math.PI },      // far end of the first room, watching west
+  { x: 11.5, y: 3.5,  angle: Math.PI / 2 },  // inside the red U, watching its opening
+  { x: 5.5,  y: 9.5,  angle: -Math.PI / 2 }, // behind the first door, watching it
+  { x: 11.5, y: 13.5, angle: -Math.PI / 2 }, // bottom-right room, watching north
+];
+
 // Where the player starts. angle is in radians: 0 faces +x (east), and
 // because y points down, increasing the angle turns clockwise (to the right).
 const PLAYER_START = { x: 2.5, y: 2.5, angle: 0 };

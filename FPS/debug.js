@@ -53,6 +53,17 @@ function drawDebug(ctx, player, hits) {
     else ctx.stroke();
   }
 
+  // Robots: a dot coloured by state, with a line showing which way each faces.
+  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80' };
+  for (const enemy of enemies) {
+    ctx.fillStyle = ctx.strokeStyle = STATE_COLOURS[enemy.state];
+    ctx.beginPath();
+    ctx.arc(enemy.x * s, enemy.y * s, ENEMY_RADIUS * s, 0, Math.PI * 2);
+    ctx.fill();
+    line(ctx, enemy.x * s, enemy.y * s,
+      (enemy.x + Math.cos(enemy.angle) * 0.7) * s, (enemy.y + Math.sin(enemy.angle) * 0.7) * s);
+  }
+
   // The player: a dot showing the collision box size.
   ctx.fillStyle = '#4cf';
   ctx.beginPath();

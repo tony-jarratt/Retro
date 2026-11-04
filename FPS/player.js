@@ -41,14 +41,26 @@ function isWall(x, y) {
   return cell !== 0;
 }
 
-// Would a square of half-width PLAYER_RADIUS centred on (x, y) overlap a wall
-// or a solid sprite? For walls, checking the four corners is enough because
-// the square is smaller than a cell.
+// Does a square of half-width r centred on (x, y) overlap a wall (or a door
+// that isn't fully open)? Checking the four corners is enough as long as the
+// square is smaller than a cell. Robots use this too, with their own r.
+function boxHitsWall(x, y, r) {
+  return isWall(x - r, y - r) || isWall(x + r, y - r) ||
+         isWall(x - r, y + r) || isWall(x + r, y + r);
+}
+
+// Do two squares overlap? Only if they're closer than their two half-widths
+// on both axes at once.
+function boxesOverlap(x1, y1, r1, x2, y2, r2) {
+  return Math.abs(x1 - x2) < r1 + r2 && Math.abs(y1 - y2) < r1 + r2;
+}
+
+// Would the player, standing at (x, y), overlap a wall, a solid sprite or a robot?
 function blocked(x, y) {
   const r = PLAYER_RADIUS;
-  return isWall(x - r, y - r) || isWall(x + r, y - r) ||
-         isWall(x - r, y + r) || isWall(x + r, y + r) ||
-         hitsSolidSprite(x, y, r);
+  return boxHitsWall(x, y, r) ||
+         hitsSolidSprite(x, y, r) ||
+         enemies.some((enemy) => boxesOverlap(x, y, r, enemy.x, enemy.y, ENEMY_RADIUS));
 }
 
 function updatePlayer(dt) {

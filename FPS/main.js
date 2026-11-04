@@ -1,4 +1,4 @@
-// Startup and the main loop: input -> doors -> move -> cast rays -> draw -> repeat.
+// Startup and the main loop: input -> doors -> move -> robots -> cast rays -> draw -> repeat.
 
 const screenCanvas = document.getElementById('screen');
 screenCanvas.width = SCREEN_W;   // the canvas really is 320x200 pixels;
@@ -43,6 +43,14 @@ function checkMap() {
       throw new Error(`SPRITES[${n}] (${s.type} at ${s.x}, ${s.y}) is ${where}.`);
     }
   });
+  enemies.forEach((enemy, n) => {
+    if (MAP[Math.floor(enemy.y)]?.[Math.floor(enemy.x)] !== 0) {
+      throw new Error(`ENEMIES[${n}] at (${enemy.x}, ${enemy.y}) is outside the map or not on a floor cell.`);
+    }
+    if (enemyBlocked(enemy, enemy.x, enemy.y)) {
+      throw new Error(`ENEMIES[${n}] at (${enemy.x}, ${enemy.y}) overlaps a wall, sprite, the player or another robot.`);
+    }
+  });
   if (MAP[Math.floor(PLAYER_START.y)]?.[Math.floor(PLAYER_START.x)] !== 0) {
     throw new Error(`PLAYER_START (${PLAYER_START.x}, ${PLAYER_START.y}) is outside the map or inside a wall.`);
   }
@@ -68,6 +76,7 @@ function frame(now) {
 
   updateDoors(dt);
   updatePlayer(dt);
+  updateEnemies(dt);
   const hits = castRays(player);
   renderView(frameImage, hits, player);
   screenCtx.putImageData(frameImage, 0, 0);

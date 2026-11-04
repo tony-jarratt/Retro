@@ -11,12 +11,15 @@
 const TEX_SIZE = 64;
 
 // Build a texture by asking colourAt(x, y) for the colour of every texel.
-// colourAt returns [r, g, b], or null for a transparent texel.
+// colourAt returns [r, g, b], or null for a transparent texel, or
+// [r, g, b, true] for a GLOWING texel: one that gives off its own light, so
+// sprite drawing skips the fog for it (a lamp bulb, a robot's eye).
 // `colour` is the texture's main colour, used by the debug map.
 function makeTexture(colour, colourAt) {
   // Uint8ClampedArray clamps out-of-range values to 0..255, so brightening a
   // colour past 255 saturates to white instead of wrapping round to dark.
   const pixels = new Uint8ClampedArray(TEX_SIZE * TEX_SIZE * 4);
+  const glow = new Uint8Array(TEX_SIZE * TEX_SIZE); // 1 = glowing texel
   for (let y = 0; y < TEX_SIZE; y++) {
     for (let x = 0; x < TEX_SIZE; x++) {
       const rgb = colourAt(x, y);
@@ -26,9 +29,10 @@ function makeTexture(colour, colourAt) {
       pixels[i + 1] = rgb[1];
       pixels[i + 2] = rgb[2];
       pixels[i + 3] = 255;
+      if (rgb[3] === true) glow[y * TEX_SIZE + x] = 1;
     }
   }
-  return { pixels, colour };
+  return { pixels, glow, colour };
 }
 
 function isTransparent(tex, texX, texY) {
@@ -187,10 +191,111 @@ function makeLamp() {
       if (Math.abs(dx) > halfW) return null;
       return brighten(brass, 1.1 - 0.5 * Math.abs(dx / halfW + 0.25));
     }
-    if (y < 24) return Math.abs(dx) <= 5 ? [255, 235, 160] : null; // glowing bulb
+    if (y < 24) return Math.abs(dx) <= 5 ? [255, 235, 160, true] : null; // glowing bulb
     return null;
   });
 }
+
+// THE ROBOT ENEMY. A squat sentry robot with one glowing eye, drawn from
+// four sides so it can face different ways (see enemyTexture in enemies.js).
+// Poses: 'stand', 'walk1' and 'walk2' (alternate feet lifted), and 'aim'
+// (front only: a robot aiming at you is always facing you).
+const ROBOT_METAL = [105, 112, 125];
+const ROBOT_LEGS = [80, 85, 95];
+const ROBOT_DARK = [50, 52, 58];
+
+function robotAntenna(dx, y) {
+  if (y >= 5 && y < 7 && Math.abs(dx) < 1.5) return [255, 220, 120, true]; // glowing tip
+  if (y >= 7 && y < 14 && Math.abs(dx) < 1) return [60, 60, 65];
+  return null;
+}
+
+// The robot seen from the front (view 'front') or from behind (view 'back').
+function makeRobotFrontBack(view, pose) {
+  return makeTexture(ROBOT_METAL, (x, y) => {
+    const dx = x + 0.5 - 32; // distance from the texture's centre line
+    const adx = Math.abs(dx);
+    const antenna = robotAntenna(dx, y);
+    if (antenna) return antenna;
+
+    // Arms. Aiming: a gun held out in front of the body, muzzle towards you.
+    if (pose === 'aim') {
+      if (dx * dx + (y - 34) * (y - 34) <= 5) return [15, 15, 15];          // muzzle
+      if (adx < 7 && y >= 29 && y < 39) return brighten(ROBOT_DARK, 1.2 - 0.4 * adx / 7); // gun
+      if (adx >= 7 && adx < 12 && y >= 27 && y < 33) return brighten(ROBOT_METAL, 0.8); // forearms
+    } else if (adx >= 14 && adx < 19 && y >= 18 && y < 41) {
+      return y >= 38 ? ROBOT_DARK : brighten(ROBOT_METAL, 0.85 - 0.2 * (adx - 14) / 5); // arms at sides
+    }
+
+    // Body: a box with its top corners cut off.
+    if (adx < 13 && y >= 14 && y < 44 && !(y < 17 && adx > 10 + (y - 14))) {
+      if (view === 'front') {
+        const eye = dx * dx + (y - 25) * (y - 25); // squared distance from the eye's centre
+        if (eye <= 4) return [255, 200, 150, true]; // hot centre
+        if (eye <= 20) return [255, 60, 40, true];  // red glow
+        if (eye <= 34) return [30, 30, 35];         // socket
+      } else if (adx < 8 && y >= 21 && y < 33 && y % 3 === 0) {
+        return ROBOT_DARK;                          // cooling vents on its back
+      }
+      let f = (1.1 - 0.6 * Math.abs(dx / 13 + 0.25)) * (0.95 + 0.1 * noise(x, y, 13));
+      if (y === 36 || y === 37) f *= 0.6;           // waist band
+      return brighten(ROBOT_METAL, f);
+    }
+
+    // Legs. In each walk pose one leg is lifted (drawn shorter).
+    if (y < 44) return null;
+    const leftLeg = dx >= -11 && dx < -4;
+    const rightLeg = dx >= 4 && dx < 11;
+    if (!leftLeg && !rightLeg) return null;
+    const lifted = (pose === 'walk1' && leftLeg) || (pose === 'walk2' && rightLeg);
+    const bottom = lifted ? 59 : TEX_SIZE;
+    if (y >= bottom) return null;
+    if (y === 53 || y === bottom - 3) return ROBOT_DARK; // knee, and the top of the foot
+    return brighten(ROBOT_LEGS, 1.05 - 0.3 * Math.abs((adx - 7.5) / 3.5));
+  });
+}
+
+// The robot side-on, facing right (towards +x in the texture). Its left side
+// is the same picture mirrored: `mirror` reads x backwards.
+function makeRobotSide(pose, mirror) {
+  return makeTexture(ROBOT_METAL, (tx, y) => {
+    const x = mirror ? TEX_SIZE - 1 - tx : tx;
+    const dx = x + 0.5 - 32;
+    const antenna = robotAntenna(dx, y);
+    if (antenna) return antenna;
+
+    // The near arm hangs in front of the body, so it's checked first.
+    if (dx >= -3 && dx < 3 && y >= 18 && y < 41) {
+      return y >= 38 ? ROBOT_DARK : brighten(ROBOT_METAL, 0.85 - 0.1 * Math.abs(dx) / 3);
+    }
+
+    // Body, narrower from the side, with its front top corner cut off.
+    if (dx >= -10 && dx < 10 && y >= 14 && y < 44 && !(y < 17 && dx > 7 + (y - 14))) {
+      if (dx >= 7 && y >= 22 && y < 28) return [255, 60, 40, true]; // the eye, seen edge-on
+      let f = (1.1 - 0.6 * Math.abs(dx / 10 + 0.25)) * (0.95 + 0.1 * noise(x, y, 14));
+      if (y === 36 || y === 37) f *= 0.6;
+      return brighten(ROBOT_METAL, f);
+    }
+
+    // Legs: one stepping forward, one back. The far leg is darker.
+    if (y < 44) return null;
+    const near = pose === 'walk1' ? 4 : pose === 'walk2' ? -4 : 0;
+    const far = -near;
+    if (dx >= near - 3 && dx < near + 3) return y === 53 ? ROBOT_DARK : ROBOT_LEGS;
+    if (dx >= far - 3 && dx < far + 3) return brighten(ROBOT_LEGS, 0.65);
+    return null;
+  });
+}
+
+const robotPoses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2') });
+
+// ROBOT_FRAMES[view][pose]. The view is which side of the robot you can see.
+const ROBOT_FRAMES = {
+  front: { ...robotPoses((pose) => makeRobotFrontBack('front', pose)), aim: makeRobotFrontBack('front', 'aim') },
+  back:  robotPoses((pose) => makeRobotFrontBack('back', pose)),
+  right: robotPoses((pose) => makeRobotSide(pose, false)), // its right side: it faces your right
+  left:  robotPoses((pose) => makeRobotSide(pose, true)),  // its left side: it faces your left
+};
 
 const BARREL_TEXTURE = makeBarrel();
 const COLUMN_TEXTURE = makeColumn();
