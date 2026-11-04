@@ -10,9 +10,9 @@ const SIDE_SHADE = 0.6; // north/south-facing walls are drawn at 60% brightness
 
 // DISTANCE FOG. Every pixel is blended towards FOG_COLOUR according to how far
 // away the thing it shows is: untouched up to FOG_START, fully fog colour from
-// FOG_END on, and a straight-line blend in between. Black reads as darkness
-// ("light diminishing"); try a grey like [150, 150, 160] for mist.
-const FOG_COLOUR = [0, 0, 0];
+// FOG_END on, and a straight-line blend in between. This dark orange-brown is
+// industrial smog; [0, 0, 0] reads as plain darkness, a grey as mist.
+const FOG_COLOUR = [58, 42, 34];
 const FOG_START = 1.5; // cells
 const FOG_END = 11;    // cells
 
@@ -185,7 +185,7 @@ function renderView(image, hits, player) {
     const top = Math.max(0, Math.ceil(wallTop - 0.5));
     const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
 
-    const tex = TEXTURES[hit.cell];
+    const tex = wallTexture(hit.cell); // for animated walls, this frame's picture
     // The Math.min guards against wallX rounding to exactly 1.0, which would
     // index one column past the edge of the texture.
     const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
@@ -197,7 +197,11 @@ function renderView(image, hits, player) {
       // scaled to a texture row. This one division stretches or squashes the
       // 64-texel column to fit however tall the strip is on screen.
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
-      copyTexel(pixels, col, row, tex, texX, texY, shade, fog);
+      if (glows(tex, texX, texY)) {
+        copyTexel(pixels, col, row, tex, texX, texY, 1, 0); // a screen or lamp: no shading, no fog
+      } else {
+        copyTexel(pixels, col, row, tex, texX, texY, shade, fog);
+      }
     }
   }
 
@@ -247,10 +251,17 @@ function renderFloorCeiling(pixels, player) {
       // so the texture repeats once per grid cell.
       const texX = Math.min(TEX_SIZE - 1, Math.floor((floorX - Math.floor(floorX)) * TEX_SIZE));
       const texY = Math.min(TEX_SIZE - 1, Math.floor((floorY - Math.floor(floorY)) * TEX_SIZE));
-      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1, fog);
-      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1, fog);
+      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1, glows(FLOOR_TEXTURE, texX, texY) ? 0 : fog);
+      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1, glows(CEILING_TEXTURE, texX, texY) ? 0 : fog);
     }
   }
+}
+
+// Does this texel give off its own light? Glowing texels (screens, strip
+// lights, a robot's visor) are drawn at full brightness through the fog, so
+// lights still show in the haze after everything around them has faded.
+function glows(tex, texX, texY) {
+  return tex.glow[texY * TEX_SIZE + texX] === 1;
 }
 
 // Copy one texel of `tex` to screen pixel (x, y): darkened by `shade`, then

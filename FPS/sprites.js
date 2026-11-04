@@ -1,4 +1,4 @@
-// Sprites: flat pictures standing in the world (barrels, columns, lamps, and
+// Sprites: flat pictures standing in the world (fuel drums, struts, lamps, and
 // the robots from enemies.js). A sprite is a 1x1-unit picture that always
 // turns to face the camera (a "billboard"). Sprites are drawn after the walls,
 // column by column, and are hidden wherever a wall is nearer. Where the
@@ -6,8 +6,8 @@
 
 // What each kind of sprite looks like, and whether it blocks movement.
 const SPRITE_TYPES = {
-  barrel: { texture: BARREL_TEXTURE, solid: true },
-  column: { texture: COLUMN_TEXTURE, solid: true },
+  drum:   { texture: DRUM_TEXTURE,   solid: true },
+  strut:  { texture: STRUT_TEXTURE,  solid: true },
   lamp:   { texture: LAMP_TEXTURE,   solid: false },
 };
 
@@ -21,7 +21,7 @@ function hitsSolidSprite(x, y, r) {
 
 // Everything drawn as a billboard this frame, as seen by `viewer`. Static
 // sprites, robots (wrecks included) and pickups go into one list, so they sort
-// together: a robot walking behind a barrel is hidden by it, in front it isn't.
+// together: a robot walking behind a drum is hidden by it, in front it isn't.
 //   tex        the picture to draw
 //   shade      brightness multiplier (a robot flashes white when you hit it)
 //   glowShade  brightness of glowing texels (a robot's eye brightens as it charges)
@@ -96,7 +96,7 @@ function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
   for (let col = colStart; col < colEnd; col++) {
     // THE DEPTH BUFFER. depth[col] is how far away the wall in this column is.
     // If that wall is nearer than the sprite, it hides this whole column of
-    // the sprite: that's how a pillar can cover half a barrel.
+    // the sprite: that's how a pillar can cover half a drum.
     if (depth[col] < forward) continue;
 
     const texX = Math.min(TEX_SIZE - 1, Math.floor((col + 0.5 - left) / size * TEX_SIZE));
@@ -105,7 +105,7 @@ function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
       if (isTransparent(tex, texX, texY)) continue; // see-through: keep what's behind
       // Glowing texels make their own light, so the fog doesn't dim them:
       // a robot's eye shows in the dark before its body does.
-      if (tex.glow[texY * TEX_SIZE + texX] === 1) {
+      if (glows(tex, texX, texY)) {
         copyTexel(pixels, col, row, tex, texX, texY, thing.shade * thing.glowShade, 0);
       } else {
         copyTexel(pixels, col, row, tex, texX, texY, thing.shade, fog);

@@ -34,26 +34,26 @@ const MAP = [
 // Objects standing in the level. type is a key of SPRITE_TYPES in sprites.js.
 // x and y are positions like the player's: (4.5, 4.5) is the middle of MAP[4][4].
 const SPRITES = [
-  // Top-left room, among the green pillars, and the corridor east of it
+  // Top-left room, among the computer banks, and the corridor east of it
   { type: 'lamp',   x: 4.5,  y: 4.5 },
   { type: 'lamp',   x: 8.5,  y: 2.5 },
-  { type: 'barrel', x: 8.5,  y: 1.5 },
-  { type: 'barrel', x: 9.5,  y: 1.5 },
-  { type: 'barrel', x: 14.5, y: 1.5 },
+  { type: 'drum',   x: 8.5,  y: 1.5 },
+  { type: 'drum',   x: 9.5,  y: 1.5 },
+  { type: 'drum',   x: 14.5, y: 1.5 },
   // Bottom-left room
-  { type: 'column', x: 4.5,  y: 11.5 },
-  { type: 'column', x: 4.5,  y: 13.5 },
-  { type: 'barrel', x: 1.5,  y: 13.5 },
+  { type: 'strut',  x: 4.5,  y: 11.5 },
+  { type: 'strut',  x: 4.5,  y: 13.5 },
+  { type: 'drum',   x: 1.5,  y: 13.5 },
   // Bottom-right room
   { type: 'lamp',   x: 11.5, y: 11.5 },
-  { type: 'barrel', x: 14.5, y: 8.5 },
+  { type: 'drum',   x: 14.5, y: 8.5 },
 ];
 
 // Sentry robots (enemies.js): where each starts and which way it faces.
 // angle uses the player's convention: 0 = east, PI/2 = south, -PI/2 = north.
 const ENEMIES = [
   { x: 13.5, y: 5.5,  angle: Math.PI },      // far end of the first room, watching west
-  { x: 11.5, y: 3.5,  angle: Math.PI / 2 },  // inside the red U, watching its opening
+  { x: 11.5, y: 3.5,  angle: Math.PI / 2 },  // inside the hazard-striped U, watching its opening
   { x: 5.5,  y: 9.5,  angle: -Math.PI / 2 }, // behind the first door, watching it
   { x: 11.5, y: 13.5, angle: -Math.PI / 2 }, // bottom-right room, watching north
 ];
@@ -62,7 +62,7 @@ const ENEMIES = [
 // Destroyed robots also drop a 'clip' (+4) where they fall.
 const PICKUPS = [
   { type: 'ammo',   x: 1.5,  y: 6.5 },  // first room, bottom-left corner, by the door
-  { type: 'ammo',   x: 3.5,  y: 10.5 }, // bottom-left room, tucked inside the wooden L
+  { type: 'ammo',   x: 3.5,  y: 10.5 }, // bottom-left room, tucked inside the L of pipes
   { type: 'ammo',   x: 14.5, y: 13.5 }, // bottom-right room, far corner past its robot
   { type: 'health', x: 13.5, y: 1.5 },  // first room, top-right, behind the first robot's back
 ];

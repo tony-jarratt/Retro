@@ -30,9 +30,10 @@ const gun = { cooldown: 0, flash: 0 };
 // the nearest candidate in front of the wall is what gets hit.
 //
 // Because the crosshair is always at eye height (halfway up a wall), it
-// always lands on texture row 32: a robot's chest, or the top of a barrel.
-// So in practice this asks "is the crosshair on its silhouette?", and side-on
-// robots are thinner and harder to hit than ones facing you.
+// always lands on texture row 32: a robot's hull, or the top of a drum.
+// So in practice this asks "is the crosshair on its silhouette?" at hull
+// height. The walker's hull is a long box, so it's a slightly wider target
+// side-on than face-on.
 function thingUnderCrosshair() {
   const wall = castRay(player.x, player.y, Math.cos(player.angle), Math.sin(player.angle));
   let best = null;
@@ -55,7 +56,7 @@ function playerFire() {
   gun.cooldown = FIRE_COOLDOWN;
   gun.flash = GUN_FLASH_TIME;
   const target = thingUnderCrosshair();
-  // A barrel or column in the way soaks up the shot: only robots take damage.
+  // A drum or strut in the way soaks up the shot: only robots take damage.
   if (target && target.enemy && target.enemy.state !== 'dead') damageEnemy(target.enemy);
 }
 

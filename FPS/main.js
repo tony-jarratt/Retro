@@ -1,5 +1,5 @@
 // Startup and the main loop:
-// input -> doors -> move -> robots -> combat -> cast rays -> draw -> HUD -> repeat.
+// input -> doors -> move -> robots -> combat -> cast rays -> draw -> HUD -> CRT filter -> repeat.
 
 const screenCanvas = document.getElementById('screen');
 screenCanvas.width = SCREEN_W;   // the canvas really is 320x200 pixels;
@@ -77,6 +77,7 @@ setupInput(screenCanvas, {
   use: useDoor,
   fire: playerFire,
   restart: restartGame,
+  toggleFilter: () => { crtFilterOn = !crtFilterOn; },
 });
 
 let lastTime = performance.now();
@@ -88,6 +89,7 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
+  animTime += dt; // drives animated walls (textures.js)
   updateDoors(dt);
   if (game.state === 'playing') { // once you've won or died, everyone stops
     updatePlayer(dt);
@@ -98,6 +100,7 @@ function frame(now) {
   const hits = castRays(player);
   renderView(frameImage, hits, player);
   drawHud(frameImage.data); // flat on top of the 3D view, same buffer
+  if (crtFilterOn) applyCrtFilter(frameImage.data); // last of all, so it covers the HUD too
   screenCtx.putImageData(frameImage, 0, 0);
   if (debugOn) drawDebug(debugCtx, player, hits);
 

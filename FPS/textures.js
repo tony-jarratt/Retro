@@ -7,13 +7,17 @@
 // screen buffer: one flat array, row after row, 4 bytes per texel (R, G, B, A).
 // A "texel" is just a pixel of a texture. Walls are fully opaque; sprites use
 // alpha 0 for the see-through parts around the object.
+//
+// THE LOOK: an 1980s mech hangar. Riveted steel, hazard stripes, rust, pipes,
+// banks of green-screen computers, sodium-orange work lights. Anything that
+// gives off light (screens, lamps, a robot's visor) is marked as glowing.
 
 const TEX_SIZE = 64;
 
 // Build a texture by asking colourAt(x, y) for the colour of every texel.
 // colourAt returns [r, g, b], or null for a transparent texel, or
 // [r, g, b, true] for a GLOWING texel: one that gives off its own light, so
-// sprite drawing skips the fog for it (a lamp bulb, a robot's eye).
+// the renderer skips the fog (and the wall side-shading) for it.
 // `colour` is the texture's main colour, used by the debug map.
 function makeTexture(colour, colourAt) {
   // Uint8ClampedArray clamps out-of-range values to 0..255, so brightening a
@@ -53,240 +57,389 @@ function brighten(colour, f) {
   return [colour[0] * f, colour[1] * f, colour[2] * f];
 }
 
-// Large stone blocks, 32x16, every other row shifted half a block.
-function makeStone() {
-  const base = [110, 110, 150];
-  return makeTexture(base, (x, y) => {
-    const row = Math.floor(y / 16);
-    const shifted = x + (row % 2) * 16;
-    const bx = shifted % 32; // x within this block
-    const by = y % 16;       // y within this block
-    if (bx < 2 || by < 2) return [45, 45, 60]; // mortar
-    const block = Math.floor(shifted / 32) % 2;
-    let f = 0.75 + 0.2 * noise(block, row, 1) + 0.2 * noise(x, y, 11);
-    if (bx === 2 || by === 2) f += 0.2; // lit top/left edge of the block
-    return brighten(base, f);
-  });
+// Blend from colour a towards colour b: t = 0 gives a, t = 1 gives b.
+function mix(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-// Red bricks, 16x8, every other row shifted half a brick.
-function makeBrick() {
-  const base = [170, 60, 50];
-  return makeTexture(base, (x, y) => {
-    const row = Math.floor(y / 8);
-    const shifted = x + (row % 2) * 8;
-    if (shifted % 16 === 0 || y % 8 === 0) return [95, 90, 85]; // mortar
-    const brick = Math.floor(shifted / 16) % 4; // % 4 so bricks wrap round the edge cleanly
-    const f = 0.8 + 0.25 * noise(brick, row, 2) + 0.15 * noise(x, y, 12);
-    return brighten(base, f);
-  });
+function glowing(rgb) {
+  return [rgb[0], rgb[1], rgb[2], true];
 }
 
-// Green metal panel: bevelled edges, a seam across the middle, a rivet near each corner.
-function makePanel() {
-  const base = [60, 140, 70];
-  return makeTexture(base, (x, y) => {
-    let f = 0.9 + 0.1 * noise(x, y, 3);
-    if (x < 2 || y < 2) f = 1.3;                         // lit top/left edge
-    else if (x >= TEX_SIZE - 2 || y >= TEX_SIZE - 2) f = 0.55; // shadowed bottom/right
-    else if (y === 31) f = 0.55;                          // seam: dark line...
-    else if (y === 32) f = 1.25;                          // ...with a lit line under it
-
-    const rx = x < 32 ? 7 : 56; // the nearest rivet
-    const ry = y < 32 ? 7 : 56;
-    const dx = x - rx;
-    const dy = y - ry;
-    if (dx * dx + dy * dy <= 5) f = dx + dy < 0 ? 1.35 : 0.6; // lit on its upper-left half
-    return brighten(base, f);
-  });
+// Fake roundness for anything cylindrical. u runs from -1 at the object's left
+// edge to +1 at its right edge; brightness peaks a little left of centre, as if
+// lit from the upper left.
+function roundShade(u) {
+  return 1.1 - 0.6 * Math.abs(u + 0.25);
 }
 
-// Vertical wooden planks, 16 wide, with wavy grain.
-function makeWood() {
-  const base = [150, 110, 60];
-  return makeTexture(base, (x, y) => {
-    const plank = Math.floor(x / 16);
-    if (x % 16 === 0) return [50, 35, 20]; // gap between planks
-    const grain = Math.sin(x * 1.1 + plank * 7 + Math.sin(y * 0.12 + plank) * 2.5);
-    const f = 0.8 + 0.12 * grain + 0.1 * noise(x, y, 4) + 0.12 * noise(plank, 0, 5);
-    return brighten(base, f);
-  });
+// Diagonal yellow/black hazard stripes, 4 texels wide. `flip` slopes them the
+// other way. (x + y) & 15 is (x + y) mod 16, and it works for negative numbers too.
+function hazard(x, y, flip) {
+  return (((flip ? x - y : x + y) & 15) < 8) ? HAZARD_YELLOW : HAZARD_BLACK;
 }
 
-// Floor: big square tiles in two shades, chequerboard style, with dark grout.
-function makeFloor() {
-  const light = [120, 110, 95];
-  const dark = [88, 80, 70];
-  return makeTexture(light, (x, y) => {
-    if (x % 32 === 0 || y % 32 === 0) return [40, 36, 32]; // grout
-    const tile = (Math.floor(x / 32) + Math.floor(y / 32)) % 2;
-    return brighten(tile === 0 ? light : dark, 0.9 + 0.2 * noise(x, y, 6));
-  });
+// How far is point (px, py) from the line segment (x1, y1)-(x2, y2)? Used to
+// draw the robot's angled legs as thick lines.
+function segmentDistance(px, py, x1, y1, x2, y2) {
+  const sx = x2 - x1;
+  const sy = y2 - y1;
+  // How far along the segment the nearest point is, 0 to 1.
+  const t = Math.max(0, Math.min(1, ((px - x1) * sx + (py - y1) * sy) / (sx * sx + sy * sy)));
+  return Math.hypot(px - (x1 + sx * t), py - (y1 + sy * t));
 }
 
-// Ceiling: dim plaster panels with a darker frame round each one.
-function makeCeiling() {
-  const base = [72, 72, 78];
-  return makeTexture(base, (x, y) => {
-    const px = x % 32;
+const STEEL = [88, 96, 108];
+const DARK_STEEL = [40, 44, 52];
+const RUST = [128, 72, 36];
+const HAZARD_YELLOW = [220, 180, 30];
+const HAZARD_BLACK = [30, 28, 26];
+const SODIUM = [255, 170, 60];
+const PHOSPHOR = [90, 240, 120];
+const AMBER = [255, 176, 40];
+
+// WALLS ---------------------------------------------------------------------
+
+// Riveted steel plates, 32x32, with rust streaking down from the seams.
+function makeSteelPlates() {
+  const isRivet = (px, py) =>
+    ((px === 5 || px === 28) && py % 6 === 5) || ((py === 5 || py === 28) && px % 6 === 5);
+  return makeTexture(STEEL, (x, y) => {
+    const px = x % 32; // position within this plate
     const py = y % 32;
-    if (px < 2 || py < 2) return brighten(base, 0.55); // frame
-    return brighten(base, 0.9 + 0.15 * noise(x, y, 7));
+    if (px < 2 || py < 2) return brighten(STEEL, 0.4);           // seam between plates
+    if (isRivet(px, py)) return brighten(STEEL, 1.45);            // rivet head...
+    if (isRivet(px - 1, py - 1)) return brighten(STEEL, 0.55);    // ...and its shadow
+    let f = (0.85 + 0.2 * noise(Math.floor(x / 32), Math.floor(y / 32), 20)) * (0.9 + 0.12 * noise(x, y, 23));
+    if (px === 2 || py === 2) f *= 1.25; // lit top/left edge of the plate
+    if (px === 31 || py === 31) f *= 0.7;
+    // Rust runs down some columns, getting heavier towards the bottom of each plate.
+    const streak = noise(x, 0, 21) > 0.72 ? (py / 32) * (0.4 + 0.6 * noise(x, y >> 2, 22)) : 0;
+    return mix(brighten(STEEL, f), RUST, streak * 0.75);
   });
 }
 
-// SPRITE TEXTURES. A sprite is drawn the same size as a wall cell (1 unit
-// tall, floor to ceiling), so where the object sits in its 64x64 square
-// decides where it appears in the world: a barrel drawn in the bottom half
-// stands on the floor, a lamp drawn at the top hangs from the ceiling.
-//
-// All three fake roundness the same way: `u` runs from -1 at the object's
-// left edge to +1 at its right edge, and brightness peaks a little left of
-// centre, as if lit from the upper left.
-
-// A wooden barrel standing on the floor.
-function makeBarrel() {
-  const wood = [125, 85, 50];
-  return makeTexture(wood, (x, y) => {
-    if (y < 26) return null;
-    const t = (y - 26) / 37;                       // 0 at the barrel's top, 1 at its bottom
-    const halfW = 11 + 3 * Math.sin(t * Math.PI);  // bulges in the middle
-    const dx = x + 0.5 - 32;                       // distance from the texture's centre line
-    if (Math.abs(dx) > halfW) return null;
-    const u = dx / halfW;
-    const round = 1.1 - 0.6 * Math.abs(u + 0.25);
-    if (y <= 27 || y === 42 || y === 43 || y === 58 || y === 59) {
-      return brighten([75, 75, 80], round);        // metal hoops
+// A bulkhead: hazard chevrons top and bottom, a vent grille, an amber warning lamp.
+function makeBulkhead() {
+  return makeTexture(HAZARD_YELLOW, (x, y) => {
+    if (y === 12 || y === 51) return DARK_STEEL;
+    if (y < 12) return hazard(x, y, false);
+    if (y > 51) return hazard(x, y, true); // sloping the other way: a chevron
+    const lamp = Math.hypot(x + 0.5 - 8, y + 0.5 - 32);
+    if (lamp < 2) return glowing([255, 230, 150]);
+    if (lamp < 3.5) return glowing(AMBER);
+    if (lamp < 4.5) return DARK_STEEL;
+    if (x >= 18 && x < 56 && y >= 18 && y < 46) {         // the vent
+      if (x === 18 || y === 18) return brighten(STEEL, 0.5);
+      if (x === 55 || y === 45) return brighten(STEEL, 1.2);
+      return (x % 4 === 0) ? brighten(STEEL, 0.25) : brighten(STEEL, 0.75 + 0.1 * noise(x, y, 24));
     }
-    let f = round * (0.9 + 0.2 * noise(x, y, 9));
-    if (x % 5 === 0) f *= 0.75;                    // gaps between the staves
-    return brighten(wood, f);
+    return brighten([70, 76, 86], 0.9 + 0.15 * noise(x, y, 25));
   });
 }
 
-// A stone column, floor to ceiling, with a wider capital and plinth.
-function makeColumn() {
-  const stone = [160, 155, 140];
-  return makeTexture(stone, (x, y) => {
-    const ends = y < 6 || y >= 58;
-    const halfW = ends ? 15 : 10;
-    const dx = x + 0.5 - 32;
-    if (Math.abs(dx) > halfW) return null;
-    const u = dx / halfW;
-    let f = (1.1 - 0.6 * Math.abs(u + 0.25)) * (0.9 + 0.15 * noise(x, y, 8));
-    if (!ends && x % 4 === 0) f *= 0.8;            // fluting
-    if (y === 6 || y === 57) f *= 0.6;             // shadow where the shaft meets each end
-    return brighten(stone, f);
-  });
-}
-
-// A brass lamp hanging from the ceiling on a short chain.
-function makeLamp() {
-  const brass = [170, 130, 60];
-  return makeTexture(brass, (x, y) => {
-    const dx = x + 0.5 - 32;
-    if (y < 10) return Math.abs(dx) < 1 ? [60, 60, 60] : null; // chain
-    if (y < 20) {                                               // shade, widening downwards
-      const halfW = 3 + (y - 10) * 0.9;
-      if (Math.abs(dx) > halfW) return null;
-      return brighten(brass, 1.1 - 0.5 * Math.abs(dx / halfW + 0.25));
+// A bank of computers: two rows of green screens with scrolling text, and a
+// strip of blinking lights. `frame` (0-3) changes the text and the lights, so
+// showing the frames in turn animates it (wallTexture, below).
+function makeComputerBank(frame) {
+  return makeTexture(PHOSPHOR, (x, y) => {
+    const screenCol = x < 32 ? 0 : 1;
+    const sx = x - (screenCol === 0 ? 4 : 35); // position within a screen
+    const screenRow = y < 30 ? 0 : 1;
+    const sy = y - (screenRow === 0 ? 5 : 35);
+    if (sx >= 0 && sx < 25 && sy >= 0 && sy < 19) {
+      if (sx === 0 || sy === 0 || sx === 24 || sy === 18) return brighten(STEEL, 0.75); // bezel
+      // Lines of "text": one every 3 rows, each a run of on/off blocks whose
+      // length and pattern depend on the frame, so the text seems to scroll.
+      const line = Math.floor((sy - 2) / 3);
+      const id = screenRow * 2 + screenCol;
+      if ((sy - 2) % 3 === 0 && sy >= 2 && sx >= 2) {
+        const length = 4 + Math.floor(noise(id, line + frame, 26) * 18);
+        if (sx - 2 < length && noise(sx >> 1, line + frame * 7, 27 + id) > 0.25) return glowing(PHOSPHOR);
+      }
+      return [10, 28, 16]; // dark screen
     }
-    if (y < 24) return Math.abs(dx) <= 5 ? [255, 235, 160, true] : null; // glowing bulb
+    if (y >= 28 && y < 30 && x % 4 === 1) {
+      // Indicator lights: each one on or off, amber or green, re-rolled every frame.
+      const n = noise(x, frame, 28);
+      if (n > 0.55) return glowing(n > 0.8 ? AMBER : PHOSPHOR);
+      return [30, 24, 18];
+    }
+    if (y >= 57 && x % 8 < 6 && x > 2) return brighten(DARK_STEEL, y === 57 ? 1.6 : 1.1); // drawer handles
+    return brighten(DARK_STEEL, 0.9 + 0.15 * noise(x, y, 29));
+  });
+}
+
+// A wall of vertical pipes of different widths and metals, with brackets and a valve.
+function makePipes() {
+  const pipes = [
+    { from: 2, to: 12, colour: STEEL },
+    { from: 14, to: 20, colour: [160, 92, 52] },   // copper
+    { from: 23, to: 40, colour: [96, 100, 104] },  // the big one, with the valve
+    { from: 43, to: 49, colour: RUST },
+    { from: 52, to: 62, colour: [92, 100, 72] },   // olive paint
+  ];
+  return makeTexture(STEEL, (x, y) => {
+    // The valve wheel on the big pipe: a red ring with four spokes.
+    const vx = x + 0.5 - 31.5;
+    const vy = y + 0.5 - 22;
+    const vr = Math.hypot(vx, vy);
+    if (vr >= 5 && vr < 7) return [170, 40, 30];
+    if (vr < 5 && (Math.abs(vx) < 1 || Math.abs(vy) < 1)) return [140, 32, 24];
+    if ((y >= 4 && y < 8) || (y >= 44 && y < 48)) {                // brackets across the pipes
+      return brighten(DARK_STEEL, y === 4 || y === 44 ? 1.5 : 1.0);
+    }
+    for (const p of pipes) {
+      if (x < p.from || x >= p.to) continue;
+      const halfW = (p.to - p.from) / 2;
+      const u = (x + 0.5 - p.from - halfW) / halfW;
+      return brighten(p.colour, roundShade(u) * (0.9 + 0.15 * noise(x, y, 30)));
+    }
+    return [22, 22, 26]; // the dark gap behind the pipes
+  });
+}
+
+// A blast door: steel with ribs, hazard chevrons along its leading (left)
+// edge, and a green status light. As before, the leading edge is the one that
+// moves as the door slides open (see hitDoor in raycaster.js).
+function makeBlastDoor() {
+  return makeTexture([84, 90, 98], (x, y) => {
+    if (x < 10) return hazard(x, y, false);
+    if (x === 10 || x >= 62 || y < 2 || y >= 62) return DARK_STEEL;
+    const light = Math.hypot(x + 0.5 - 16, y + 0.5 - 32);
+    if (light < 2) return glowing([80, 255, 120]);
+    if (light < 3) return DARK_STEEL;
+    const rib = y % 12;
+    if (rib === 0) return brighten([84, 90, 98], 1.35);
+    if (rib === 1) return brighten([84, 90, 98], 0.5);
+    return brighten([84, 90, 98], 0.9 + 0.12 * noise(x, y, 31));
+  });
+}
+
+// FLOOR AND CEILING -----------------------------------------------------------
+
+// Diamond-plate steel: a lattice of small raised diamonds, with oil stains.
+function makeDiamondPlate() {
+  const base = [84, 88, 96];
+  return makeTexture(base, (x, y) => {
+    if (x === 0 || y === 0) return brighten(base, 0.45); // seam at the cell edge
+    const lx = (x + (Math.floor(y / 8) % 2) * 4) % 8; // every other row of diamonds shifted
+    const ly = y % 8;
+    let f = 0.85 + 0.12 * noise(x, y, 32);
+    if (Math.abs(lx - 3.5) + Math.abs(ly - 3.5) < 2.5) f = lx + ly < 7 ? 1.25 : 0.7; // lit top-left, shaded bottom-right
+    if (noise(x >> 3, y >> 3, 33) < 0.12) f *= 0.7; // oil stain
+    return brighten(base, f);
+  });
+}
+
+// Ceiling: steel girders along the cell edges, dark between them, and a
+// glowing strip light in the middle of every cell.
+function makeGirders() {
+  const beam = [70, 72, 80];
+  return makeTexture(beam, (x, y) => {
+    if (x >= 14 && x < 50 && y >= 29 && y < 35) {
+      if (x === 14 || x === 49 || y === 29 || y === 34) return [50, 50, 56]; // light housing
+      return glowing([255, 214, 150]);
+    }
+    const ex = Math.min(x, 63 - x); // distance from the nearest vertical edge
+    const ey = Math.min(y, 63 - y);
+    if (ex < 6 || ey < 6) {
+      const e = Math.min(ex, ey);
+      if (e === 0 || e === 5) return brighten(beam, 0.6);      // flange edges
+      if (e === 2 && (x + y) % 6 === 0) return brighten(beam, 1.5); // rivets
+      return brighten(beam, 0.95 + 0.1 * noise(x, y, 34));
+    }
+    return brighten([26, 26, 32], 0.9 + 0.2 * noise(x, y, 35));
+  });
+}
+
+// OBJECTS (sprites) -------------------------------------------------------------
+// A sprite is drawn the same size as a wall cell (1 unit tall, floor to
+// ceiling), so where the object sits in its 64x64 square decides where it
+// appears in the world: a drum drawn in the bottom half stands on the floor,
+// a lamp drawn at the top hangs from the ceiling.
+
+// A red fuel drum with a hazard label.
+function makeDrum() {
+  const paint = [170, 64, 36];
+  return makeTexture(paint, (x, y) => {
+    if (y < 24) return null;
+    const dx = x + 0.5 - 32;
+    if (Math.abs(dx) > 12) return null;
+    const round = roundShade(dx / 12);
+    if (y <= 25) return brighten([120, 120, 128], round * 1.2);       // rim
+    if (y === 34 || y === 35 || y === 52 || y === 53) return brighten(paint, round * 0.6); // ribs
+    const label = Math.abs(dx) + Math.abs(y + 0.5 - 43.5);           // a diamond-shaped label
+    if (label < 6) return brighten(HAZARD_YELLOW, round);
+    if (label < 7.2) return HAZARD_BLACK;
+    return brighten(paint, round * (0.88 + 0.15 * noise(x, y, 36)));
+  });
+}
+
+// A hydraulic support strut, floor to ceiling: a painted housing at the top,
+// a chrome piston, and a hazard-striped foot.
+function makeStrut() {
+  return makeTexture([190, 160, 40], (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y < 18) {
+      if (Math.abs(dx) > 11) return null;
+      if (y === 17 || (y % 6 === 3 && Math.abs(Math.abs(dx) - 8) < 1)) return DARK_STEEL; // edge and bolts
+      return brighten([190, 160, 40], roundShade(dx / 11));
+    }
+    if (y < 50) {
+      if (Math.abs(dx) > 4) return null;
+      const u = dx / 4;
+      if (Math.abs(u + 0.45) < 0.2) return [235, 238, 245];           // chrome highlight
+      return brighten([150, 156, 168], roundShade(u) * 0.95);
+    }
+    if (Math.abs(dx) > 14) return null;
+    if (y === 50) return DARK_STEEL;
+    return brighten(hazard(x, y, false), roundShade(dx / 14));
+  });
+}
+
+// A caged sodium work lamp hanging from the ceiling.
+function makeCagedLamp() {
+  return makeTexture(SODIUM, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y < 4) return Math.abs(dx) < 2 ? DARK_STEEL : null;            // bracket
+    if (y < 8) return Math.abs(dx) < 6 ? brighten(STEEL, 0.8) : null;  // housing
+    if (y < 23) {
+      if (Math.abs(dx) > 7) return null;
+      if (x % 3 === 0 || y === 14 || y === 22) return [50, 50, 56];    // the cage's bars
+      const d = Math.hypot(dx, y + 0.5 - 15);
+      if (d < 2.5) return glowing([255, 230, 150]);                    // bulb core
+      if (d < 5) return glowing(SODIUM);
+      return glowing([200, 110, 40]);                                  // glow filling the cage
+    }
     return null;
   });
 }
 
-// THE ROBOT ENEMY. A squat sentry robot with one glowing eye, drawn from
-// four sides so it can face different ways (see enemyTexture in enemies.js).
-// Poses: 'stand', 'walk1' and 'walk2' (alternate feet lifted), 'aim', and
-// 'fire' (aim plus a muzzle flash). Aim and fire are front only: a robot
+// THE ROBOT ENEMY ---------------------------------------------------------------
+// A squat walker: a chunky hull on two reverse-jointed ("chicken") legs, with
+// a glowing red visor slit, missile pods on its shoulders and a twin chin gun.
+// Drawn from four sides so it can face different ways (enemyTexture in
+// enemies.js). Poses: 'stand', 'walk1' and 'walk2' (one foot lifted), 'aim',
+// and 'fire' (aim plus muzzle flashes). Aim and fire are front only: a robot
 // aiming at you is always facing you.
-const ROBOT_METAL = [105, 112, 125];
-const ROBOT_LEGS = [80, 85, 95];
-const ROBOT_DARK = [50, 52, 58];
+const HULL = [104, 110, 86];
+const HULL_DARK = [54, 58, 48];
+const LEG_STEEL = [118, 122, 112]; // lighter than the floor, so the legs read against it
+const VISOR = [255, 50, 30];
 
-function robotAntenna(dx, y) {
-  if (y >= 5 && y < 7 && Math.abs(dx) < 1.5) return [255, 220, 120, true]; // glowing tip
-  if (y >= 7 && y < 14 && Math.abs(dx) < 1) return [60, 60, 65];
-  return null;
+// A thick line from a to b (points as [x, y]), shaded across its width.
+function robotLimb(dx, y, a, b, width, colour) {
+  const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
+  if (d >= width) return null;
+  return brighten(colour, 1.1 - 0.5 * d / width);
 }
 
-// The robot seen from the front (view 'front') or from behind (view 'back').
-function makeRobotFrontBack(view, pose) {
-  return makeTexture(ROBOT_METAL, (x, y) => {
-    const dx = x + 0.5 - 32; // distance from the texture's centre line
+// The robot from the front (view 'front') or from behind (view 'back').
+function makeWalkerFrontBack(view, pose) {
+  return makeTexture(HULL, (x, y) => {
+    const dx = x + 0.5 - 32;
     const adx = Math.abs(dx);
-    const antenna = robotAntenna(dx, y);
-    if (antenna) return antenna;
 
-    // Arms. Aiming: a gun held out in front of the body, muzzle towards you.
+    // Antenna on top of the left pod, with a glowing tip.
+    if (Math.abs(dx + 18) < 1.5 && y >= 4 && y < 6) return glowing(AMBER);
+    if (Math.abs(dx + 18) < 1 && y >= 6 && y < 12) return DARK_STEEL;
+
+    // Shoulder pods. From the front you see their missile tubes.
+    if (adx >= 14 && adx < 22 && y >= 12 && y < 26) {
+      if (y >= 23) return hazard(x, y, dx < 0);
+      if (view === 'front' && y >= 15 && y < 22 && (adx - 15) % 3 < 2 && (y - 15) % 3 < 2) return [18, 18, 20];
+      if (y === 12 || adx < 15 || adx >= 21) return HULL_DARK;
+      return brighten(HULL, 0.95 + 0.1 * noise(x, y, 37));
+    }
+
+    // Chin gun. Aiming, its two muzzles point straight at you.
     if (pose === 'aim' || pose === 'fire') {
-      const muzzle = dx * dx + (y - 34) * (y - 34); // squared distance from the muzzle
-      if (pose === 'fire' && muzzle <= 5) return [255, 255, 230, true];      // flash: white core...
-      if (pose === 'fire' && muzzle <= 14) return [255, 220, 110, true];     // ...yellow edge
-      if (muzzle <= 5) return [15, 15, 15];                                  // muzzle
-      if (adx < 7 && y >= 29 && y < 39) return brighten(ROBOT_DARK, 1.2 - 0.4 * adx / 7); // gun
-      if (adx >= 7 && adx < 12 && y >= 27 && y < 33) return brighten(ROBOT_METAL, 0.8); // forearms
-    } else if (adx >= 14 && adx < 19 && y >= 18 && y < 41) {
-      return y >= 38 ? ROBOT_DARK : brighten(ROBOT_METAL, 0.85 - 0.2 * (adx - 14) / 5); // arms at sides
+      const m = (adx - 4) * (adx - 4) + (y + 0.5 - 37) * (y + 0.5 - 37);
+      if (pose === 'fire' && m <= 5) return glowing([255, 255, 230]);
+      if (pose === 'fire' && m <= 13) return glowing([255, 210, 100]);
+      if (m <= 3) return [12, 12, 12];
+      if (adx < 8 && y >= 33 && y < 41) return brighten(DARK_STEEL, 1.3 - 0.4 * adx / 8);
+    } else if (adx < 6 && y >= 33 && y < 37) {
+      return brighten(DARK_STEEL, 1.2);
     }
 
-    // Body: a box with its top corners cut off.
-    if (adx < 13 && y >= 14 && y < 44 && !(y < 17 && adx > 10 + (y - 14))) {
-      if (view === 'front') {
-        const eye = dx * dx + (y - 25) * (y - 25); // squared distance from the eye's centre
-        if (eye <= 4) return [255, 200, 150, true]; // hot centre
-        if (eye <= 20) return [255, 60, 40, true];  // red glow
-        if (eye <= 34) return [30, 30, 35];         // socket
-      } else if (adx < 8 && y >= 21 && y < 33 && y % 3 === 0) {
-        return ROBOT_DARK;                          // cooling vents on its back
+    // Hull: wide at the shoulders, narrowing to the hips, top corners cut off.
+    const halfW = 14 - (y - 12) * 0.15;
+    if (y >= 12 && y < 34 && adx < halfW && !(y < 15 && adx > halfW - (15 - y) * 2)) {
+      if (view === 'front' && y >= 19 && y < 22 && adx < 9) {
+        return glowing(adx < 3 ? [255, 170, 120] : VISOR); // visor slit, hottest in the middle
       }
-      let f = (1.1 - 0.6 * Math.abs(dx / 13 + 0.25)) * (0.95 + 0.1 * noise(x, y, 13));
-      if (y === 36 || y === 37) f *= 0.6;           // waist band
-      return brighten(ROBOT_METAL, f);
+      if (view === 'back' && y >= 17 && y < 29 && adx < 8) {
+        return y % 3 === 0 ? [20, 20, 22] : brighten(HULL_DARK, 1.2); // engine grille
+      }
+      if (y === 27 || (y > 27 && Math.abs(dx) < 0.5)) return HULL_DARK; // panel lines
+      return brighten(HULL, roundShade(dx / halfW) * (0.92 + 0.1 * noise(x, y, 38)));
     }
 
-    // Legs. In each walk pose one leg is lifted (drawn shorter).
-    if (y < 44) return null;
-    const leftLeg = dx >= -11 && dx < -4;
-    const rightLeg = dx >= 4 && dx < 11;
-    if (!leftLeg && !rightLeg) return null;
-    const lifted = (pose === 'walk1' && leftLeg) || (pose === 'walk2' && rightLeg);
-    const bottom = lifted ? 59 : TEX_SIZE;
-    if (y >= bottom) return null;
-    if (y === 53 || y === bottom - 3) return ROBOT_DARK; // knee, and the top of the foot
-    return brighten(ROBOT_LEGS, 1.05 - 0.3 * Math.abs((adx - 7.5) / 3.5));
+    if (y >= 34 && y < 38 && adx < 9) return brighten(DARK_STEEL, 1.2); // hip joint
+
+    // Legs: hip -> knee -> ankle, then a broad foot. Walking lifts one foot.
+    for (const side of [-1, 1]) {
+      const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 4 : 0;
+      const hip = [side * 6, 37];
+      const knee = [side * 11, 47 - lift];
+      const ankle = [side * 8, 57 - lift];
+      if (Math.hypot(dx - knee[0], y - knee[1]) < 3.5) return HULL_DARK;    // knee joint
+      const limb = robotLimb(dx, y, hip, knee, 4.5, LEG_STEEL) || robotLimb(dx, y, knee, ankle, 3.5, LEG_STEEL);
+      if (limb) return limb;
+      if (y >= 58 - lift && y < 63 - lift && Math.abs(dx - side * 8) < 6) {
+        return brighten(HULL_DARK, y === 58 - lift ? 1.5 : 1.0);           // foot
+      }
+    }
+    return null;
   });
 }
 
 // The robot side-on, facing right (towards +x in the texture). Its left side
-// is the same picture mirrored: `mirror` reads x backwards.
-function makeRobotSide(pose, mirror) {
-  return makeTexture(ROBOT_METAL, (tx, y) => {
+// is the same picture mirrored: `mirror` reads x backwards. This is the view
+// that shows off the reverse-jointed legs: the knee bends FORWARD.
+function makeWalkerSide(pose, mirror) {
+  return makeTexture(HULL, (tx, y) => {
     const x = mirror ? TEX_SIZE - 1 - tx : tx;
     const dx = x + 0.5 - 32;
-    const antenna = robotAntenna(dx, y);
-    if (antenna) return antenna;
 
-    // The near arm hangs in front of the body, so it's checked first.
-    if (dx >= -3 && dx < 3 && y >= 18 && y < 41) {
-      return y >= 38 ? ROBOT_DARK : brighten(ROBOT_METAL, 0.85 - 0.1 * Math.abs(dx) / 3);
+    if (Math.abs(dx + 4) < 1.5 && y >= 2 && y < 4) return glowing(AMBER); // antenna tip
+    if (Math.abs(dx + 4) < 1 && y >= 4 && y < 10) return DARK_STEEL;
+
+    // The near shoulder pod sits in front of the hull, so it's checked first.
+    if (dx >= -10 && dx < 5 && y >= 10 && y < 25) {
+      if (y >= 22) return hazard(x, y, false);
+      if (dx >= 2 && (y - 12) % 3 < 2 && y < 21) return [18, 18, 20]; // tube mouths on its front face
+      if (y === 10 || dx < -9) return HULL_DARK;
+      return brighten(HULL, 0.85 + 0.1 * noise(x, y, 39));
     }
 
-    // Body, narrower from the side, with its front top corner cut off.
-    if (dx >= -10 && dx < 10 && y >= 14 && y < 44 && !(y < 17 && dx > 7 + (y - 14))) {
-      if (dx >= 7 && y >= 22 && y < 28) return [255, 60, 40, true]; // the eye, seen edge-on
-      let f = (1.1 - 0.6 * Math.abs(dx / 10 + 0.25)) * (0.95 + 0.1 * noise(x, y, 14));
-      if (y === 36 || y === 37) f *= 0.6;
-      return brighten(ROBOT_METAL, f);
+    // Chin gun pointing forward. The aim/fire poses never use the side view.
+    if (dx >= 6 && dx < 22 && y >= 33 && y < 36) return brighten(DARK_STEEL, y === 33 ? 1.5 : 1.0);
+    if (dx >= 4 && dx < 12 && y >= 31 && y < 38) return DARK_STEEL;
+
+    // Hull, with its lower front corner sloped back like a beak.
+    if (dx >= -15 && dx < 15 && y >= 12 && y < 34 && !(dx > 9 && y > 27 + (15 - dx))) {
+      if (dx >= 11 && y >= 18 && y < 21) return glowing(VISOR);
+      if (y === 27) return HULL_DARK;
+      return brighten(HULL, roundShade(dx / 15) * (0.92 + 0.1 * noise(x, y, 40)));
     }
 
-    // Legs: one stepping forward, one back. The far leg is darker.
-    if (y < 44) return null;
-    const near = pose === 'walk1' ? 4 : pose === 'walk2' ? -4 : 0;
-    const far = -near;
-    if (dx >= near - 3 && dx < near + 3) return y === 53 ? ROBOT_DARK : ROBOT_LEGS;
-    if (dx >= far - 3 && dx < far + 3) return brighten(ROBOT_LEGS, 0.65);
+    // Legs. The near leg is drawn first (in front); the far leg is darker.
+    // Walking swings the knees and feet forward and back.
+    const swing = pose === 'walk1' ? 5 : pose === 'walk2' ? -5 : 0;
+    for (const [s, shade] of [[swing, 1], [-swing, 0.6]]) {
+      const hip = [0, 35];
+      const knee = [7 + s * 0.6, 45];
+      const ankle = [-3 + s, 56];
+      if (Math.hypot(dx - knee[0], y - knee[1]) < 3.5) return brighten(HULL_DARK, shade);
+      const limb = robotLimb(dx, y, hip, knee, 4.5, LEG_STEEL) || robotLimb(dx, y, knee, ankle, 3.5, LEG_STEEL);
+      if (limb) return brighten(limb, shade);
+      if (y >= 57 && y < 62 && dx >= ankle[0] - 5 && dx < ankle[0] + 9) {
+        return brighten(HULL_DARK, (y === 57 ? 1.5 : 1.0) * shade); // foot, toes forward
+      }
+    }
     return null;
   });
 }
@@ -296,75 +449,80 @@ const robotPoses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk
 // ROBOT_FRAMES[view][pose]. The view is which side of the robot you can see.
 const ROBOT_FRAMES = {
   front: {
-    ...robotPoses((pose) => makeRobotFrontBack('front', pose)),
-    aim: makeRobotFrontBack('front', 'aim'),
-    fire: makeRobotFrontBack('front', 'fire'),
+    ...robotPoses((pose) => makeWalkerFrontBack('front', pose)),
+    aim: makeWalkerFrontBack('front', 'aim'),
+    fire: makeWalkerFrontBack('front', 'fire'),
   },
-  back:  robotPoses((pose) => makeRobotFrontBack('back', pose)),
-  right: robotPoses((pose) => makeRobotSide(pose, false)), // its right side: it faces your right
-  left:  robotPoses((pose) => makeRobotSide(pose, true)),  // its left side: it faces your left
+  back:  robotPoses((pose) => makeWalkerFrontBack('back', pose)),
+  right: robotPoses((pose) => makeWalkerSide(pose, false)), // its right side: it faces your right
+  left:  robotPoses((pose) => makeWalkerSide(pose, true)),  // its left side: it faces your left
 };
 
-// A destroyed robot: a low heap of scrap with a dead eye and a bent antenna.
+// A destroyed walker: its hull slumped on the floor, a leg sticking out, the
+// visor gone dark, and a few embers still glowing.
 function makeWreck() {
-  return makeTexture(ROBOT_METAL, (x, y) => {
+  return makeTexture(HULL, (x, y) => {
     const dx = x + 0.5 - 32;
-    // Bent antenna sticking up out of the heap, leaning right.
-    if (y >= 42 && y < 50 && Math.abs((x - 38) - (50 - y) * 0.75) < 1) return [60, 60, 65];
-    if (y >= 46) {
-      const halfW = 8 + (y - 46) * 0.8; // the heap widens towards the floor
+    const leg = robotLimb(dx, y, [10, 56], [24, 44], 2.5, LEG_STEEL); // broken leg, angled up
+    if (leg) return leg;
+    if (y >= 44) {
+      const halfW = 10 + (y - 44) * 0.9; // the heap widens towards the floor
       if (Math.abs(dx) <= halfW) {
-        const eye = (x - 26) * (x - 26) + (y - 54) * (y - 54);
-        if (eye <= 9) return [90, 20, 15]; // the eye, gone dark
-        const f = 0.55 + 0.35 * noise(Math.floor(x / 4), Math.floor(y / 3), 15) + 0.1 * noise(x, y, 16);
-        return brighten(ROBOT_METAL, f); // jumbled panels
+        if (y >= 50 && y < 52 && dx > -12 && dx < -2) return [80, 18, 12]; // dead visor
+        if (noise(x, y, 41) > 0.97) return glowing(SODIUM);               // embers
+        const f = 0.5 + 0.35 * noise(x >> 2, Math.floor(y / 3), 42) + 0.1 * noise(x, y, 43);
+        return brighten(noise(x >> 3, y >> 2, 44) > 0.6 ? HULL_DARK : HULL, f);
       }
-      if (y >= 58 && y < 61 && x >= 48 && x < 57) return ROBOT_LEGS; // a leg poking out
     }
     return null;
   });
 }
 
-// THE PLAYER'S GUN, seen from behind as you hold it. This isn't drawn in
-// the world: hud.js stamps it onto the bottom of the screen at 2x size.
-// GUN_FLASH is the same gun with a muzzle flash above the barrel.
+// THE PLAYER'S GUN ----------------------------------------------------------------
+// A boxy pulse pistol seen from behind, with glowing coils round the barrel.
+// It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
+// at 2x size. GUN_FLASH is the same gun firing.
 function makeGun(flash) {
-  return makeTexture([70, 74, 82], (x, y) => {
+  return makeTexture(DARK_STEEL, (x, y) => {
     const dx = x + 0.5 - 32;
-    if (flash && y >= 2 && y < 21) {
+    if (flash && y >= 0 && y < 14) {
       // A spiky starburst: its radius varies with the angle around the centre.
-      const fx = dx;
-      const fy = y - 12;
-      const r = 5 + 4 * Math.abs(Math.cos(4 * Math.atan2(fy, fx)));
-      const d = Math.hypot(fx, fy);
-      if (d <= r * 0.5) return [255, 255, 225];
-      if (d <= r) return [255, 215, 110];
+      const fy = y + 0.5 - 7;
+      const r = 4.5 + 3.5 * Math.abs(Math.cos(4 * Math.atan2(fy, dx)));
+      const d = Math.hypot(dx, fy);
+      if (d <= r * 0.5) return [230, 255, 255];
+      if (d <= r) return [90, 210, 255];
     }
-    if (y >= 21 && y < 24 && Math.abs(dx) < 1.5) return [40, 40, 45]; // front sight
-    if (y >= 24 && y < 46) {
-      const halfW = 5 + (y - 24) * 0.15; // the slide, wider nearer to you
+    if (y >= 12 && y < 15 && Math.abs(dx) < 3) return [16, 16, 18];        // muzzle
+    if (y >= 15 && y < 27 && Math.abs(dx) < 5) {                          // barrel shroud
+      if (y % 3 === 1) return [90, 230, 255];                             // glowing coils
+      return brighten(DARK_STEEL, roundShade(dx / 5) * 1.3);
+    }
+    if (y >= 27 && y < 47) {                                              // body, wider nearer to you
+      const halfW = 8 + (y - 27) * 0.1;
       if (Math.abs(dx) <= halfW) {
-        const u = dx / halfW;
-        let f = 1.15 - 0.5 * Math.abs(u + 0.4); // lit from the upper left
-        if (y >= 41 && y < 44 && Math.abs(dx) < 2) f = 0.4; // rear sight notch
-        return brighten([70, 74, 82], f);
+        if (y < 29) return brighten(DARK_STEEL, 1.7);                      // top rail
+        if (Math.abs(dx) > halfW - 3 && y % 4 === 0) return [16, 16, 18];   // side vents
+        if (y >= 38 && y < 41 && Math.abs(dx) < 2) return glowing(PHOSPHOR); // charge readout
+        return brighten([64, 68, 78], roundShade(dx / halfW) * 1.1);
       }
     }
-    if (y >= 46) {
-      const halfW = 9 + (y - 46) * 0.25; // a gloved hand round the grip
+    if (y >= 47) {                                                        // black-gloved hand
+      const halfW = 9 + (y - 47) * 0.25;
       if (Math.abs(dx) <= halfW) {
-        let f = 0.9 + 0.15 * noise(x, y, 17) - 0.3 * Math.abs(dx / halfW);
-        if ((y - 46) % 5 === 0 && dx > -4) f *= 0.65; // creases between the fingers
-        return brighten([92, 70, 55], f);
+        let f = 0.9 + 0.15 * noise(x, y, 45) - 0.3 * Math.abs(dx / halfW);
+        if ((y - 47) % 5 === 0 && dx > -4) f *= 0.6;                      // knuckle creases
+        return brighten([58, 54, 52], f);
       }
     }
     return null;
   });
 }
 
-// PICKUPS: small things lying on the floor, so drawn in the bottom rows.
+// PICKUPS ---------------------------------------------------------------------
+// Small things lying on the floor, so drawn in the bottom rows.
 
-// An olive ammo crate with a yellow stripe.
+// An olive ammo crate with a hazard stripe.
 function makeAmmoBox() {
   const olive = [95, 105, 60];
   return makeTexture(olive, (x, y) => {
@@ -372,33 +530,33 @@ function makeAmmoBox() {
     if (y < 48 || Math.abs(dx) > 12) return null;
     if (y < 51) return brighten(olive, 1.3);                          // lid, lit from above
     if (Math.abs(dx) > 11 || y === 51) return brighten(olive, 0.55);  // edges
-    if (y >= 55 && y < 58) return [210, 180, 50];                     // stripe
+    if (y >= 55 && y < 58) return hazard(x, y, false);
     return brighten(olive, 0.9 + 0.15 * noise(x, y, 18));
   });
 }
 
-// A single magazine, dropped by a destroyed robot.
+// An energy cell, dropped by a destroyed robot: a small canister with a glowing band.
 function makeClip() {
-  const steel = [60, 62, 70];
-  return makeTexture(steel, (x, y) => {
+  return makeTexture(DARK_STEEL, (x, y) => {
     const dx = x + 0.5 - 32;
-    if (y >= 50 && y < 53 && Math.abs(dx) < 2.5) return [220, 180, 80]; // brass rounds on top
-    if (y >= 53 && Math.abs(dx) < 4) return brighten(steel, 1.1 - 0.4 * Math.abs(dx / 4 + 0.25));
-    return null;
+    if (y < 50 || Math.abs(dx) > 4) return null;
+    if (y < 52) return brighten(STEEL, 1.3);                           // cap
+    if (y >= 55 && y < 58) return glowing([90, 230, 255]);
+    return brighten(DARK_STEEL, roundShade(dx / 4) * 1.3);
   });
 }
 
-// A white medical kit with a red cross.
+// A field medical kit: an off-white case with a red cross.
 function makeMedkit() {
-  const white = [215, 215, 210];
+  const white = [200, 200, 192];
   return makeTexture(white, (x, y) => {
     const dx = x + 0.5 - 32;
     const dy = y - 56; // the cross is centred on row 56
     if (y < 48 || Math.abs(dx) > 11) return null;
     if ((Math.abs(dx) < 2 && Math.abs(dy) < 5) || (Math.abs(dx) < 5 && Math.abs(dy) < 2)) return [200, 30, 30];
     if (y < 50) return brighten(white, 1.1);               // lid
-    if (Math.abs(dx) > 10) return brighten(white, 0.6);    // edges
-    return brighten(white, 0.9 + 0.1 * noise(x, y, 19));
+    if (Math.abs(dx) > 10) return brighten(white, 0.55);   // edges
+    return brighten(white, 0.88 + 0.12 * noise(x, y, 19));
   });
 }
 
@@ -410,36 +568,32 @@ const WRECK_TEXTURE = makeWreck();
 const GUN_TEXTURE = makeGun(false);
 const GUN_FLASH_TEXTURE = makeGun(true);
 
-const BARREL_TEXTURE = makeBarrel();
-const COLUMN_TEXTURE = makeColumn();
-const LAMP_TEXTURE = makeLamp();
+const DRUM_TEXTURE = makeDrum();
+const STRUT_TEXTURE = makeStrut();
+const LAMP_TEXTURE = makeCagedLamp();
 
-const FLOOR_TEXTURE = makeFloor();
-const CEILING_TEXTURE = makeCeiling();
+const FLOOR_TEXTURE = makeDiamondPlate();
+const CEILING_TEXTURE = makeGirders();
 
-// A steel sliding door: frame, two recessed panels, and a handle at the
-// left edge, which is the edge that leads as the door slides open.
-function makeDoor() {
-  const base = [95, 110, 125];
-  return makeTexture(base, (x, y) => {
-    let f = 0.95 + 0.1 * noise(x, y, 10);
-    if (x < 3 || y < 3 || x >= TEX_SIZE - 3 || y >= TEX_SIZE - 3) f = 0.6; // frame
-    const inPanel = x >= 12 && x < 52 && ((y >= 8 && y < 28) || (y >= 36 && y < 56));
-    if (inPanel) {
-      f = 0.8;                                         // recessed panel...
-      if (y === 8 || y === 36 || x === 12) f = 0.55;   // ...shadowed top/left inner edge
-      if (y === 27 || y === 55 || x === 51) f = 1.2;   // ...lit bottom/right inner edge
-    }
-    if (x >= 5 && x < 8 && y >= 28 && y < 36) return [210, 190, 90]; // brass handle
-    return brighten(base, f);
-  });
-}
+// ANIMATED WALLS. The computer bank exists as several frames; wallTexture
+// picks one from animTime, which the main loop advances every frame. The
+// renderer doesn't know or care: it just gets a different texture each time.
+const COMPUTER_FRAMES = [0, 1, 2, 3].map(makeComputerBank);
+const ANIMATED_WALLS = { 3: COMPUTER_FRAMES };
+const ANIMATION_FPS = 3;
+let animTime = 0; // seconds since the game started
 
 // Map cell value -> texture. Every non-zero number used in MAP needs an entry.
+// (Animated walls list their first frame here, for the map check and debug map.)
 const TEXTURES = {
-  1: makeStone(),
-  2: makeBrick(),
-  3: makePanel(),
-  4: makeWood(),
-  [DOOR_CELL]: makeDoor(),
+  1: makeSteelPlates(),
+  2: makeBulkhead(),
+  3: COMPUTER_FRAMES[0],
+  4: makePipes(),
+  [DOOR_CELL]: makeBlastDoor(),
 };
+
+function wallTexture(cell) {
+  const frames = ANIMATED_WALLS[cell];
+  return frames ? frames[Math.floor(animTime * ANIMATION_FPS) % frames.length] : TEXTURES[cell];
+}

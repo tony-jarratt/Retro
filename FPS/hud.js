@@ -1,6 +1,10 @@
 // The HUD (heads-up display): everything drawn flat on top of the 3D view,
 // straight into the same pixel buffer: the gun, the crosshair, the health
 // bar, a robot counter, the red damage flash, and end-of-game messages.
+// Styled like a green-phosphor CRT readout.
+
+const HUD_GREEN = [120, 255, 150];
+const HUD_WARN = [255, 96, 64];
 
 // A BITMAP FONT. Each character is a 3x5 grid of pixels: '#' on, '.' off.
 // Drawing text is just stamping these grids side by side, 1 pixel apart.
@@ -95,7 +99,9 @@ function drawGun(pixels) {
   const bobY = Math.round(Math.abs(Math.cos(player.walkTime * 6)) * 4);
   const recoil = gun.flash > 0 ? 6 : 0;
   const x = SCREEN_W / 2 - TEX_SIZE * scale / 2 + bobX;
-  const y = SCREEN_H - TEX_SIZE * scale + 8 + bobY + recoil; // +8 tucks the hand's bottom edge off screen
+  // +26 sinks the gun so its muzzle sits well below the crosshair, with the
+  // hand's bottom edge off screen.
+  const y = SCREEN_H - TEX_SIZE * scale + 26 + bobY + recoil;
   drawTextureFlat(pixels, gun.flash > 0 ? GUN_FLASH_TEXTURE : GUN_TEXTURE, x, y, scale);
 }
 
@@ -103,7 +109,7 @@ function drawGun(pixels) {
 function drawCrosshair(pixels) {
   const cx = SCREEN_W / 2;
   const cy = SCREEN_H / 2;
-  const colour = [220, 220, 220];
+  const colour = HUD_GREEN;
   for (const d of [2, 3]) {
     putPixel(pixels, cx + d, cy, colour);
     putPixel(pixels, cx - d, cy, colour);
@@ -122,18 +128,21 @@ function tintScreen(pixels, rgb, amount) {
 function drawHealth(pixels) {
   const x = 6;
   const y = SCREEN_H - 12;
-  drawText(pixels, 'HP ' + player.health, x, y - 8, [230, 230, 230], 1);
-  fillRect(pixels, x, y, 62, 6, [0, 0, 0]);       // bar border
-  fillRect(pixels, x + 1, y + 1, 60, 4, [60, 15, 15]); // empty part
-  const filled = Math.round(60 * player.health / PLAYER_MAX_HEALTH);
-  const colour = player.health > 30 ? [200, 40, 40] : [255, 120, 40]; // orange when low
-  fillRect(pixels, x + 1, y + 1, filled, 4, colour);
+  const low = player.health <= 30;
+  drawText(pixels, 'HP ' + player.health, x, y - 8, low ? HUD_WARN : HUD_GREEN, 1);
+  fillRect(pixels, x, y, 62, 6, [0, 0, 0]);             // bar border
+  fillRect(pixels, x + 1, y + 1, 60, 4, [20, 60, 30]);  // empty part
+  // The bar is cut into 5-pixel segments, like an old LED gauge.
+  const filled = Math.round(12 * player.health / PLAYER_MAX_HEALTH);
+  for (let seg = 0; seg < filled; seg++) {
+    fillRect(pixels, x + 1 + seg * 5, y + 1, 4, 4, low ? HUD_WARN : [60, 200, 90]);
+  }
 }
 
 // Bottom right, level with the HP label; red when you're out.
 function drawAmmo(pixels) {
   const text = 'AMMO ' + player.ammo;
-  const colour = player.ammo === 0 ? [255, 70, 50] : [230, 230, 230];
+  const colour = player.ammo === 0 ? HUD_WARN : HUD_GREEN;
   drawText(pixels, text, SCREEN_W - 6 - textWidth(text, 1), SCREEN_H - 20, colour, 1);
 }
 
@@ -154,13 +163,13 @@ function drawHud(pixels) {
   drawAmmo(pixels);
   const left = enemies.filter((e) => e.state !== 'dead').length;
   const counter = 'ROBOTS ' + left;
-  drawText(pixels, counter, SCREEN_W - 6 - textWidth(counter, 1), 6, [230, 230, 230], 1);
+  drawText(pixels, counter, SCREEN_W - 6 - textWidth(counter, 1), 6, HUD_GREEN, 1);
 
   if (game.state === 'dead') {
-    drawTextCentred(pixels, 'SCRAPPED', 70, [255, 80, 60], 4);
-    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, [230, 230, 230], 2);
+    drawTextCentred(pixels, 'SCRAPPED', 70, HUD_WARN, 4);
+    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   } else if (game.state === 'clear') {
-    drawTextCentred(pixels, 'LEVEL CLEAR', 70, [120, 255, 140], 4);
-    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, [230, 230, 230], 2);
+    drawTextCentred(pixels, 'LEVEL CLEAR', 70, HUD_GREEN, 4);
+    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   }
 }
