@@ -24,11 +24,12 @@ function hitsSolidSprite(x, y, r) {
 // together: a robot walking behind a drum is hidden by it, in front it isn't.
 //   tex        the picture to draw
 //   shade      brightness multiplier (a robot flashes white when you hit it)
-//   glowShade  brightness of glowing texels (a robot's eye brightens as it charges)
+//   glowShade  brightness of glowing texels (a robot's eye brightens as it
+//              charges; a flickering lamp's bulb dims with its light)
 //   enemy      the robot this is, or null
 function spriteThings(viewer) {
   return [
-    ...SPRITES.map((s) => ({ x: s.x, y: s.y, tex: SPRITE_TYPES[s.type].texture, shade: 1, glowShade: 1, enemy: null })),
+    ...SPRITES.map((s) => ({ x: s.x, y: s.y, tex: SPRITE_TYPES[s.type].texture, shade: 1, glowShade: spriteGlow(s), enemy: null })),
     ...enemies.map((e) => ({
       x: e.x,
       y: e.y,
@@ -86,6 +87,10 @@ function renderSprites(pixels, depth, player) {
 function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
   const tex = thing.tex;
   const fog = fogAmount(forward); // a billboard is flat, so one distance for all of it
+  // Likewise one light for all of it: the light map at the spot it stands on.
+  const light = lightAt(thing.x, thing.y).map((v) => v * thing.shade);
+  const g = thing.shade * thing.glowShade;
+  const glowLight = [g, g, g];
 
   // As for walls: the columns and rows whose pixel centres fall on the sprite.
   const colStart = Math.max(0, Math.ceil(left - 0.5));
@@ -103,12 +108,12 @@ function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
     for (let row = rowStart; row < rowEnd; row++) {
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - top) / size * TEX_SIZE));
       if (isTransparent(tex, texX, texY)) continue; // see-through: keep what's behind
-      // Glowing texels make their own light, so the fog doesn't dim them:
-      // a robot's eye shows in the dark before its body does.
+      // Glowing texels make their own light, so neither the light map nor the
+      // fog dims them: a robot's visor shows in the dark before its body does.
       if (glows(tex, texX, texY)) {
-        copyTexel(pixels, col, row, tex, texX, texY, thing.shade * thing.glowShade, 0);
+        copyTexel(pixels, col, row, tex, texX, texY, glowLight, 0);
       } else {
-        copyTexel(pixels, col, row, tex, texX, texY, thing.shade, fog);
+        copyTexel(pixels, col, row, tex, texX, texY, light, fog);
       }
     }
   }

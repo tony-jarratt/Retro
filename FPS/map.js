@@ -33,10 +33,11 @@ const MAP = [
 
 // Objects standing in the level. type is a key of SPRITE_TYPES in sprites.js.
 // x and y are positions like the player's: (4.5, 4.5) is the middle of MAP[4][4].
+// Every lamp is also a light (lighting.js); flicker: true makes it stutter.
 const SPRITES = [
   // Top-left room, among the computer banks, and the corridor east of it
   { type: 'lamp',   x: 4.5,  y: 4.5 },
-  { type: 'lamp',   x: 8.5,  y: 2.5 },
+  { type: 'lamp',   x: 8.5,  y: 2.5, flicker: true },
   { type: 'drum',   x: 8.5,  y: 1.5 },
   { type: 'drum',   x: 9.5,  y: 1.5 },
   { type: 'drum',   x: 14.5, y: 1.5 },
@@ -47,6 +48,19 @@ const SPRITES = [
   // Bottom-right room
   { type: 'lamp',   x: 11.5, y: 11.5 },
   { type: 'drum',   x: 14.5, y: 8.5 },
+];
+
+// Ceiling cells with a working strip light (lighting.js). Every other cell's
+// fitting is dead. x and y are CELL coordinates here: { x: 2, y: 2 } is MAP[2][2].
+// (Computer banks, MAP value 3, also give off a little green light by themselves.)
+const CEILING_LIGHTS = [
+  { x: 2,  y: 2 },               // over the start
+  { x: 9,  y: 5 },               // first room, east side
+  { x: 13, y: 2 },               // first room, top-right corner
+  { x: 6,  y: 9 },               // bottom-left room
+  { x: 2,  y: 13 },              // bottom-left room, far corner
+  { x: 14, y: 9, flicker: true }, // bottom-right room, failing
+  { x: 9,  y: 13 },              // bottom-right room, by the door
 ];
 
 // Sentry robots (enemies.js): where each starts and which way it faces.

@@ -232,14 +232,15 @@ function makeDiamondPlate() {
   });
 }
 
-// Ceiling: steel girders along the cell edges, dark between them, and a
-// glowing strip light in the middle of every cell.
-function makeGirders() {
+// Ceiling: steel girders along the cell edges, dark between them, and a strip
+// light fitting in the middle of every cell. `lit` makes the strip glow; the
+// renderer uses the lit version only in cells listed in CEILING_LIGHTS.
+function makeGirders(lit) {
   const beam = [70, 72, 80];
   return makeTexture(beam, (x, y) => {
     if (x >= 14 && x < 50 && y >= 29 && y < 35) {
       if (x === 14 || x === 49 || y === 29 || y === 34) return [50, 50, 56]; // light housing
-      return glowing([255, 214, 150]);
+      return lit ? glowing([255, 214, 150]) : [62, 60, 58];                  // tube: on, or dead
     }
     const ex = Math.min(x, 63 - x); // distance from the nearest vertical edge
     const ey = Math.min(y, 63 - y);
@@ -573,7 +574,8 @@ const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
 
 const FLOOR_TEXTURE = makeDiamondPlate();
-const CEILING_TEXTURE = makeGirders();
+const CEILING_TEXTURE = makeGirders(true);
+const CEILING_DARK_TEXTURE = makeGirders(false);
 
 // ANIMATED WALLS. The computer bank exists as several frames; wallTexture
 // picks one from animTime, which the main loop advances every frame. The

@@ -53,6 +53,16 @@ function drawDebug(ctx, player, hits) {
     else ctx.stroke();
   }
 
+  // Lights: a small cross coloured by kind, dim while it's flickering off.
+  const LIGHT_COLOURS = { lamp: '#fa4', ceiling: '#cdf', screen: '#4f8' };
+  for (const light of LIGHTS) {
+    ctx.strokeStyle = LIGHT_COLOURS[light.kind];
+    ctx.globalAlpha = 0.4 + 0.6 * light.level;
+    line(ctx, (light.x - 0.2) * s, light.y * s, (light.x + 0.2) * s, light.y * s);
+    line(ctx, light.x * s, (light.y - 0.2) * s, light.x * s, (light.y + 0.2) * s);
+    ctx.globalAlpha = 1;
+  }
+
   // Pickups: small squares, gold for ammo, white for health.
   for (const p of pickups) {
     ctx.fillStyle = p.type === 'health' ? '#fff' : '#fc4';

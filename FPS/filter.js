@@ -38,7 +38,7 @@ const BAYER_4X4 = [
 const DITHER_STRENGTH = 28; // how far (0-255 scale) the nudge can move a channel: roughly the gap between palette shades
 const SCANLINE_SHADE = 0.8;
 
-let crtFilterOn = true;
+let crtFilterOn = false; // off by default: press C to see it
 
 // The palette colour closest to (r, g, b): a straight search through all 32,
 // measuring distance in RGB space (squared, since we only compare).

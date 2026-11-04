@@ -10,9 +10,9 @@ const SIDE_SHADE = 0.6; // north/south-facing walls are drawn at 60% brightness
 
 // DISTANCE FOG. Every pixel is blended towards FOG_COLOUR according to how far
 // away the thing it shows is: untouched up to FOG_START, fully fog colour from
-// FOG_END on, and a straight-line blend in between. This dark orange-brown is
-// industrial smog; [0, 0, 0] reads as plain darkness, a grey as mist.
-const FOG_COLOUR = [58, 42, 34];
+// FOG_END on, and a straight-line blend in between. Black reads as darkness
+// ("light diminishing"); a dark orange-brown like [58, 42, 34] reads as smog.
+const FOG_COLOUR = [0, 0, 0];
 const FOG_START = 1.5; // cells
 const FOG_END = 11;    // cells
 
@@ -192,15 +192,22 @@ function renderView(image, hits, player) {
     const shade = hit.side === 1 ? SIDE_SHADE : 1;
     const fog = fogAmount(hit.perpDist); // the whole strip is at one distance
 
+    // The light on this strip of wall. The light map lives in the open space
+    // in front of walls, so look it up a little way out from the face, on the
+    // viewer's side. (The light map is flat, so one lookup does the whole strip.)
+    const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
+    const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
+    const light = lightAt(lx, ly).map((v) => v * shade);
+
     for (let row = top; row < bottom; row++) {
       // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
       // scaled to a texture row. This one division stretches or squashes the
       // 64-texel column to fit however tall the strip is on screen.
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
       if (glows(tex, texX, texY)) {
-        copyTexel(pixels, col, row, tex, texX, texY, 1, 0); // a screen or lamp: no shading, no fog
+        copyTexel(pixels, col, row, tex, texX, texY, FULL_LIGHT, 0); // a screen or lamp: unlit, no fog
       } else {
-        copyTexel(pixels, col, row, tex, texX, texY, shade, fog);
+        copyTexel(pixels, col, row, tex, texX, texY, light, fog);
       }
     }
   }
@@ -251,8 +258,20 @@ function renderFloorCeiling(pixels, player) {
       // so the texture repeats once per grid cell.
       const texX = Math.min(TEX_SIZE - 1, Math.floor((floorX - Math.floor(floorX)) * TEX_SIZE));
       const texY = Math.min(TEX_SIZE - 1, Math.floor((floorY - Math.floor(floorY)) * TEX_SIZE));
-      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, 1, glows(FLOOR_TEXTURE, texX, texY) ? 0 : fog);
-      copyTexel(pixels, col, ceilingRow, CEILING_TEXTURE, texX, texY, 1, glows(CEILING_TEXTURE, texX, texY) ? 0 : fog);
+
+      // Floor and ceiling share a lookup: the light map is flat, so the spot
+      // on the ceiling gets the same light as the spot on the floor below it.
+      const light = lightAt(floorX, floorY);
+      copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, light, fog);
+
+      // Only cells with a working strip light show one; the rest have a dark fixture.
+      const lit = ceilingLightOn[Math.floor(floorY)]?.[Math.floor(floorX)] === true;
+      const ceiling = lit ? CEILING_TEXTURE : CEILING_DARK_TEXTURE;
+      if (glows(ceiling, texX, texY)) {
+        copyTexel(pixels, col, ceilingRow, ceiling, texX, texY, FULL_LIGHT, 0);
+      } else {
+        copyTexel(pixels, col, ceilingRow, ceiling, texX, texY, light, fog);
+      }
     }
   }
 }
@@ -264,14 +283,15 @@ function glows(tex, texX, texY) {
   return tex.glow[texY * TEX_SIZE + texX] === 1;
 }
 
-// Copy one texel of `tex` to screen pixel (x, y): darkened by `shade`, then
-// blended with FOG_COLOUR by `fog` (0 = pure texel, 1 = pure fog). The blend is
-// the usual "lerp", a + (b - a) * t, done separately for red, green and blue.
-function copyTexel(pixels, x, y, tex, texX, texY, shade, fog) {
+// Copy one texel of `tex` to screen pixel (x, y): multiplied by `light` (an
+// [r, g, b] of multipliers, so coloured light tints it), then blended with
+// FOG_COLOUR by `fog` (0 = pure texel, 1 = pure fog). The blend is the usual
+// "lerp", a + (b - a) * t, done separately for red, green and blue.
+function copyTexel(pixels, x, y, tex, texX, texY, light, fog) {
   const t = (texY * TEX_SIZE + texX) * 4; // 4 bytes per texel (RGBA)...
   const i = (y * SCREEN_W + x) * 4;       // ...and 4 per screen pixel
   for (let c = 0; c < 3; c++) {
-    const lit = tex.pixels[t + c] * shade;
+    const lit = tex.pixels[t + c] * light[c];
     pixels[i + c] = lit + (FOG_COLOUR[c] - lit) * fog;
   }
   pixels[i + 3] = 255; // alpha: fully opaque

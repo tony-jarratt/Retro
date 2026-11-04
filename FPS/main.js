@@ -1,5 +1,5 @@
 // Startup and the main loop:
-// input -> doors -> move -> robots -> combat -> cast rays -> draw -> HUD -> CRT filter -> repeat.
+// input -> doors -> move -> robots -> combat -> lighting -> cast rays -> draw -> HUD -> CRT filter -> repeat.
 
 const screenCanvas = document.getElementById('screen');
 screenCanvas.width = SCREEN_W;   // the canvas really is 320x200 pixels;
@@ -42,6 +42,11 @@ function checkMap() {
     if (cell !== 0) {
       const where = cell === undefined ? 'outside the map' : 'inside a wall';
       throw new Error(`SPRITES[${n}] (${s.type} at ${s.x}, ${s.y}) is ${where}.`);
+    }
+  });
+  CEILING_LIGHTS.forEach((c, n) => {
+    if (MAP[c.y]?.[c.x] !== 0) {
+      throw new Error(`CEILING_LIGHTS[${n}] at cell (${c.x}, ${c.y}) is outside the map or not a floor cell.`);
     }
   });
   PICKUPS.forEach((p, n) => {
@@ -97,6 +102,7 @@ function frame(now) {
     updateEnemies(dt);
   }
   updateCombat(dt);
+  updateLighting(); // after combat, so this frame's muzzle flashes light the scene
   const hits = castRays(player);
   renderView(frameImage, hits, player);
   drawHud(frameImage.data); // flat on top of the 3D view, same buffer
