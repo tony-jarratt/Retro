@@ -13,7 +13,9 @@ const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hi
 //   hurtFlash    seconds of red flash left
 //   pickupFlash  seconds of gold flash left (pickups.js)
 //   endTime      seconds since the game ended (for the slow fade)
-const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0 };
+//   playTime     seconds of play on this level (the controls hint shows at first)
+// state is 'playing' until campaign.js sets where the page opens: see there for the rest.
+const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0, playTime: 0 };
 
 // The gun's moment-to-moment state (its fire modes are in weapons.js):
 //   cooldown    seconds until you can pull the trigger again
@@ -103,6 +105,7 @@ function fireRound() {
   sfxPlayerShot(gun.pullMode); // sound.js
   makeNoise(player.x, player.y, SHOT_NOISE[gun.pullMode]); // the lab's creatures hear it (creatures.js)
   mothsSeeFlash(player.x, player.y);                        // and the HQ's moths see the flash (pollinators.js)
+  countShot();                                              // campaign.js: the run's numbers
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
@@ -227,10 +230,4 @@ function updateCombat(dt) {
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
   game.pickupFlash = Math.max(0, game.pickupFlash - dt);
   if (game.state !== 'playing') game.endTime += dt;
-}
-
-// R after the game ends. Reloading the page puts every piece of state back to
-// its start: simpler, and harder to get subtly wrong, than resetting by hand.
-function restartGame() {
-  if (game.state !== 'playing') location.reload();
 }

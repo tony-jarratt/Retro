@@ -45,7 +45,17 @@ const FONT = {
   'X': ['#.#', '#.#', '.#.', '#.#', '#.#'],
   'W': ['#.#', '#.#', '###', '###', '#.#'],
   'Y': ['#.#', '#.#', '.#.', '.#.', '.#.'],
+  'J': ['..#', '..#', '..#', '#.#', '.#.'],
+  'Q': ['.#.', '#.#', '#.#', '##.', '.##'],
+  'Z': ['###', '..#', '.#.', '#..', '###'],
   '/': ['..#', '..#', '.#.', '#..', '#..'],
+  '.': ['...', '...', '...', '...', '.#.'],
+  ',': ['...', '...', '...', '.#.', '#..'],
+  ':': ['...', '.#.', '...', '.#.', '...'],
+  '-': ['...', '...', '###', '...', '...'],
+  "'": ['.#.', '.#.', '...', '...', '...'],
+  '!': ['.#.', '.#.', '.#.', '...', '.#.'],
+  '?': ['##.', '..#', '.#.', '...', '.#.'],
   ' ': ['...', '...', '...', '...', '...'],
 };
 
@@ -259,6 +269,7 @@ function displayShutdown(pixels, t) {
 }
 
 function drawHud(pixels) {
+  if (game.state === 'title' || game.state === 'briefing') { drawCampaignScreen(pixels); return; } // campaign.js
   if (game.state !== 'dead' && !paused) {
     drawGun(pixels);
     drawCrosshair(pixels);
@@ -295,15 +306,14 @@ function drawHud(pixels) {
   }
 
   // For the first few seconds, how to find the controls.
-  if (game.state === 'playing' && animTime < CONTROLS_HINT_TIME) drawTextCentred(pixels, 'PRESS P FOR CONTROLS', 66, HUD_GREEN, 1);
+  if (game.state === 'playing' && game.playTime < CONTROLS_HINT_TIME) drawTextCentred(pixels, 'PRESS P FOR CONTROLS', 66, HUD_GREEN, 1);
 
   if (game.state === 'dead' && game.endTime > SHUTDOWN_TIME) {
     drawTextCentred(pixels, 'TERMINATED', 70, HUD_WARN, 4);
     if (game.endTime > SHUTDOWN_TIME + 1) drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   } else if (game.state === 'clear') {
     drawTextCentred(pixels, 'LEVEL COMPLETE', 70, HUD_GREEN, 4);
-    // map.js knows whether there's another level after this one.
-    if (nextLevel()) drawTextCentred(pixels, 'PRESS ENTER FOR THE NEXT LEVEL', 110, HUD_GREEN, 2);
-    else drawTextCentred(pixels, 'PRESS R TO PLAY AGAIN', 110, HUD_GREEN, 2);
+    // The lift goes up: to the next level, or after the last, to the roof (campaign.js).
+    drawTextCentred(pixels, nextLevel() ? 'PRESS ENTER TO GO UP' : 'PRESS ENTER FOR THE ROOF', 110, HUD_GREEN, 2);
   }
 }

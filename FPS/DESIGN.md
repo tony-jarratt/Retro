@@ -164,6 +164,36 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 
 ## 7. Levels
 
+### The campaign: VERIDIAN (`campaign.js`, `lift.js`, `music.js`)
+
+The game is called **VERIDIAN** (owner, 2026-11-05). You go in at the bottom
+of the Veridian Group complex and fight your way UP: industrial sector
+(sublevel 6), the lab (sublevel 3), the HQ (floor 12), then the roof.
+
+- **Title** (`index.html` with no level): VERIDIAN over a slow turn of the
+  first level, the premise, the title music. The first key wakes it (the
+  browser allows sound only after one); then Enter begins.
+- **Briefing**: each level opens on its floor, name, four lines of what
+  you're walking into (`briefing` in the level file) and the objective.
+- **The lift ride** (LEVEL COMPLETE, Enter): a freight lift's scissor gate,
+  the shaft sliding down behind it, each floor passing as a lit landing with
+  its number, the indicator counting up, the car humming and shaking, a
+  chime on arrival. Then the next level loads. After the last level it goes
+  on to the ROOF.
+- **Finale**: dawn over the complex from its roof, the ending a line at a
+  time ("...something is still growing"), and the run's numbers: time,
+  destroyed, rounds fired, suit failures. Enter: back to the title.
+- **The run's numbers** are kept between levels (each level is a page load)
+  in sessionStorage. R after dying replays that level from its briefing,
+  and counts a suit failure.
+- **Music**: 80s synth, generated (`music.js`): a step sequencer with a saw
+  bass, detuned pads, arps with echo, a lead, a drum machine. Tracks: title
+  (A minor, heroic), industrial (E minor, driving), lab (cold, a heartbeat),
+  HQ (lush sevenths, the pads wavering out of tune), lift (lift music),
+  finale (C major at last). Silence when you die; a flourish at LEVEL
+  COMPLETE. U toggles it.
+- Each level starts fresh (armour, ammo, single fire); its modules are in it.
+
 Levels live in `levels/` as data, one file each, in play order
 (`levels/industrial.js`, `levels/lab.js`, `levels/hq.js`). Reaching the lift shows LEVEL
 COMPLETE; Enter goes on to the next. All are **test sandboxes** for now, not
@@ -334,7 +364,6 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
   puzzle to get past; only the core silences them.
 - **Tripwires don't raise the alarm**: they only wake turrets.
 - **The core doesn't fight back** — it relies on its guards.
-- **No music** yet.
 
 ## 9. Open ideas
 
@@ -348,9 +377,10 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · M map · V visor · C CRT · N sound · R restart ·
-Enter next level (after LEVEL COMPLETE) · P pause (shows these controls; the
-page itself has no help text) · with `?playtest`: L level chooser.
+fire (hold to spin up) · M map · V visor · C CRT · N sound · U music ·
+R restart (once you've died) · Enter carry on (title, briefing, LEVEL
+COMPLETE, finale) · P pause (shows these controls; the page itself has no
+help text) · with `?playtest`: L level chooser.
 
 ---
 

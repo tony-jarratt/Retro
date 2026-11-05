@@ -16,6 +16,13 @@
 LEVELS.push({
   id: 'hq',
   name: 'THE HQ',
+  floor: 12,
+  briefing: [
+    "HEAD OFFICE. THE ATRIUM GARDEN WAS THE CHAIRMAN'S",
+    'PRIDE. THE STAFF NEVER WENT HOME.',
+    'FINISH THEM ON THE FLOOR, OR THEY GET UP.',
+    'AND MIND THE FLOWERS.',
+  ],
   theme: 'hq',              // floor, ceiling and lighting (map.js)
   objective: 'motherplant', // the K cells are the mother plant (core.js)
 

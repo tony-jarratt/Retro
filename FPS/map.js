@@ -23,6 +23,13 @@ function levelById(id) {
 
 const CURRENT_LEVEL = PAGE_ARGS.has('level') ? levelById(PAGE_ARGS.get('level')) : LEVELS[0];
 
+// The campaign goes UP the complex (campaign.js, lift.js): every level has a
+// floor number, each higher than the one before.
+LEVELS.forEach((l, n) => {
+  if (!Number.isInteger(l.floor)) throw new Error(`Level "${l.id}" has no floor (a whole number: below 0 is a sublevel).`);
+  if (n > 0 && l.floor <= LEVELS[n - 1].floor) throw new Error(`Level "${l.id}" is on floor ${l.floor}, but the level before it is on ${LEVELS[n - 1].floor}: the lift only goes up.`);
+});
+
 // The page address for another level, keeping ?playtest if it's on.
 function levelAddress(id) {
   return '?' + (PLAYTEST ? 'playtest&' : '') + 'level=' + id;

@@ -13,6 +13,13 @@
 LEVELS.push({
   id: 'lab',
   name: 'THE LAB',
+  floor: -3,
+  briefing: [
+    'GENETICS. THE CAMERAS DOWN HERE WENT DARK',
+    'LONG BEFORE THE LOCKDOWN.',
+    'WHATEVER THEY WERE BREEDING IS LOOSE.',
+    "IT CAN'T SEE YOU IN THE DARK. IT CAN HEAR YOU.",
+  ],
   theme: 'lab',         // floor, ceiling and lighting (map.js)
   objective: 'chamber', // the K cells are the breeding chamber (core.js)
 

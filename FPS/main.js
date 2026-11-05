@@ -80,20 +80,15 @@ setupInput(screenCanvas, {
     debugCanvas.style.display = debugOn ? 'block' : 'none';
   },
   fire: playerFire,
-  restart: restartGame,
+  restart: restartLevel, // campaign.js: R, once it's over
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
   toggleVisor: () => { visorOn = !visorOn; },
   toggleSound,
-  nextLevel: goToNextLevel,
+  toggleMusic, // music.js
+  enter: handleEnter, // campaign.js: on to whatever's next
   levelChooser: () => { if (PLAYTEST) location.search = '?playtest'; },
   togglePause, // pause.js
 });
-
-// LEVEL COMPLETE -> Enter loads the next level (map.js), if there is one.
-function goToNextLevel() {
-  const next = nextLevel();
-  if (game.state === 'clear' && next) location.search = levelAddress(next.id);
-}
 
 // THE PLAY-TEST LEVEL CHOOSER: with ?playtest and no level picked yet, show a
 // button per level instead of starting the game. Picking one reloads the page
@@ -126,6 +121,7 @@ function frame(now) {
   // but the frozen view is still drawn, with the controls over it.
   if (!paused) {
     animTime += dt; // drives animated walls (textures.js)
+    updateCampaign(dt); // campaign.js: the title's turn, the lift ride, the finale
     updateDoors(dt);
     if (game.state === 'playing') { // once you've won or died, everyone stops
       updatePlayer(dt);
@@ -150,16 +146,23 @@ function frame(now) {
     updateLighting(); // after combat, so this frame's muzzle flashes light the scene
     updateSound(dt);  // the sounds that keep going: whines, buzzes, beeps (sound.js)
   }
-  const hits = castRays(player);
-  renderView(frameImage, hits, player);
-  drawHud(frameImage.data); // flat on top of the 3D view, same buffer
+  updateCampaignMusic(); // campaign.js: silence when you die, a flourish when you win
+  updateMusic();         // music.js: book the next few notes
+  let hits = null;
+  if (cutsceneShowing()) {
+    drawCutscene(frameImage.data); // campaign.js: the lift ride or the finale, instead of the 3D view
+  } else {
+    hits = castRays(player);
+    renderView(frameImage, hits, player);
+    drawHud(frameImage.data); // flat on top of the 3D view, same buffer
+  }
   // Last of all, so it covers the HUD too: the full CRT look if you've asked
   // for it (C), otherwise however much your visor's damage calls for.
   // (Once you're dead the display has shut down: see drawHud.)
   if (crtFilterOn) applyCrtFilter(frameImage.data);
   else if (game.state !== 'dead') applyDamageFilter(frameImage.data, player.armour, dt);
   screenCtx.putImageData(frameImage, 0, 0);
-  if (debugOn) drawDebug(debugCtx, player, hits);
+  if (debugOn && hits) drawDebug(debugCtx, player, hits);
 
   requestAnimationFrame(frame);
 }

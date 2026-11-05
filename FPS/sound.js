@@ -649,6 +649,18 @@ function sfxChargeBeep(x, y) {
   if (!out) return;
   tone(out, 'square', 1800, 1800, 0.05, 0.16);
 }
+// THE LIFT RIDE (lift.js). A floor going by, or the gate: a heavy steel
+// clunk. Arriving: a two-note chime.
+function sfxLiftClunk() {
+  if (!audioReady()) return;
+  drumHit(audio.master, 'sine', 90, 40, 0.06, 0.25, 0.45);
+  noiseBurst(audio.master, 'lowpass', 900, 200, 0.15, 0.3);
+}
+function sfxLiftChime() {
+  if (!audioReady()) return;
+  tone(audio.master, 'sine', 1319, 1319, 0.9, 0.18);
+  tone(audio.master, 'sine', 1047, 1047, 1.2, 0.18, 0.35);
+}
 function sfxLiftOpen() {
   tone(audio.master, 'sine', 784, 784, 0.25, 0.2);
   tone(audio.master, 'sine', 1175, 1175, 0.4, 0.2, 0.2);
@@ -685,6 +697,7 @@ const last = {
 
 function updateSound(dt) {
   if (!audioReady()) return;
+  if (game.state === 'title' || game.state === 'briefing') return; // campaign.js: nothing in the world is moving yet
 
   // GAME OVER (dead or cleared): everything is frozen, so any whine or buzz
   // would hang on as one flat, endless tone. Instead, fade every ongoing

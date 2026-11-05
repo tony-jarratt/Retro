@@ -8,6 +8,15 @@
 LEVELS.push({
   id: 'industrial',
   name: 'INDUSTRIAL SECTOR',
+  // Where it is in the complex (lift.js: below 0 is a sublevel), and the
+  // briefing shown as it opens (campaign.js).
+  floor: -6,
+  briefing: [
+    'THE VERIDIAN GROUP COMPLEX WENT INTO LOCKDOWN',
+    'THREE DAYS AGO. NOTHING HAS COME OUT SINCE.',
+    'ITS SECURITY NETWORK HAS TURNED ON EVERYONE.',
+    'THE CORE THAT RUNS IT IS DOWN HERE.',
+  ],
 
   rows: [
   // x: 0         1         2         3

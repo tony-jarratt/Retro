@@ -25,8 +25,9 @@ const CONTROLS = [
   ['V', 'VISOR'],
   ['C', 'CRT'],
   ['N', 'SOUND'],
+  ['U', 'MUSIC'],
   ['R', 'RESTART'],
-  ['ENTER', 'NEXT LEVEL'],
+  ['ENTER', 'CARRY ON'],
   ...(PLAYTEST ? [['L', 'LEVEL CHOOSER']] : []),
 ];
 
