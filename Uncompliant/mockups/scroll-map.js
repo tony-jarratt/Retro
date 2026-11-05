@@ -195,7 +195,7 @@ function draw(clock) {
 
   // header and the right-hand panel
   g.textAlign = 'left'; g.font = FONT_SMALL; g.fillStyle = COLOURS.dim;
-  g.fillText(`HEXFIRE   SCROLL MOCKUP   MAP ${COLS} x ${ROWS} HEXES   (the map area shows about 19 x 12)`, 16, 22);
+  g.fillText(`UNCOMPLIANT   SCROLL MOCKUP   MAP ${COLS} x ${ROWS} HEXES   (the map area shows about 19 x 12)`, 16, 22);
   g.font = 'bold 22px ' + MONO; g.fillStyle = COLOURS.player; g.fillText('SCROLL', 16, 50);
   g.font = FONT; g.fillStyle = COLOURS.warn; g.fillText('Drag the map, use the wheel, arrows / WASD, or click the minimap. Click a mech or TAB to select; hover another to aim.', 16, 70);
   panel(g, 806, MAP_TOP, 202, 568);

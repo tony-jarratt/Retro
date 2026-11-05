@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs tests/check.html in headless Chrome and prints the result the page puts in its title.
-# Usage: Hexfire/tests/run-checks.sh   (exit code 0 only if every check passes)
+# Usage: Uncompliant/tests/run-checks.sh   (exit code 0 only if every check passes)
 # To read the full list of checks and the balance report, open tests/check.html in a browser,
 # or run tests/run-jsc.sh, which prints everything.
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

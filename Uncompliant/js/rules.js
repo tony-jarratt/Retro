@@ -1,6 +1,6 @@
 'use strict';
 
-// The Hexfire rules engine. No drawing and no DOM, so it can be tested on its own.
+// The Uncompliant rules engine. No drawing and no DOM, so it can be tested on its own.
 // The state is a plain object. The action functions (moveMech, resolveFirePhase, endRound) change it in place
 // and return a list of events for the UI and the tests to read.
 //

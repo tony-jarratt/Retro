@@ -808,13 +808,15 @@ function drawBlack(g) { g.fillStyle = '#000'; g.fillRect(0, 0, VIEW_W, VIEW_H); 
 
 // The name, built from hexes: each lit hex pops in a little after the one before (spread across the letters, with a
 // scatter so it does not sweep like a wipe), then shimmers gently. `clock` is seconds since the title card appeared.
-const TITLE_HEX_R = 9;
+const TITLE_MAX_W = 600;      // the title's width in pixels: the hex size is chosen so the whole name fits it
 const TITLE_CENTRE_X = 345;   // the title block sits left of centre: the background picture keeps its left half clear for text
+const TITLE_BOTTOM_Y = 390;   // the title's lowest hex sits here, just above the tagline, whatever the hex size
 function drawHexTitle(g, clock) {
-  const r = TITLE_HEX_R, cells = titleHexes(TITLE_TEXT);
+  const cells = titleHexes(TITLE_TEXT);
   const cols = TITLE_TEXT.length * (TITLE_GLYPH_W + TITLE_GLYPH_GAP) - TITLE_GLYPH_GAP;
+  const r = TITLE_MAX_W / ((cols - 1) * 1.5 + 2);
   const width = (cols - 1) * 1.5 * r + 2 * r, height = (TITLE_GLYPH_H - 1) * Math.sqrt(3) * r + Math.sqrt(3) * r * 1.5;
-  const x0 = TITLE_CENTRE_X - width / 2 + r, y0 = 270 + Math.sqrt(3) * r / 2;
+  const x0 = TITLE_CENTRE_X - width / 2 + r, y0 = TITLE_BOTTOM_Y - height + Math.sqrt(3) * r / 2;
   g.save();
   for (const { col, row } of cells) {
     const delay = col * 0.025 + (((col * 7 + row * 13) % 10) / 10) * 0.45;
@@ -825,7 +827,7 @@ function drawHexTitle(g, clock) {
     const t = row / (TITLE_GLYPH_H - 1);
     g.globalAlpha = pop * shimmer;
     g.shadowColor = 'rgba(79,179,217,0.75)'; g.shadowBlur = 16;
-    hexPathOn(g, x, y, (r - 1.5) * (0.6 + 0.4 * pop));
+    hexPathOn(g, x, y, (r - r / 6) * (0.6 + 0.4 * pop));
     g.fillStyle = `rgb(${Math.round(120 - 50 * t)},${Math.round(210 - 40 * t)},${Math.round(245 - 30 * t)})`;
     g.fill();
     g.shadowBlur = 0;
@@ -1207,7 +1209,7 @@ function drawFrame(g, view) {
   // header, banner, instruction, the unit panel, the log and the help
   g.font = FONT_SMALL; g.fillStyle = COLOURS.dim; g.textAlign = 'left';
   const goal = objectiveStatus(state);
-  g.fillText(`HEXFIRE   ${state.map.name}   ${goal.name}   ${goal.lines.length ? goal.lines.join('   ') : 'ROUND ' + state.round}`, 16, 22);
+  g.fillText(`UNCOMPLIANT   ${state.map.name}   ${goal.name}   ${goal.lines.length ? goal.lines.join('   ') : 'ROUND ' + state.round}`, 16, 22);
   g.textAlign = 'right'; g.fillText(`SEED ${view.seed}`, 1008, 22); g.textAlign = 'left';
   if (view.debug) g.fillText(view.debug, 480, 22);
   if (view.debug2) g.fillText(view.debug2, 380, 38);

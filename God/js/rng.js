@@ -1,7 +1,7 @@
 'use strict';
 
 // A small seeded random number generator (mulberry32), so a game, and any test, can be replayed from its seed.
-// Copied from Hexfire's js/rng.js (Hexfire used to live here as Mech/; it is its own project now).
+// Copied from Uncompliant's js/rng.js (the mech game, once called Hexfire, which lived here as Mech/ and is now Uncompliant/).
 class Rng {
   constructor(seed) {
     this.s = seed >>> 0;

@@ -1,6 +1,6 @@
 'use strict';
 
-// The games on the menu, in the order they appear: by the year of the game that inspired each, then Hexfire.
+// The games on the menu, in the order they appear: by the year of the game that inspired each, then Uncompliant.
 // To add a game: put its folder (with an index.html inside) next to this file, add a screenshot
 // to thumbs/, then add one entry below. Every field is required; the menu shows an error naming
 // the entry if one is missing or wrong.
@@ -88,15 +88,15 @@ const GAMES = [
     inspiredBy: 'Wolfenstein 3D (1992)',
   },
   {
-    id: 'hexfire',
-    title: 'Hexfire',
-    folder: 'Hexfire/',
+    id: 'uncompliant',
+    title: 'Uncompliant',
+    folder: 'Uncompliant/',
     tag: 'Mech tactics',
     blurb: 'Hex-grid mech battles. Lead a squad of three rebel pilots through a seven-mission breakout against the Consortium, or build your own squad in free play.',
     players: '1 PLAYER',
     controls: 'MOUSE + ARROWS / WASD',
     accent: '#4aa8ff',
-    thumb: 'thumbs/hexfire.jpg',
+    thumb: 'thumbs/uncompliant.jpg',
   },
   // Cocoa Cascade is hidden from the menu while it's in development. Uncomment to restore.
   // {

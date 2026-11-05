@@ -1,6 +1,6 @@
 'use strict';
 
-// Every tuning number for Hexfire lives in this file, so balancing never means touching the rules.
+// Every tuning number for Uncompliant lives in this file, so balancing never means touching the rules.
 // All names here are original. Costs are in credits.
 
 // ---------- body locations ----------

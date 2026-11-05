@@ -1,6 +1,6 @@
 'use strict';
 
-// The checks for the Hexfire rules, data and squad code. Runs in a browser (check.html) or in macOS jsc
+// The checks for the Uncompliant rules, data and squad code. Runs in a browser (check.html) or in macOS jsc
 // (run-jsc.sh). runAllChecks(log) returns { passed, failed, lines } and also logs each line.
 
 const CHECKS = [];

@@ -1,4 +1,4 @@
-# Hexfire: the campaign (draft 2, 2026-10-25)
+# Uncompliant: the campaign (draft 2, 2026-10-25)
 
 **Built:** all seven encounters are playable from STORY (2026-10-25), with the story screen, briefings, debriefs and access phrases. The text below is the plan they were built from; the code (`js/campaign.js`) has the final words.
 
