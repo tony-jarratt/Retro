@@ -10,17 +10,32 @@ const SIGHT_RANGE = 10;                      // cells; nothing sees further than
 const WALK_FPS = 4;                          // walk animation frames per second
 const TURRET_SWEEP_SPEED = 0.7;              // radians per second an awake turret turns while looking
 const SHOT_TURN_SPEED = 12;                  // radians per second a shot robot spins round to face you: half a turn in 0.25s
+const STRAFE_SPEED = 0.7;                    // a smart robot sidesteps at this fraction of its walking speed
+const STRAFE_MIN = 0.6, STRAFE_MAX = 1.3;    // seconds it keeps sidestepping one way before switching
+const BEACON_IDLE_RATE = 1;                  // a smart robot's beacon: blinks a second while it hasn't seen you...
+const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's calling you in
 
 // THE ROBOT TYPES. The numbers are the whole difference between them; the
 // state machine below is shared. Each type changes how you fight it:
 //   walker  the all-rounder
-//   scout   twice as fast, dies to one hit, and doesn't stop at range: it
+//   scout   twice as fast, dies to two hits, and doesn't stop at range: it
 //           rushes in close, firing quick weak shots
 //   heavy   slow and armoured (6 hits), stands off at range and fires rockets
 //           you can see coming and sidestep (explosions.js). Hits from behind
 //           count double: flank it.
 //   turret  never moves. Sleeps until a tripwire wakes it (security.js), then
-//           turns slowly on the spot looking for you, with a long reach.
+//           turns slowly on the spot looking for you, with a long reach. When
+//           it fires, it fires a VOLLEY: five quick rounds, each a fresh chance
+//           to hit. Don't get caught in its line of fire.
+//
+// SMART robots (smart: true in map.js's ENEMIES) are any walking type with a
+// better brain, marked by a blinking beacon and chevrons on the hull. Same
+// health, same gun; on top of the usual state machine they:
+//   - STRAFE: sidestep across your aim while charging, so a careful single
+//     shot can miss (scouts also weave from side to side as they rush you);
+//   - CALL FOR HELP: seeing you raises their zone's alarm, exactly like a
+//     camera would: every robot in the zone hears, and drone hives open.
+//     Kill the smart one first. Turrets are never smart.
 // speed      cells per second (the player does 3)
 // health     hits to destroy
 // aimRange   how close it gets before it stops and aims
@@ -28,11 +43,14 @@ const SHOT_TURN_SPEED = 12;                  // radians per second a shot robot 
 // damage, hitNear, hitFar   for 'gun' weapons: damage per hit, and the chance
 //            to hit at 1 cell, falling in a straight line to hitFar at aimRange
 // backHits   hits taken per shot that lands from behind
+// strafe     smart ones sidestep across your aim while charging
+// weave      smart ones also zig-zag at you as they rush in
+// volley, volleyGap   rounds per charge, and seconds between them (the turret's rapid fire)
 const ROBOT_TYPES = {
-  walker: { speed: 1.5, health: 3, aimRange: 3,   charge: 1.0, weapon: 'gun',    damage: 15, hitNear: 0.8,  hitFar: 0.3,  backHits: 1, mobile: true },
-  scout:  { speed: 3.0, health: 1, aimRange: 1.6, charge: 0.5, weapon: 'gun',    damage: 8,  hitNear: 0.7,  hitFar: 0.45, backHits: 1, mobile: true },
-  heavy:  { speed: 0.8, health: 6, aimRange: 6,   charge: 1.8, weapon: 'rocket', damage: 0,  hitNear: 0,    hitFar: 0,    backHits: 2, mobile: true },
-  turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 12, hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false },
+  walker: { speed: 1.5, health: 4, aimRange: 3,   charge: 1.0, weapon: 'gun',    damage: 15, hitNear: 0.8,  hitFar: 0.3,  backHits: 1, mobile: true,  strafe: true,  weave: false, volley: 1, volleyGap: 0 },
+  scout:  { speed: 3.0, health: 2, aimRange: 1.6, charge: 0.5, weapon: 'gun',    damage: 8,  hitNear: 0.7,  hitFar: 0.45, backHits: 1, mobile: true,  strafe: true,  weave: true,  volley: 1, volleyGap: 0 },
+  heavy:  { speed: 0.8, health: 6, aimRange: 6,   charge: 1.8, weapon: 'rocket', damage: 0,  hitNear: 0,    hitFar: 0,    backHits: 2, mobile: true,  strafe: false, weave: false, volley: 1, volleyGap: 0 },
+  turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 6,  hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false, strafe: false, weave: false, volley: 5, volleyGap: 0.12 },
 };
 
 // The live robots, built once from the starting positions in map.js:
@@ -48,6 +66,12 @@ const ROBOT_TYPES = {
 //   hurtTime, firedTime    seconds left of its white hit flash / muzzle flash
 //   path                   the cells it's following this frame (pathfinding.js), or null
 //   turning                true while it's spinning round to face whoever shot it
+//   smart                  the better brain (see above)
+//   strafeDir, strafeTimer which way it's sidestepping (+1 / -1), and for how much longer
+//   volleyLeft, volleyTimer rounds of the current volley still to fire, and when the next goes
+ENEMIES.forEach((e, n) => {
+  if (e.smart && e.type === 'turret') throw new Error(`ENEMIES[${n}] is a smart turret: turrets are always dumb.`);
+});
 const enemies = ENEMIES.map((start) => ({
   type: start.type,
   x: start.x,
@@ -64,6 +88,11 @@ const enemies = ENEMIES.map((start) => ({
   firedTime: 0,
   path: null,
   turning: false,
+  smart: start.smart === true,
+  strafeDir: Math.random() < 0.5 ? -1 : 1,
+  strafeTimer: 0,
+  volleyLeft: 0,
+  volleyTimer: 0,
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -177,13 +206,74 @@ function wakeTurret(enemy) {
 }
 
 // Aiming: face the player, charge up, then fire. Shared by every type.
+// A finished charge starts a VOLLEY: `volley` rounds, `volleyGap` apart
+// (one round, for everything but the turret). updateVolley fires them.
 function aimAndFire(enemy, dt) {
   enemy.angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  if (enemy.volleyLeft > 0) return; // still firing the last one
   enemy.charge += dt;
   if (enemy.charge >= ROBOT_TYPES[enemy.type].charge) {
     enemy.charge = 0;
-    robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
+    enemy.volleyLeft = ROBOT_TYPES[enemy.type].volley;
+    enemy.volleyTimer = 0; // the first round goes this frame
   }
+}
+
+// The rounds of a volley, one each time the gap runs out. Each is its own
+// shot, with its own chance to hit, as long as the robot can still see you:
+// duck out of sight mid-volley and the rest go wide.
+function updateVolley(enemy, dt) {
+  if (enemy.volleyLeft === 0) return;
+  enemy.volleyTimer -= dt;
+  if (enemy.volleyTimer > 0) return;
+  enemy.volleyLeft -= 1;
+  enemy.volleyTimer = ROBOT_TYPES[enemy.type].volleyGap;
+  if (canSee(enemy)) robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
+  else enemy.firedTime = ROBOT_FIRE_FLASH / 2; // still fires, at where you were
+}
+
+// SMART: sidestep across your line of fire while charging. It goes one way
+// for a random while (STRAFE_MIN to STRAFE_MAX seconds), then the other, and
+// turns back early if it bumps into something. "Across" is at right angles
+// to the line between you: if that line's direction is (cos a, sin a), the
+// sideways direction is (-sin a, cos a). Returns whether it moved.
+function strafeStep(enemy, dt) {
+  enemy.strafeTimer -= dt;
+  if (enemy.strafeTimer <= 0) {
+    enemy.strafeDir = -enemy.strafeDir;
+    enemy.strafeTimer = STRAFE_MIN + Math.random() * (STRAFE_MAX - STRAFE_MIN);
+  }
+  const a = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const step = ROBOT_TYPES[enemy.type].speed * STRAFE_SPEED * dt * enemy.strafeDir;
+  const nx = enemy.x - Math.sin(a) * step;
+  const ny = enemy.y + Math.cos(a) * step;
+  if (enemyBlocked(enemy, nx, ny)) {
+    enemy.strafeDir = -enemy.strafeDir;
+    return false;
+  }
+  enemy.x = nx;
+  enemy.y = ny;
+  return true;
+}
+
+// SMART scouts: rush at you zig-zagging, half towards you and half sideways
+// (the sideways half flips with strafeDir, on the same timer as strafing).
+function weaveStep(enemy, dt) {
+  enemy.strafeTimer -= dt;
+  if (enemy.strafeTimer <= 0) {
+    enemy.strafeDir = -enemy.strafeDir;
+    enemy.strafeTimer = (STRAFE_MIN + Math.random() * (STRAFE_MAX - STRAFE_MIN)) / 2; // twitchier
+  }
+  const a = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const mx = Math.cos(a) - Math.sin(a) * enemy.strafeDir;
+  const my = Math.sin(a) + Math.cos(a) * enemy.strafeDir;
+  return stepTowards(enemy, enemy.x + mx, enemy.y + my, dt);
+}
+
+// SMART: seeing you raises the alarm in its zone, like a camera.
+function callForHelp(enemy) {
+  const zone = ZONES.find((z) => inZone(z, enemy.x, enemy.y));
+  if (zone) raiseAlarm(zone.id, 'camera'); // security.js
 }
 
 // THE WALKING ROBOTS' STATE MACHINE (walker, scout, heavy).
@@ -194,7 +284,9 @@ function aimAndFire(enemy, dt) {
 //          were last seen, round corners if need be, then go idle
 function updateWalker(enemy, dt) {
   const type = ROBOT_TYPES[enemy.type];
-  if (canSee(enemy)) {
+  const sees = canSee(enemy);
+  if (sees) {
+    if (enemy.smart) callForHelp(enemy);
     enemy.lastSeenX = player.x;
     enemy.lastSeenY = player.y;
     const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
@@ -205,9 +297,14 @@ function updateWalker(enemy, dt) {
 
   if (enemy.state === 'aim') {
     aimAndFire(enemy, dt);
+    if (enemy.smart && type.strafe) enemy.moving = strafeStep(enemy, dt);
   } else if (enemy.state === 'chase') {
-    // No route (a door shut between you)? It waits, still watching.
-    enemy.moving = moveAlongPath(enemy, player.x, player.y, dt);
+    if (enemy.smart && type.weave && sees) {
+      enemy.moving = weaveStep(enemy, dt);
+    } else {
+      // No route (a door shut between you)? It waits, still watching.
+      enemy.moving = moveAlongPath(enemy, player.x, player.y, dt);
+    }
   } else if (enemy.state === 'search') {
     const arrived = Math.hypot(enemy.lastSeenX - enemy.x, enemy.lastSeenY - enemy.y) < 0.2;
     enemy.moving = !arrived && moveAlongPath(enemy, enemy.lastSeenX, enemy.lastSeenY, dt);
@@ -237,6 +334,8 @@ function updateEnemy(enemy, dt) {
   enemy.moving = false;
   if (enemy.state === 'dead') return;
 
+  updateVolley(enemy, dt); // a volley under way keeps firing whatever else happens
+
   // Just been shot: spin round to face you first, then carry on as normal.
   if (enemy.turning) {
     if (turnStep(enemy, dt)) enemy.turning = false;
@@ -261,9 +360,16 @@ function updateEnemies(dt) {
 // Compare the direction from the robot to the viewer with the way the robot
 // is facing: viewer straight ahead of it sees its front, straight behind sees
 // its back, and in between sees a side. The circle is cut into four 90° slices.
+// A smart robot's beacon: a slow blink while it's unaware of you, fast once
+// it's after you. Its position offsets the timing, so they don't blink in step.
+function beaconLit(enemy) {
+  const rate = enemy.state === 'idle' ? BEACON_IDLE_RATE : BEACON_ALERT_RATE;
+  return (animTime * rate + enemy.x * 0.37) % 1 < 0.5;
+}
+
 function enemyTexture(enemy, viewer) {
   if (enemy.state === 'dead') return WRECK_TEXTURE; // a heap looks the same from every side
-  const frames = ROBOT_FRAMES[enemy.type];
+  const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off'] : ROBOT_FRAMES[enemy.type];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.
     return enemy.firedTime > 0 ? frames.front.fire : frames.front.aim;

@@ -108,6 +108,7 @@ function frame(now) {
     updateSteam(dt);    // before security and robots, so they see this frame's plumes
     updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
     updateEnemies(dt);
+    updateDrones(dt);
   }
   updateCombat(dt);
   updateWeapons(dt);

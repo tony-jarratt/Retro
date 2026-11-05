@@ -78,6 +78,7 @@ function zoneAlarmedAt(x, y) {
 function raiseAlarm(zoneId, cause) {
   if (!(alarms[zoneId] > 0)) showSecurityMessage(cause === 'tripwire' ? 'TURRETS ONLINE' : 'ALARM');
   alarms[zoneId] = ALARM_TIME;
+  droneAlarm(zoneId); // drones.js: waiting packs wake, hives release
   const zone = zoneById(zoneId);
   for (const e of enemies) {
     if (!inZone(zone, e.x, e.y)) continue;

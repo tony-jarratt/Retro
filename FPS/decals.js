@@ -101,6 +101,23 @@ function makeVent() {
   });
 }
 
+// A drone hive set into a wall (drones.js): a steel panel of hexagonal
+// cells. `loaded`, each cell holds a sleeping drone, its red eye showing;
+// once the hive has released them, the cells are dark and empty.
+function makeHive(loaded) {
+  return makeTexture([60, 62, 58], (x, y) => {
+    if (x < 6 || x >= 58 || y < 8 || y >= 56) return null;
+    if (x < 8 || x >= 56 || y < 10 || y >= 54) return brighten(DARK_STEEL, 1.2); // frame
+    // A honeycomb: rows of cells 12 wide, every other row shifted half a cell.
+    const row = Math.floor((y - 10) / 11);
+    const cx = (x - 8 + (row % 2) * 6) % 12 - 6, cy = (y - 10) % 11 - 5.5;
+    const d = Math.max(Math.abs(cx) * 0.87 + Math.abs(cy) * 0.5, Math.abs(cy)); // a hexagon-ish distance
+    if (d > 4.6) return brighten([60, 62, 58], 0.9 + 0.2 * noise(x, y, 119));  // the walls between cells
+    if (loaded && Math.hypot(cx, cy) < 1.3) return [230, 50, 35];              // a sleeping drone's eye
+    return [12, 12, 14];                                                       // inside a cell
+  });
+}
+
 // A round floor drain: a steel rim and slotted cover.
 function makeDrain() {
   return makeTexture(DARK_STEEL, (x, y) => {
@@ -236,6 +253,8 @@ const DECAL_TYPES = {
   scorch:     { surfaces: ['floor', 'ceiling'], frames: [0, 1].map(makeScorch) },
   drain:      { surfaces: ['floor'],            frames: [makeDrain()] },
   vent:       { surfaces: ['floor'],            frames: [makeVent()] },
+  hive:       { surfaces: ['wall'],             frames: [makeHive(true)], text: true },
+  hiveEmpty:  { surfaces: ['wall'],             frames: [makeHive(false)], text: true },
   footprint:  { surfaces: ['floor'],            frames: [makeFootprint()] },
   stain:      { surfaces: ['ceiling'],          frames: [0, 1].map(makeCeilingStain) },
   wallScorch: { surfaces: ['wall'],             frames: [0, 1].map(makeWallScorch) },
@@ -359,6 +378,7 @@ function placeMapDecals() {
 scatterDecals();
 placeMapDecals();
 for (const v of VENTS) placeDecal('floor', v.x, v.y, null, 'vent', 0, 0); // every steam vent's grille (steam.js)
+for (const h of HIVES) placeDecal('wall', h.x, h.y, h.face, 'hive', 0);   // every drone hive (drones.js)
 
 // 3. EXPLOSIONS (explosions.js calls this). The floor and ceiling of the cell
 // the blast is in get scorched, and so does any plain wall face close enough.

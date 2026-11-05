@@ -141,9 +141,12 @@ const CEILING_LIGHTS = [
 // Robots (enemies.js): type (a key of ROBOT_TYPES: walker, scout, heavy,
 // turret), where each starts, and which way it faces.
 // angle uses the player's convention: 0 = east, PI/2 = south, -PI/2 = north.
+// smart: true gives a walking robot the better brain (strafing, calling for
+// help) and its beacon and chevrons. (This level is a test sandbox, so the
+// smart ones are just a spread for trying them out.)
 const ENEMIES = [
   // Fuel depot
-  { type: 'walker', x: 16.5, y: 2.5,  angle: Math.PI },      // watching the door in from the start bay
+  { type: 'walker', x: 16.5, y: 2.5,  angle: Math.PI, smart: true }, // watching the door in from the start bay
   { type: 'scout',  x: 14.5, y: 6.5,  angle: -Math.PI / 2 },
   // Pipe works
   { type: 'walker', x: 22.5, y: 2.5,  angle: Math.PI },      // watching the door in from the depot
@@ -151,15 +154,15 @@ const ENEMIES = [
   { type: 'turret', x: 28.5, y: 1.5,  angle: Math.PI / 2 },  // asleep until the tripwire
   // Server room
   { type: 'walker', x: 10.5, y: 10.5, angle: Math.PI },
-  { type: 'scout',  x: 4.5,  y: 14.5, angle: -Math.PI / 2 },
+  { type: 'scout',  x: 4.5,  y: 14.5, angle: -Math.PI / 2, smart: true },
   // Workshop
-  { type: 'heavy',  x: 28.5, y: 12.5, angle: Math.PI },
+  { type: 'heavy',  x: 28.5, y: 12.5, angle: Math.PI, smart: true },
   // Hangar hall
   { type: 'walker', x: 12.5, y: 19.5, angle: -Math.PI / 2 },
   { type: 'scout',  x: 8.5,  y: 21.5, angle: -Math.PI / 2 },
-  { type: 'walker', x: 18.5, y: 18.5, angle: Math.PI },
+  { type: 'walker', x: 18.5, y: 18.5, angle: Math.PI, smart: true },
   { type: 'heavy',  x: 27.5, y: 20.5, angle: Math.PI },
-  { type: 'scout',  x: 29.5, y: 17.5, angle: Math.PI / 2 },
+  { type: 'scout',  x: 29.5, y: 17.5, angle: Math.PI / 2, smart: true },
   { type: 'turret', x: 10.5, y: 21.5, angle: -Math.PI / 2 }, // asleep until the corridor tripwire
   { type: 'turret', x: 20.5, y: 18.5, angle: Math.PI },
 ];
@@ -231,6 +234,18 @@ const VENTS = [
   { x: 22, y: 11, delay: 1.0 },                               // workshop: blinds the camera by the door
   { x: 18, y: 19, delay: 2.5 },                               // hangar, in front of the turret
   { x: 9,  y: 21, delay: 0.2 },                               // hangar, by the scout and the other turret
+];
+
+// DRONES (drones.js). Packs hover in place until one sees you or their zone's
+// alarm goes off. Hives are wall panels (cell + face, as for decals) full of
+// drones, released when their zone's alarm goes off.
+const DRONE_PACKS = [
+  { x: 6.5,  y: 12.5, count: 6 },   // server room, among the computer banks
+  { x: 28.5, y: 22.0, count: 5 },   // hangar, far corner
+];
+const HIVES = [
+  { x: 31, y: 13, face: 'W', zone: 'workshop', count: 6 }, // the workshop camera sets this off
+  { x: 20, y: 23, face: 'N', zone: 'hangar',   count: 6 }, // the hangar cameras set this off
 ];
 
 // Hand-placed DECALS (decals.js): the signs and scenes that tell a story. The

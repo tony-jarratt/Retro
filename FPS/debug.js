@@ -134,6 +134,17 @@ function drawDebug(ctx, player, hits) {
       (enemy.x + Math.cos(enemy.angle) * 0.7) * s, (enemy.y + Math.sin(enemy.angle) * 0.7) * s);
   }
 
+  // Drones: small dots, dim while waiting; hives as squares on their wall.
+  for (const d of drones) {
+    if (d.state === 'dead') continue;
+    ctx.fillStyle = d.state === 'swarm' ? '#f4f' : '#848';
+    ctx.fillRect((d.x - 0.1) * s, (d.y - 0.1) * s, 0.2 * s, 0.2 * s);
+  }
+  for (const h of hives) {
+    ctx.strokeStyle = h.state === 'empty' ? '#555' : '#f4f';
+    ctx.strokeRect((h.x + 0.2) * s, (h.y + 0.2) * s, 0.6 * s, 0.6 * s);
+  }
+
   // The player: a dot showing the collision box size.
   ctx.fillStyle = '#4cf';
   ctx.beginPath();

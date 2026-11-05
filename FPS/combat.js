@@ -108,6 +108,7 @@ function shotHits(target) {
     damageEnemy(target.enemy, hits);
   }
   if (target.camera) shootCamera(target.camera); // security.js
+  if (target.drone) destroyDrone(target.drone);   // drones.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);
@@ -150,7 +151,7 @@ function robotHitChance(type, dist) {
 // fires: the window takes every shot, hit or miss, until it gives way.
 function robotFires(enemy, dist) {
   const type = ROBOT_TYPES[enemy.type];
-  enemy.firedTime = ROBOT_FIRE_FLASH;
+  enemy.firedTime = type.volley > 1 ? ROBOT_FIRE_FLASH / 2 : ROBOT_FIRE_FLASH; // a volley flickers
   if (type.weapon === 'rocket') { launchRocket(enemy); return; } // explosions.js
   const glass = glassInTheWay(enemy.x, enemy.y, player.x, player.y); // panels.js
   if (glass) hitGlass(glass);
@@ -187,7 +188,10 @@ function updateCombat(dt) {
   gun.flash = Math.max(0, gun.flash - dt);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
   game.pickupFlash = Math.max(0, game.pickupFlash - dt);
-  if (game.state === 'playing' && enemies.every((e) => e.state === 'dead')) game.state = 'clear';
+  // Cleared: every robot down, and every drone that's out (hives never set off don't count).
+  if (game.state === 'playing' && enemies.every((e) => e.state === 'dead') && drones.every((d) => d.state === 'dead')) {
+    game.state = 'clear';
+  }
   if (game.state !== 'playing') game.endTime += dt;
 }
 
