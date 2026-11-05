@@ -220,14 +220,15 @@ const pixelDepth = new Float32Array(SCREEN_W * SCREEN_H);
 function renderView(image, hits, player) {
   const pixels = image.data; // flat RGBA bytes: 4 per pixel, row after row
 
-  renderFloorCeiling(pixels, player);
+  const placed = placeSprites(player); // sprites.js: needed by the puddles as well as for drawing
+  renderFloorCeiling(pixels, player, hits, placed);
 
   for (let col = 0; col < SCREEN_W; col++) drawWallStrip(pixels, col, hits[col], player);
 
   // Each column's wall distance is the depth buffer that lets walls hide sprites.
   const depth = hits.map((hit) => hit.perpDist);
   pixelDepth.fill(Infinity);
-  renderSprites(pixels, depth, player);
+  renderSprites(pixels, depth, placed);
   renderPanes(pixels, hits, player);
 }
 
@@ -253,12 +254,7 @@ function drawWallStrip(pixels, col, hit, player) {
   const shade = hit.side === 1 ? SIDE_SHADE : 1;
   const fog = fogAmount(hit.perpDist); // the whole strip is at one distance
 
-  // The light on this strip of wall. The light map lives in the open space
-  // in front of walls, so look it up a little way out from the face, on the
-  // viewer's side. (The light map is flat, so one lookup does the whole strip.)
-  const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
-  const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
-  const light = lightAt(lx, ly).map((v) => v * shade);
+  const light = wallLight(hit, player).map((v) => v * shade);
   const decal = wallDecalAt(hit); // rust, scorch, a sign... or null (decals.js)
 
   for (let row = top; row < bottom; row++) {
@@ -276,6 +272,15 @@ function drawWallStrip(pixels, col, hit, player) {
     }
     if (decal) blendDecal(pixels, col, row, decal, texX, texY, light, fog); // over the wall, lit the same
   }
+}
+
+// The light on a strip of wall. The light map lives in the open space in
+// front of walls, so look it up a little way out from the face, on the
+// viewer's side. (The light map is flat, so one lookup does the whole strip.)
+function wallLight(hit, player) {
+  const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
+  const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
+  return lightAt(lx, ly);
 }
 
 // GLASS AND GRATES. Each column's panels are drawn FARTHEST FIRST (the
@@ -302,7 +307,7 @@ function renderPanes(pixels, hits, player) {
 //
 // This also fills in the pixels that walls will cover. That's wasted work,
 // but it keeps the two passes independent.
-function renderFloorCeiling(pixels, player) {
+function renderFloorCeiling(pixels, player, hits, placed) {
   const dirX = Math.cos(player.angle);
   const dirY = Math.sin(player.angle);
   // The vector from the centre of the screen to its right edge, for a screen
@@ -311,6 +316,7 @@ function renderFloorCeiling(pixels, player) {
   const planeX = -dirY * halfWidth;
   const planeY = dirX * halfWidth;
   const horizon = SCREEN_H / 2;
+  const columnSprites = spritesByColumn(placed); // for the puddles (reflections.js)
 
   for (let row = horizon; row < SCREEN_H; row++) {
     const d = 0.5 * PROJ_DIST / (row + 0.5 - horizon);
@@ -337,7 +343,15 @@ function renderFloorCeiling(pixels, player) {
       // A puddle, oil, scorch... laid over the floor in this cell (decals.js).
       const cellX = Math.floor(floorX), cellY = Math.floor(floorY);
       const floorDecal = floorDecalAt(cellX, cellY);
-      if (floorDecal) blendDecal(pixels, col, row, floorDecal, texX, texY, light, fog);
+      if (floorDecal) {
+        blendDecal(pixels, col, row, floorDecal, texX, texY, light, fog);
+        // Standing water mirrors the room (reflections.js). Only worth doing
+        // if this floor point is in front of the wall: beyond it, the wall
+        // will be drawn over this pixel anyway.
+        if (d < hits[col].perpDist && isWater(floorDecal, texX, texY)) {
+          reflectInPuddle(pixels, col, row, d, floorX, floorY, screenX, hits[col], columnSprites[col], player);
+        }
+      }
 
       // Only cells with a working strip light show one lit (red in an alarm);
       // the rest have a dark fixture.

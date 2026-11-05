@@ -88,25 +88,35 @@ function placeOnScreen(thing, viewer) {
   return { forward, size, left, top };
 }
 
-// depth[col] is the perpendicular distance to the wall drawn in that column.
-function renderSprites(pixels, depth, player) {
+// Every sprite on screen this frame, FARTHEST FIRST, with where it lands and
+// how it's lit. Worked out once per frame and used twice: to draw the
+// sprites, and to show them reflected in puddles (reflections.js).
+function placeSprites(player) {
   const placed = [];
   for (const thing of spriteThings(player)) {
     const spot = placeOnScreen(thing, player);
-    if (spot) placed.push({ thing, ...spot });
+    if (!spot) continue;
+    const g = thing.shade * thing.glowShade;
+    placed.push({
+      thing, ...spot,
+      fog: fogAmount(spot.forward), // a billboard is flat, so one distance for all of it
+      // Likewise one light for all of it: the light map at the spot it stands on.
+      light: lightAt(thing.x, thing.y).map((v) => v * thing.shade),
+      glowLight: [g, g, g],
+    });
   }
   // Painter's algorithm: draw the farthest first so nearer ones paint over it.
   placed.sort((a, b) => b.forward - a.forward);
+  return placed;
+}
+
+// depth[col] is the perpendicular distance to the wall drawn in that column.
+function renderSprites(pixels, depth, placed) {
   for (const p of placed) drawSprite(pixels, depth, p);
 }
 
-function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
+function drawSprite(pixels, depth, { thing, forward, size, left, top, fog, light, glowLight }) {
   const tex = thing.tex;
-  const fog = fogAmount(forward); // a billboard is flat, so one distance for all of it
-  // Likewise one light for all of it: the light map at the spot it stands on.
-  const light = lightAt(thing.x, thing.y).map((v) => v * thing.shade);
-  const g = thing.shade * thing.glowShade;
-  const glowLight = [g, g, g];
 
   // As for walls: the columns and rows whose pixel centres fall on the sprite.
   const colStart = Math.max(0, Math.ceil(left - 0.5));

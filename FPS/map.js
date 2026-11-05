@@ -236,6 +236,7 @@ const DECALS = [
   { surface: 'wall', type: 'maxLoad', x: 8, y: 2, face: 'W' },
   { surface: 'wall', type: 'insignia', x: 4, y: 0, face: 'S' },
   ...footprints([[2, 4], [3, 4], [4, 4], [5, 4], [6, 4]], 1),
+  { surface: 'floor', type: 'puddle', x: 6, y: 2 }, // catching the signs and the strip light as you start
   // Fuel depot: a warning, and the pillar where it was ignored once.
   { surface: 'wall', type: 'noFlame', x: 13, y: 0, face: 'S' },
   { surface: 'wall', type: 'wallScorch', x: 13, y: 3, face: 'W' },

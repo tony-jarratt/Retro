@@ -41,8 +41,12 @@ function blobT(x, y, cx, cy, base, seed) {
 // Standing water: dark (it mirrors the dark ceiling), a lighter wet rim,
 // a few glints, and a damp halo on the floor around it.
 function makePuddle(v) {
-  return makeTexture([30, 36, 44], (x, y) => {
-    const t = blobT(x, y, 32 + v * 2, 31 - v, 21 + v * 2, v * 1.7 + 0.4);
+  const shape = (x, y) => blobT(x, y, 32 + v * 2, 31 - v, 21 + v * 2, v * 1.7 + 0.4);
+  // Which texels are open water, for the reflections (reflections.js).
+  const water = new Uint8Array(TEX_SIZE * TEX_SIZE);
+  for (let y = 0; y < TEX_SIZE; y++) for (let x = 0; x < TEX_SIZE; x++) water[y * TEX_SIZE + x] = shape(x, y) < 0.9 ? 1 : 0;
+  const tex = makeTexture([30, 36, 44], (x, y) => {
+    const t = shape(x, y);
     if (t < 0.9) {
       if (noise(x, y, 80 + v) < 0.025) return seeThrough([150, 170, 185], 220); // glint
       return seeThrough([34, 42, 54], 220);
@@ -51,6 +55,8 @@ function makePuddle(v) {
     if (t < 1.25) return seeThrough([0, 0, 0], 70 * (1.25 - t) / 0.25); // damp floor round it
     return null;
   });
+  tex.water = water;
+  return tex;
 }
 
 // An oil slick: near-black, with rings of rainbow sheen ("thin-film
@@ -387,7 +393,7 @@ function wallDecalAt(hit) {
 // applied to find which of its texels lands there. A quarter turn clockwise
 // sends texel (x, y) to (63 - y, x), so turning the lookup the other way
 // round, (x, y) reads from (y, 63 - x).
-function blendDecal(pixels, x, y, decal, texX, texY, light, fog) {
+function decalTexelIndex(decal, texX, texY) {
   let dx = decal.mirror ? TEX_SIZE - 1 - texX : texX;
   let dy = texY;
   for (let r = 0; r < decal.rot; r++) {
@@ -395,5 +401,16 @@ function blendDecal(pixels, x, y, decal, texX, texY, light, fog) {
     dx = dy;
     dy = TEX_SIZE - 1 - t;
   }
-  blendTexel(pixels, x, y, decal.tex, dx, dy, light, fog);
+  return dy * TEX_SIZE + dx;
+}
+
+function blendDecal(pixels, x, y, decal, texX, texY, light, fog) {
+  const i = decalTexelIndex(decal, texX, texY);
+  blendTexel(pixels, x, y, decal.tex, i % TEX_SIZE, Math.floor(i / TEX_SIZE), light, fog);
+}
+
+// Is this texel of a decal open water, which reflects? Only puddles have a
+// `water` mask (makePuddle); 1 marks the water itself, not its rim.
+function isWater(decal, texX, texY) {
+  return decal.tex.water !== undefined && decal.tex.water[decalTexelIndex(decal, texX, texY)] === 1;
 }
