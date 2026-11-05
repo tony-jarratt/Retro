@@ -137,6 +137,9 @@ function frame(now) {
       updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
       updateEnemies(dt);
       updateDrones(dt);
+      updateLarvae(dt);   // larvae.js
+      updateAcid(dt);     // acid.js: globs in flight, pools burning
+      updateCreatures(dt); // creatures.js: once the lab's loose, they always know where you are
       updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
     }
     updateCombat(dt);

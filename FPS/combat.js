@@ -60,7 +60,9 @@ function shotTarget(angle) {
     const spot = placeOnScreen(thing, viewer);
     if (!spot || spot.forward > stopDist) continue; // behind us, or behind the wall or window
     const texX = Math.floor((SCREEN_W / 2 - spot.left) / spot.size * TEX_SIZE);
-    const texY = Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
+    // Things below eye height (larvae) are tested at their own body row
+    // instead: the gun aims down at them, as it can't aim up or down itself.
+    const texY = thing.aimRow !== null ? thing.aimRow : Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
     if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // the shot misses its square
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
     if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward };
@@ -121,6 +123,7 @@ function shotHits(target) {
   }
   if (target.camera) shootCamera(target.camera); // security.js
   if (target.drone) destroyDrone(target.drone);   // drones.js
+  if (target.larva) destroyLarva(target.larva);   // larvae.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);
@@ -133,6 +136,7 @@ function shotHits(target) {
 function damageEnemy(enemy, hits = 1, byPlayer = true) {
   enemy.health -= hits;
   enemy.hurtTime = HURT_FLASH_TIME;
+  if (enemy.state === 'dormant' && ROBOT_TYPES[enemy.type].creature) wakeCreature(enemy); // shot in its tank (creatures.js)
   if (enemy.health <= 0) {
     enemy.state = 'dead';
     enemy.moving = false;
@@ -165,6 +169,7 @@ function robotFires(enemy, dist) {
   const type = ROBOT_TYPES[enemy.type];
   enemy.firedTime = type.volley > 1 ? ROBOT_FIRE_FLASH / 2 : ROBOT_FIRE_FLASH; // a volley flickers
   if (type.weapon === 'rocket') { launchRocket(enemy); sfxRocketLaunch(enemy); return; } // explosions.js, sound.js
+  if (type.weapon === 'lob') { lobAcid(enemy, player.x, player.y); return; }              // a spitter (acid.js)
   sfxRobotShot(enemy);
   const glass = glassInTheWay(enemy.x, enemy.y, player.x, player.y); // panels.js
   if (glass) hitGlass(glass);

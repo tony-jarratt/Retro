@@ -20,6 +20,7 @@ const CORE_CELL = 8;
 const LIFT_CELL = 10;
 const LAB_TILE_CELL = 11;
 const LAB_CABINET_CELL = 12;
+const TANK_GLASS_CELL = 13;
 
 const LEGEND = {
   '.': 0,         // floor
@@ -36,6 +37,7 @@ const LEGEND = {
   // The lab's walls (lower case: the lab's own pieces).
   't': LAB_TILE_CELL,    // stained white tiles
   'b': LAB_CABINET_CELL, // steel bench cabinets under tiles, with a biohazard placard
+  'g': TANK_GLASS_CELL,  // specimen tank glass: like a window, but once broken it's gone, and the tank is open (panels.js)
 };
 
 // Every level, in the order you play them. Each levels/*.js file pushes one.

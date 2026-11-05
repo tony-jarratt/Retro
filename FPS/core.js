@@ -107,6 +107,7 @@ function destroyCore() {
     alarms[z.id] = Infinity;
   }
   showSecurityMessage(OBJECTIVE_LOOK.done);
+  if (OBJECTIVE === 'chamber') labComesLoose(); // creatures.js: every tank breaks, every pod bursts
 }
 
 // The lift's hint while you stand at it with the core still running.

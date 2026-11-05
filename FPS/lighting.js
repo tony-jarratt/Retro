@@ -219,6 +219,7 @@ function updateLighting() {
     addLight(lightGrid, player.x, player.y, GUN_FLASH_LIGHT, PLAYER_FLASH_RADIUS, gun.flash / GUN_FLASH_TIME);
   }
   for (const e of enemies) {
+    if (ROBOT_TYPES[e.type].creature) continue; // a spitter has no muzzle flash: its glob carries its own light (acid.js)
     if (e.firedTime > 0) addLight(lightGrid, e.x, e.y, ROBOT_FLASH.colour, ROBOT_FLASH.radius, e.firedTime / ROBOT_FIRE_FLASH);
   }
   // Explosions: a big orange light that dies away with the fireball.
@@ -233,6 +234,7 @@ function updateLighting() {
   }
   addSecurityLights(lightGrid); // cameras' red spots (security.js)
   addCoreLights(lightGrid);     // the core's pulsing heart (core.js)
+  addAcidLights(lightGrid);     // globs in flight and pools of acid (acid.js)
 
   dilateIntoWalls(lightGrid);
 }

@@ -13,6 +13,11 @@ const PICKUP_TYPES = {
     texture: AMMO_BOX_TEXTURE,
     collect: () => { player.ammo += 8; return true; },
   },
+  // The lab's big supply crate: its creatures drop no clips, so its ammo comes in bulk.
+  ammocrate: {
+    texture: AMMO_CRATE_TEXTURE,
+    collect: () => { player.ammo += 20; return true; },
+  },
   clip: {
     texture: CLIP_TEXTURE,
     collect: () => { player.ammo += 4; return true; },

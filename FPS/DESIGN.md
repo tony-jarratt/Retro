@@ -205,9 +205,9 @@ stencils) and its **objective**, the breeding chamber (`objective:
 'chamber'`: the K cells become a viewport packed with pulsing green eggs; it
 works exactly like the core underneath).
 
-**Stage 1 of the creatures is built** (`creatures.js`, art in
-`creature-art.js`): **hearing** and the **lurcher**. The lab has creatures
-only: no robots, cameras, tripwires or terminals (owner, 2026-11-05).
+**The lab's creatures are built** (behaviour in `creatures.js`, `acid.js`,
+`larvae.js`; art in `creature-art.js`). The lab has creatures only: no robots,
+cameras, tripwires or terminals (owner, 2026-11-05).
 
 - **Noise:** every round fired is a noise where you stand, carrying 4 cells
   (single), 6 (burst) or 9 (auto); explosions 12. A wall or closed door in
@@ -220,12 +220,29 @@ only: no robots, cameras, tripwires or terminals (owner, 2026-11-05).
   rears up for 0.6s (eyes flare, a rising screech), then lunges 1.4 cells
   in a straight line at where you were, then stands for 0.7s. Back off
   during the rear-up, or sidestep the lunge, and it misses.
-- **Creatures drop nothing** (so the lab has more ammo lying about), can't
-  open doors, and are never smart.
-
-Still to build: spitters and acid pools, larvae (they **bite** and come back,
-rather than exploding) and breeding pods, things in the tanks, gas vents, and
-the chamber's ending. The vents are still steam.
+- **Spitter:** frail (3 hits), keeps its distance (range 6) and charges for
+  1.3s (its throat sac swells and glows, a rising gurgle), then lobs acid at
+  where you're standing. A ring on the floor marks where it lands: move.
+  The splash does 15; the POOL burns the cell for 6s (5 every 0.4s), and
+  hurts creatures too (lure a lurcher through) and kills larvae. Its glands
+  are on its back: hits there count double. Get within 2.5 and it backs
+  off rather than fire, showing you its back. Acid eats through glass.
+- **Larvae:** the drones' role, on the floor. 1 hit, speed 2.4. Close in,
+  they LEAP and BITE (4), scuttle back for a second, and come again. Nests
+  lie still until they see you (light again) or hear a noise.
+  **Breeding pods** on the walls burst when a noise reaches them.
+- **Specimen tanks** (tank glass `g`): two hold a sleeping creature. Break
+  a pane (a stray shot, a blast, acid) and it's out; a broken pane is gone
+  and the tank is open.
+- **Gas vents:** the lab's vents blow green toxic gas: they burn like
+  steam, but you can see through gas, so it hides nobody.
+- **The lab comes loose:** burning the chamber breaks every tank, bursts
+  every pod, turns the lights red, and from then on every creature always
+  knows where you are.
+- **Creatures drop nothing** (owner: it makes sense for robots, not
+  creatures). The lab's ammo comes in big supply crates (`ammocrate`, +20),
+  and the automatic module lies in the larvae's nest. They can't open doors
+  and are never smart.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of
@@ -271,7 +288,7 @@ chamber). Still to build: a per-level enemy roster and ambience (sound).
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · M map · V visor (off by default) · C CRT · N sound · R restart ·
+fire (hold to spin up) · M map · V visor · C CRT · N sound · R restart ·
 Enter next level (after LEVEL COMPLETE) · P pause (shows these controls; the
 page itself has no help text) · with `?playtest`: L level chooser.
 

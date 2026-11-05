@@ -39,8 +39,13 @@ function hitsSolidSprite(x, y, r) {
 //   camera     the security camera this is, or null
 //   drone      the drone this is (drones.js), or null
 //   effect     true for an explosion, rocket or laser beam: you can see it, but shots pass through
+//   larva      the larva this is (larvae.js), or null
+//   lift       how far above its usual height it's drawn, in cells (a glob of
+//              acid in its arc, a larva mid-leap); negative is lower
+//   aimRow     the texture row a shot tests (combat.js), for things that sit
+//              below eye height (larvae, on the floor); null = eye height
 function spriteThings(viewer) {
-  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, drone: null, effect: false, ...extra });
+  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, drone: null, larva: null, effect: false, lift: 0, aimRow: null, ...extra });
   return [
     ...props.map((p) => thing(p.x, p.y, p.state === 'exploded' ? DRUM_WRECK_TEXTURE : SPRITE_TYPES[p.type].texture,
       { glowShade: spriteGlow(p), prop: p })),
@@ -53,6 +58,8 @@ function spriteThings(viewer) {
     ...securityThings(thing), // cameras and tripwire beams (security.js)
     ...steamThings(thing),    // plumes of steam (steam.js)
     ...droneThings(thing),    // the swarm (drones.js)
+    ...larvaThings(thing),    // the lab's swarm (larvae.js)
+    ...acidThings(thing),     // spitters' globs, and where they'll land (acid.js)
     ...rockets.map((r) => thing(r.x, r.y, ROCKET_TEXTURE, { effect: true })),
     ...glassBursts.map((g) => thing(g.x, g.y, glassBurstTexture(g), { effect: true })), // panels.js
     // Explosions come last: one drawn at the same spot as its drum's remains
@@ -87,7 +94,9 @@ function placeOnScreen(thing, viewer) {
   // to the right appears across * PROJ_DIST / forward pixels right of centre.
   const size = PROJ_DIST / forward;
   const left = SCREEN_W / 2 + across * PROJ_DIST / forward - size / 2;
-  const top = (SCREEN_H - size) / 2; // same vertical span as a wall at this distance
+  // Same vertical span as a wall at this distance, raised by its lift: one
+  // cell of height is `size` pixels here, as one cell across is.
+  const top = (SCREEN_H - size) / 2 - thing.lift * size;
   return { forward, size, left, top };
 }
 

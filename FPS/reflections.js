@@ -105,6 +105,7 @@ function reflectInPuddle(pixels, col, row, d, floorX, floorY, screenX, hit, spri
   // below the floor yet.
   for (const p of sprites) {
     if (p.forward <= d || p.forward >= farDist) continue;
+    if (p.thing.lift !== 0) continue; // off the floor (a glob, a leaping larva): not worth mirroring
     const hs = p.forward * k / PROJ_DIST - 0.5;
     if (hs < 0 || hs > 1) continue; // the ray passes under or over its reflection
     const texX = Math.min(TEX_SIZE - 1, Math.floor((col + 0.5 - p.left) / p.size * TEX_SIZE));

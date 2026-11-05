@@ -72,6 +72,7 @@ function showSecurityMessage(text) {
 
 // Is (x, y) inside a zone whose alarm is going? (The lights there turn red.)
 function zoneAlarmedAt(x, y) {
+  if (labLoose) return true; // creatures.js: the chamber's burning, and every light in the lab goes red
   return ZONES.some((z) => alarms[z.id] > 0 && inZone(z, x, y));
 }
 

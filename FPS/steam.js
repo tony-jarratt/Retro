@@ -39,7 +39,12 @@ function inPlume(vent, x, y, r) {
 
 // Is the straight line from (x1, y1) to (x2, y2) through a bursting plume?
 // segmentDistance (textures.js) is the closest the line comes to the vent.
+// In the lab the vents blow toxic GAS (textures.js draws it green): it burns
+// the same, but it's thin enough to see through, so it hides nobody.
+const VENT_GAS = THEME === 'lab';
+
 function steamBlocksSight(x1, y1, x2, y2) {
+  if (VENT_GAS) return false;
   return vents.some((v) => v.state === 'burst' && segmentDistance(v.x, v.y, x1, y1, x2, y2) < STEAM_RADIUS);
 }
 

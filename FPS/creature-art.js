@@ -215,6 +215,209 @@ function makeLurcherCorpse() {
   });
 }
 
+// THE SPITTER: lanky and stooped, on a long neck, with a huge throat sac of
+// acid under its jaw that glows through the skin, so you can pick it out
+// across a dark room. Aiming, the sac swells and brightens; firing, its
+// mouth gapes. On its back, two acid glands, glowing too: shots there count
+// double (backHits), so get round behind it.
+// Poses as a robot's: stand, walk1, walk2, and front aim and fire.
+const SPITTER_SKIN = [160, 150, 128];
+const SPITTER_DARK = [92, 84, 70];
+const ACID = [120, 235, 70];
+const ACID_HOT = [220, 255, 170];
+
+// The sac: an ellipse of glowing, mottled acid seen through the skin.
+function sacTexel(x, y, dx, cx, cy, rx, ry, hot) {
+  const e = inEllipse(dx, y, cx, cy, rx, ry);
+  if (e === null) return null;
+  if (e > 0.85) return skin(SPITTER_DARK, x, y, 1, 90); // the skin round its edge
+  const swirl = noise(x >> 1, y >> 1, 91);
+  return glowing(mix(hot ? ACID_HOT : ACID, [40, 90, 20], 0.5 * e + 0.25 * swirl));
+}
+
+function spitterFrontBackShape(view, pose) {
+  const front = view === 'front';
+  const aiming = pose === 'aim' || pose === 'fire';
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+
+    // Thin arms, hanging long, with small hooked claws.
+    for (const side of [-1, 1]) {
+      const sway = pose === 'walk1' ? side * 2 : pose === 'walk2' ? -side * 2 : 0;
+      const hand = [side * 13 + sway * 0.5, 50];
+      for (const k of [-1, 1]) {
+        const d = segmentDistance(dx, y, hand[0] + k * 1.5, hand[1] + 1, hand[0] + k * 2.3, hand[1] + 6);
+        if (d < 0.9) return brighten(CLAW, 1.1 - 0.3 * d);
+      }
+      for (const [a, b, w] of [[[side * 9, 27], [side * 14, 39], 2.2], [[side * 14, 39], hand, 2]]) {
+        const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
+        if (d < w) return skin(SPITTER_SKIN, x, y, 1.1 - 0.5 * d / w, 92);
+      }
+    }
+
+    // The head, high up on its neck: four small eyes, and a mouth that gapes to fire.
+    const head = inEllipse(dx, y, 0, 12, 4.5, 4);
+    if (head !== null) {
+      if (front) {
+        if (y === 11 && [-3.5, -1.5, 1.5, 3.5].some((ex) => Math.abs(dx - ex) < 0.8)) return glowing(aiming ? ACID_HOT : ACID);
+        if (pose === 'fire' && y >= 13 && y < 17 && Math.abs(dx) < 2.5) return glowing(ACID_HOT); // the spray leaving its mouth
+        if (y === 14 && Math.abs(dx) < 2) return MAW;
+      }
+      return skin(SPITTER_SKIN, x, y, 1.1 - 0.4 * head, 93);
+    }
+
+    // The throat sac. From behind you just see it bulging out either side.
+    const sac = aiming ? sacTexel(x, y, dx, 0, 21, 8, 6.5, true) : sacTexel(x, y, dx, 0, 20.5, 6, 5, false);
+    if (sac && (front || Math.abs(dx) > 4)) return sac;
+    if (Math.abs(dx) < 2 && y >= 15 && y < 27) return skin(SPITTER_SKIN, x, y, 0.9, 94); // the neck
+
+    // A narrow chest, tapering to a pinched waist.
+    if (y >= 26 && y < 45) {
+      const halfW = 9 - (y - 26) * 0.18;
+      if (Math.abs(dx) < halfW) {
+        if (!front) {
+          for (const gx of [-4, 4]) {                      // the acid glands: shoot them
+            const g = Math.hypot(dx - gx, y + 0.5 - 31);
+            if (g < 2.4) return glowing(mix(ACID, ACID_HOT, 1 - g / 2.4));
+            if (g < 3.3) return skin(SPITTER_DARK, x, y, 1, 95);
+          }
+          if (Math.abs(dx) < 1 && y % 3 < 2) return brighten(CLAW, 0.75); // spine
+        } else if (y < 40 && Math.abs(dx) > 1.5 && Math.abs(dx) < halfW - 1.5 && Math.floor(y - 28 - Math.abs(dx) * 0.4) % 4 === 0) {
+          return brighten(SPITTER_DARK, 0.95);                 // its ribs showing, curving down from the breastbone
+        }
+        return skin(SPITTER_SKIN, x, y, roundShade(dx / halfW), 96);
+      }
+    }
+
+    for (const side of [-1, 1]) {
+      const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 3 : 0;
+      for (const [a, b, w] of [[[side * 4, 44], [side * 8, 52 - lift], 2.6], [[side * 8, 52 - lift], [side * 6, 60 - lift], 2.2]]) {
+        const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
+        if (d < w) return skin(SPITTER_DARK, x, y, 1.15 - 0.5 * d / w, 97);
+      }
+      if (y >= 60 - lift && y < 63 - lift && Math.abs(dx - side * 6) < 3.5) return skin(SPITTER_DARK, x, y, 0.9, 98);
+    }
+    return null;
+  };
+}
+
+// Side on, facing right: the stoop shows, its neck reaching forward and the
+// sac hanging under its jaw, a gland glowing on its back.
+function spitterSideShape(pose) {
+  const swing = pose === 'walk1' ? 4 : pose === 'walk2' ? -4 : 0;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    for (const [a, b, w] of [[[2, 28], [5 + swing * 0.3, 40], 2.2], [[5 + swing * 0.3, 40], [7 + swing * 0.6, 51], 2]]) {
+      const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
+      if (d < w) return skin(SPITTER_SKIN, x, y, 1.1 - 0.5 * d / w, 99);
+    }
+    const head = inEllipse(dx, y, 11, 13, 5, 3.5);
+    if (head !== null) {
+      if (dx >= 12.5 && dx < 14.5 && y === 12) return glowing(ACID);
+      return skin(SPITTER_SKIN, x, y, 1.1 - 0.4 * head, 100);
+    }
+    const sac = sacTexel(x, y, dx, 9, 19.5, 4.5, 4.5, false);
+    if (sac) return sac;
+    if (segmentDistance(dx, y, 0, 30, 9, 15) < 2.4) return skin(SPITTER_SKIN, x, y, 0.95, 101); // the neck
+    const g = Math.hypot(dx + 7, y + 0.5 - 30);
+    if (g < 2.4) return glowing(ACID);
+    const body = inEllipse(dx, y, -3, 35, 9, 9.5);
+    if (body !== null) return skin(SPITTER_SKIN, x, y, 1.15 - 0.45 * body, 102);
+    for (const [s, shade] of [[swing, 1], [-swing, 0.6]]) {
+      for (const [a, b, w] of [[[-4, 42], [1 + s * 0.6, 51], 2.6], [[1 + s * 0.6, 51], [-3 + s, 60], 2.2]]) {
+        const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
+        if (d < w) return skin(SPITTER_DARK, x, y, shade * (1.15 - 0.5 * d / w), 103);
+      }
+      if (y >= 60 && y < 63 && dx >= -6 + s && dx < 2 + s) return skin(SPITTER_DARK, x, y, 0.9 * shade, 104);
+    }
+    return null;
+  };
+}
+
+function makeSpitterFrames() {
+  const bake = (shape) => makeTexture(SPITTER_SKIN, shape);
+  const poses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2') });
+  const front = (pose) => bake(spitterFrontBackShape('front', pose));
+  return {
+    front: { ...poses(front), aim: front('aim'), fire: front('fire') },
+    back:  poses((pose) => bake(spitterFrontBackShape('back', pose))),
+    right: poses((pose) => bake(spitterSideShape(pose))),
+    left:  poses((pose) => bake(mirroredShape(spitterSideShape(pose), true))),
+  };
+}
+
+// A dead spitter: a heap with its sac burst, acid soaking the floor round it.
+function makeSpitterCorpse() {
+  return makeTexture(SPITTER_SKIN, (x, y) => {
+    const dx = x + 0.5 - 32;
+    const sac = inEllipse(dx, y, 12, 55, 6, 3.5);
+    if (sac !== null) return brighten(SPITTER_DARK, 0.7 + 0.3 * sac); // emptied
+    if (y >= 49 && y < 61 && Math.abs(dx + 2) < 8 + (y - 49) * 0.7) return skin(SPITTER_SKIN, x, y, 0.5 + 0.4 * noise(x >> 2, y >> 1, 105), 106);
+    if (y >= 59 && Math.abs(dx) < 27 - (63 - y) * 2.5) return glowing(mix(ACID, [30, 60, 10], 0.55 + 0.3 * noise(x, y, 107)));
+    return null;
+  });
+}
+
+// A GLOB of acid in flight (acid.js): a glowing ball with a hot core, at
+// eye height in the texture; acid.js raises and lowers it along its arc.
+const ACID_GLOB_TEXTURE = makeTexture(ACID, (x, y) => {
+  const r = Math.hypot(x + 0.5 - 32, y + 0.5 - 32);
+  if (r < 2) return glowing(ACID_HOT);
+  if (r < 4.5) return glowing(ACID);
+  if (r < 5.5 && noise(x, y, 108) < 0.5) return glowing([60, 140, 30]);
+  return null;
+});
+
+// Where a glob will land: a thin ring flat on the floor (the bottom rows of
+// the texture are the floor), two frames so it pulses.
+const ACID_TARGET_FRAMES = [0, 1].map((f) => makeTexture(ACID, (x, y) => {
+  const ex = (x + 0.5 - 32) / (14 - f * 3), ey = (y + 0.5 - 61) / (2.2 - f * 0.5);
+  const r = Math.hypot(ex, ey);
+  return r > 0.8 && r < 1 ? glowing(f ? ACID_HOT : ACID) : null;
+}));
+
+// THE LARVAE (larvae.js): pale, segmented grubs the size of a cat, low on
+// the floor, mandibles first, with glowing spots down their sides. They look
+// the same from every side (a swarm, like the drones), so just three frames:
+// two of scuttling, and the leap, legs splayed and jaws wide.
+// They sit on the bottom rows of the texture, which is the floor, so the
+// shot test aims at LARVA_AIM_ROW rather than eye height (combat.js).
+const LARVA_SKIN = [204, 194, 160];
+const LARVA_AIM_ROW = 55;
+function larvaShape(frame) {
+  const leap = frame === 2;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    const cy = leap ? 52 : 56;
+    // Legs: little spikes along the bottom, out of step frame to frame.
+    for (let k = -3; k <= 3; k++) {
+      if (k === 0) continue;
+      const lx = k * 3.6, tip = leap ? [lx * 1.5, cy + 9] : [lx * 1.2 + ((k + frame) % 2 ? 1.5 : -1.5), 62.5];
+      if (segmentDistance(dx, y, lx, cy + 3, tip[0], tip[1]) < 0.8) return brighten(SPITTER_DARK, 0.9);
+    }
+    // Mandibles, opening wide to leap.
+    for (const side of [-1, 1]) {
+      const tip = leap ? [side * 7, cy - 6] : [side * 3, cy + 4];
+      if (segmentDistance(dx, y, side * 3, cy - 1, tip[0], tip[1]) < 1) return brighten(CLAW, 0.95);
+    }
+    const head = inEllipse(dx, y, 0, cy, 5, 4.2);
+    if (head !== null) {
+      if (y === cy - 2 && Math.abs(Math.abs(dx) - 2) < 0.8) return glowing(ACID);
+      if (leap && y >= cy && y < cy + 2 && Math.abs(dx) < 2.5) return MAW;
+      return skin(LARVA_SKIN, x, y, 1.1 - 0.35 * head, 109);
+    }
+    const body = inEllipse(dx, y, 0, cy, 13, 6);
+    if (body !== null) {
+      if (Math.floor(Math.abs(dx) + 1) % 4 === 0) return brighten(LARVA_SKIN, 0.6);     // the segments
+      if (Math.abs(y + 0.5 - cy) < 1 && Math.floor(Math.abs(dx) + 1) % 4 === 2 && Math.abs(dx) > 6) return glowing([90, 200, 60]);
+      return skin(LARVA_SKIN, x, y, 1.1 - 0.5 * body, 110);
+    }
+    return null;
+  };
+}
+const LARVA_FRAMES = [0, 1, 2].map((f) => makeTexture(LARVA_SKIN, larvaShape(f)));
+
 ROBOT_FRAMES.lurcher = makeLurcherFrames();
+ROBOT_FRAMES.spitter = makeSpitterFrames();
 // What each type leaves behind (enemies.js). Robots leave the robot wreck.
-const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse() };
+const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse(), spitter: makeSpitterCorpse() };

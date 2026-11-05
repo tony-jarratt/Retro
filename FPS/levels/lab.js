@@ -3,8 +3,8 @@
 // slime), its own objective, the BREEDING CHAMBER, and its own enemies: the
 // lab's CREATURES (creatures.js), which hear you rather than watch for you,
 // so there are no cameras, tripwires or terminals here. The
-// glass boxes are SPECIMEN TANKS: one floor cell walled in by glass, with
-// steel pillars at the corners. Empty for now; one day, something will be in them.
+// glass boxes are SPECIMEN TANKS: one floor cell walled in by tank glass ('g'),
+// with steel pillars at the corners. Two of them hold something asleep.
 //
 // The route: start (top left) -> the specimen hall (right) -> the one door
 // down to the lower lab -> the chamber at the back. The side room (left)
@@ -16,20 +16,20 @@ LEVELS.push({
   theme: 'lab',         // floor, ceiling and lighting (map.js)
   objective: 'chamber', // the K cells are the breeding chamber (core.js)
 
-  // t = tiled wall, b = bench cabinets (legend.js). The tanks' pillars are steel (#).
+  // t = tiled wall, b = bench cabinets, g = tank glass (legend.js). The tanks' pillars are steel (#).
   rows: [
   // x: 0         1         2
   //    012345678901234567890123
     'tttttbbbtttttttttttttttt', //  0
     'L.........t............t', //  1  exit lift (x0)
-    'L.........t..#W#..#W#..t', //  2  specimen tanks
-    't.........D..W.W..W.W..t', //  3
-    't.........t..#W#..#W#..t', //  4
+    'L.........t..#g#..#g#..t', //  2  specimen tanks
+    't.........D..g.g..g.g..t', //  3
+    't.........t..#g#..#g#..t', //  4
     't.........t............t', //  5
     'tttttDtttttt...........t', //  6
-    't..........t..#W#..#W#.t', //  7  more tanks
-    'b..........D..W.W..W.W.b', //  8  side room (left) | specimen hall
-    'b..........t..#W#..#W#.b', //  9
+    't..........t..#g#..#g#.t', //  7  more tanks
+    'b..........D..g.g..g.g.b', //  8  side room (left) | specimen hall
+    'b..........t..#g#..#g#.b', //  9
     't..........t...........t', // 10
     'tttttttttttttttttDtttttt', // 11  the only way down (x17)
     't......................t', // 12  the lower lab
@@ -59,30 +59,47 @@ LEVELS.push({
     { x: 20, y: 13, flicker: true },
   ],
 
-  // LURCHERS. They hear every shot (further in burst and auto), and spot you
-  // much sooner under a light than in the dark.
+  // THE CREATURES (creatures.js). They hear every shot (further in burst and
+  // auto), and spot you much sooner under a light than in the dark.
+  //   lurcher  melee: rears up, then lunges. Back off or sidestep.
+  //   spitter  lobs acid where you stand. Keep moving; get behind it.
+  // tank: true sleeps in a specimen tank until its glass breaks.
   enemies: [
-    // The specimen hall: two, out of sight of the door in. A careless burst
-    // at one brings the other.
+    // The specimen hall: a lurcher out of sight of the door in, and a
+    // spitter guarding the way down, under the light by the door.
     { type: 'lurcher', x: 21.5, y: 5.5,  angle: Math.PI },
-    { type: 'lurcher', x: 17.5, y: 1.5,  angle: Math.PI / 2 },
-    // The side room: one, in the dark at the far end.
-    { type: 'lurcher', x: 2.5,  y: 8.5,  angle: 0 },
-    // The lower lab: three, around the chamber. Shooting down here wakes them all.
+    { type: 'spitter', x: 22.5, y: 10.5, angle: Math.PI },
+    // In the tanks. A stray shot, a blast or the spitter's acid lets them out.
+    { type: 'lurcher', x: 19.5, y: 3.5,  angle: Math.PI / 2, tank: true },
+    { type: 'spitter', x: 15.5, y: 8.5,  angle: 0, tank: true },
+    // The lower lab, round the chamber. Shooting down here wakes them all, and the pods.
     { type: 'lurcher', x: 4.5,  y: 12.5, angle: 0 },
     { type: 'lurcher', x: 10.5, y: 13.5, angle: -Math.PI / 2 },
-    { type: 'lurcher', x: 19.5, y: 13.5, angle: Math.PI },
+    { type: 'spitter', x: 19.5, y: 13.5, angle: Math.PI },
   ],
 
-  // Creatures drop no clips, so there's more ammo lying about than in the hangar.
+  // LARVAE (larvae.js): a nest in the side room, lying on the automatic
+  // module. You'll want auto for them, and auto is loud.
+  larvae: [
+    { x: 5.5, y: 8.5, count: 6 },
+  ],
+  // Breeding pods on the wall either side of the chamber (cell + face, as
+  // for decals). A noise that reaches one bursts it; burning the chamber bursts both.
+  pods: [
+    { x: 7,  y: 15, face: 'N', count: 5 },
+    { x: 13, y: 15, face: 'N', count: 5 },
+  ],
+
+  // Creatures drop nothing, so the lab's ammo comes in big supply crates (+20).
   pickups: [
-    { type: 'ammo',   x: 8.5,  y: 1.5 },
-    { type: 'repair', x: 22.5, y: 1.5 },
-    { type: 'ammo',   x: 1.5,  y: 10.5 },
-    { type: 'burstmod', x: 12.5, y: 5.5 },
-    { type: 'ammo',   x: 22.5, y: 9.5 },  // specimen hall, far corner
-    { type: 'ammo',   x: 21.5, y: 12.5 }, // lower lab
-    { type: 'repair', x: 1.5,  y: 14.5 }, // lower lab
+    { type: 'ammocrate', x: 8.5,  y: 1.5 },  // start room
+    { type: 'repair',    x: 22.5, y: 1.5 },
+    { type: 'burstmod',  x: 12.5, y: 5.5 },
+    { type: 'ammo',      x: 12.5, y: 9.5 },  // specimen hall
+    { type: 'automod',   x: 1.5,  y: 7.5 },  // side room, under the larvae
+    { type: 'ammocrate', x: 1.5,  y: 10.5 }, // side room
+    { type: 'ammocrate', x: 21.5, y: 12.5 }, // lower lab
+    { type: 'repair',    x: 1.5,  y: 14.5 }, // lower lab
   ],
 
   vents: [

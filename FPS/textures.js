@@ -359,8 +359,10 @@ const STEAM_LOOP = 48; // texels the billows rise over a whole cycle of frames
 // at the floor and spreading as it rises, made of billows that drift upwards
 // from frame to frame. Its alpha is how thick the steam is: you see the room
 // through it. `sputter` gives the weak, low puffs that warn of a burst.
-function makeSteam(frame, sputter) {
+// `gas`: the lab's vents blow a sickly green toxic gas instead (steam.js).
+function makeSteam(frame, sputter, gas) {
   const rise = frame * STEAM_LOOP / STEAM_FRAMES;
+  const tint = gas ? [150, 205, 110] : [200, 205, 212];
   return makeTexture([210, 214, 220], (x, y) => {
     const up = (63 - y) / 63; // 0 at the floor, 1 at the ceiling
     if (sputter && up > 0.4) return null;
@@ -371,7 +373,7 @@ function makeSteam(frame, sputter) {
     // A sputter's puffs thin out to nothing by 40% of the way up, rather than stopping in a hard edge.
     const density = (1 - across * across) * (0.3 + 0.7 * n) * (1 - 0.4 * up) * (sputter ? 0.7 * (1 - up / 0.4) : 1);
     if (density < 0.12) return null;
-    return seeThrough(brighten([200, 205, 212], 0.85 + 0.3 * n), Math.min(210, 240 * density));
+    return seeThrough(brighten(tint, 0.85 + 0.3 * n), Math.min(gas ? 170 : 210, 240 * density));
   });
 }
 
@@ -1231,6 +1233,23 @@ function makeAmmoBox() {
   });
 }
 
+// The lab's AMMO CRATE: a big white supply case with a green band and a
+// carrying handle. The lab's creatures drop nothing, so its ammo comes in these.
+function makeAmmoCrate() {
+  const white = [190, 196, 188];
+  return makeTexture(white, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y >= 38 && y < 41 && Math.abs(dx) < 6 && Math.abs(dx) > 3.5) return brighten(DARK_STEEL, 1.2); // handle
+    if (y === 38 && Math.abs(dx) < 6) return brighten(DARK_STEEL, 1.2);
+    if (y < 41 || Math.abs(dx) > 17) return null;
+    if (y < 44) return brighten(white, 1.2);                              // lid, lit from above
+    if (Math.abs(dx) > 16 || y === 44 || y === 62) return brighten(white, 0.5); // edges
+    if (y >= 50 && y < 55) return brighten([70, 160, 60], 0.9 + 0.1 * noise(x, y, 19)); // the green band
+    if ((Math.abs(dx) === 12.5 || Math.abs(dx) === 13.5) && y > 45 && y < 61) return brighten(white, 0.7); // ribs
+    return brighten(white, 0.85 + 0.12 * noise(x, y, 20));
+  });
+}
+
 // An energy cell, dropped by a destroyed robot: a small canister with a glowing band.
 function makeClip() {
   return makeTexture(DARK_STEEL, (x, y) => {
@@ -1275,6 +1294,7 @@ const KEYCARD_TEXTURES = {};
 for (const colour in KEY_COLOURS) KEYCARD_TEXTURES[colour] = makeKeycard(KEY_COLOURS[colour]);
 
 const AMMO_BOX_TEXTURE = makeAmmoBox();
+const AMMO_CRATE_TEXTURE = makeAmmoCrate();
 const CLIP_TEXTURE = makeClip();
 const REPAIR_KIT_TEXTURE = makeRepairKit();
 
@@ -1305,8 +1325,8 @@ const GLASS_BURST_FRAMES = [0, 1, 2, 3].map(makeGlassBurst);
 const STEAM_BURST_FRAMES = [];
 const STEAM_SPUTTER_FRAMES = [];
 for (let f = 0; f < STEAM_FRAMES; f++) {
-  STEAM_BURST_FRAMES.push(makeSteam(f, false));
-  STEAM_SPUTTER_FRAMES.push(makeSteam(f, true));
+  STEAM_BURST_FRAMES.push(makeSteam(f, false, THEME === 'lab'));
+  STEAM_SPUTTER_FRAMES.push(makeSteam(f, true, THEME === 'lab'));
 }
 
 const DRUM_TEXTURE = makeDrum();
@@ -1340,6 +1360,7 @@ const TEXTURES = {
   5: TERMINAL_TEXTURES.armed, // security terminal (security.js shows armed or safe)
   [GLASS_CELL]: GLASS_TEXTURES.intact, // panels.js shows intact, cracked or shattered
   [GRATE_CELL]: GRATE_TEXTURE,
+  [TANK_GLASS_CELL]: GLASS_TEXTURES.intact,
   [CORE_CELL]: CORE_TEXTURES[0][0], // core.js shows its damage, pulse, or wreck
   [LIFT_CELL]: LIFT_TEXTURES.locked, // core.js shows locked or open
   [DOOR_CELL]: makeBlastDoor(null),

@@ -148,6 +148,40 @@ function makeHive(loaded) {
   });
 }
 
+// A breeding pod (larvae.js): a fleshy sac grown over the wall, veined,
+// with larvae curled up inside showing through as glowing shapes. Burst, it
+// hangs open and empty, a dark split down the middle.
+function makePod(loaded) {
+  return makeTexture([150, 120, 110], (x, y) => {
+    const dx = x + 0.5 - 32, dy = y + 0.5 - 32;
+    const r = Math.hypot(dx / 22, dy / 26);
+    if (r >= 1) return r < 1.12 ? seeThrough([60, 40, 36], 140) : null; // a stain where it's grown into the wall
+    if (!loaded && Math.abs(dx) < 4 + 6 * (1 - r)) return [24, 12, 12]; // split open
+    if (loaded) {
+      for (const [cx, cy] of [[-8, -10], [7, -4], [-5, 8], [8, 12]]) {
+        if (Math.hypot(dx - cx, (dy - cy) * 1.6) < 4.5) return [110 + 60 * (1 - r), 200, 80 + 30 * noise(x, y, 131)];
+      }
+    }
+    const vein = Math.abs(Math.sin(dx * 0.4 + dy * 0.25 + 3 * noise(x >> 3, y >> 3, 132))) < 0.1;
+    return brighten(vein ? [100, 60, 70] : [170, 135, 120], (1.15 - 0.5 * r) * (0.9 + 0.15 * noise(x >> 1, y >> 1, 133)));
+  });
+}
+
+// A pool of a spitter's acid (acid.js): bright, bubbling green. Two frames,
+// so it seethes. It isn't water: nothing reflects in it.
+function makeAcidPool(v) {
+  const shape = (x, y) => blobT(x, y, 32, 32, 22, 2.1);
+  return makeTexture([100, 220, 60], (x, y) => {
+    const t = shape(x, y);
+    if (t < 0.9) {
+      if (noise(x, y, 134 + v) < 0.05) return seeThrough([230, 255, 200], 255); // bubbles
+      return seeThrough(brighten([90, 210, 50], 0.8 + 0.35 * noise(x >> 1, (y >> 1) + v * 3, 136)), 235);
+    }
+    if (t < 1.1) return seeThrough([40, 80, 20], 200 * (1.1 - t) / 0.2); // the floor scorched round it
+    return null;
+  });
+}
+
 // A round floor drain: a steel rim and slotted cover.
 function makeDrain() {
   return makeTexture(DARK_STEEL, (x, y) => {
@@ -306,6 +340,9 @@ const DECAL_TYPES = {
   rearm:      { surfaces: ['wall'], text: true, frames: [makeStencil([['REARM', 2, 20], ['REPAIR', 2, 34]], STENCIL_WHITE)] },
   // The lab's.
   slime:      { surfaces: ['floor'],            frames: [0, 1, 2].map(makeSlime) },
+  acid:       { surfaces: ['floor'],            frames: [0, 1].map(makeAcidPool) },
+  pod:        { surfaces: ['wall'],             frames: [makePod(true)], text: true },
+  podEmpty:   { surfaces: ['wall'],             frames: [makePod(false)], text: true },
   biohazard:  { surfaces: ['wall'], text: true, frames: [makeBiohazardSign()] },
   genetics:   { surfaces: ['wall'], text: true, frames: [makeStencil([['GENETICS', 2, 20], ['LAB 2', 2, 34]], STENCIL_GREEN)] },
   specimens:  { surfaces: ['wall'], text: true, frames: [makeStencil([['SPECIMEN', 2, 20], ['HALL', 2, 34]], STENCIL_GREEN)] },

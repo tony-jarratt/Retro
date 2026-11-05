@@ -18,6 +18,15 @@
 //     and it misses. It's slow, so on open floor you can always back away;
 //     what makes it dangerous is a corridor, a corner, or a second one.
 //   Creatures drop nothing when they die, and are never smart.
+//
+// Also here:
+//   SPECIMEN TANKS. A creature listed with tank: true sleeps in a tank (one
+//     floor cell walled in by tank glass, 'g') until a pane of it breaks:
+//     your stray shot, a blast, or a spitter's acid. Then it comes for you.
+//   THE LAB COMES LOOSE. Burning the breeding chamber (core.js) breaks every
+//     tank, bursts every pod, wakes every larva, and from then on every
+//     creature always knows where you are. The lights go red. Run.
+// The spitter's acid is in acid.js; the larvae and their pods in larvae.js.
 
 // How far each noise carries, in cells.
 const SHOT_NOISE = { single: 4, burst: 6, auto: 9 }; // one round, by the gun's mode
@@ -36,6 +45,57 @@ const LURCHER_REACH = 0.6;
 const LURCHER_RECOVER = 0.7;      // seconds it stands there afterwards: shoot it
 
 const ATTACK_STATES = ['windup', 'lunge', 'recover'];
+const LOOSE_CALL_GAP = 1.5; // once the lab is loose: seconds between creatures being told where you are
+
+let labLoose = false;
+let looseTimer = 0;
+
+// A tank creature must have tank glass beside it, or nothing could ever wake it.
+enemies.forEach((e, n) => {
+  if (e.state !== 'dormant' || !ROBOT_TYPES[e.type].creature) return;
+  const x = Math.floor(e.x), y = Math.floor(e.y);
+  if (![[0, -1], [0, 1], [1, 0], [-1, 0]].some(([dx, dy]) => MAP[y + dy]?.[x + dx] === TANK_GLASS_CELL)) {
+    throw new Error(`ENEMIES[${n}] (${e.type} at ${e.x}, ${e.y}) is in a tank (tank: true), but there's no tank glass ('g') beside its cell.`);
+  }
+});
+
+// A sleeping creature wakes: it goes to look for you where you are now.
+function wakeCreature(enemy) {
+  if (enemy.state !== 'dormant') return;
+  enemy.state = 'search';
+  enemy.lastSeenX = player.x;
+  enemy.lastSeenY = player.y;
+}
+
+// A pane of tank glass has gone (panels.js): whatever was in that tank is out.
+function tankBroken(panel) {
+  for (const e of enemies) {
+    if (e.state !== 'dormant' || !ROBOT_TYPES[e.type].creature) continue;
+    if (Math.abs(Math.floor(e.x) - panel.x) + Math.abs(Math.floor(e.y) - panel.y) === 1) wakeCreature(e);
+  }
+}
+
+// The chamber is burning (core.js).
+function labComesLoose() {
+  labLoose = true;
+  looseTimer = 0;
+  for (const panel of PANELS) if (panel.tank) shatterGlass(panel);
+  burstAllPods(); // larvae.js
+}
+
+function updateCreatures(dt) {
+  if (!labLoose) return;
+  looseTimer -= dt;
+  if (looseTimer > 0) return;
+  looseTimer = LOOSE_CALL_GAP;
+  makeNoise(player.x, player.y, Infinity); // every creature, everywhere, hears where you are
+}
+
+// A ranged creature backing off: a step straight away from you. Returns
+// whether it moved (if it's cornered, it stands and fights instead).
+function retreatStep(enemy, dt) {
+  return stepTowards(enemy, 2 * enemy.x - player.x, 2 * enemy.y - player.y, dt);
+}
 
 // A noise at (x, y) carrying `radius` cells: every creature that hears it
 // goes to look. One already after you carries on.
@@ -45,6 +105,7 @@ function makeNoise(x, y, radius) {
     const reach = clearLine(x, y, e.x, e.y) ? radius : radius * WALL_MUFFLE;
     if (Math.hypot(e.x - x, e.y - y) <= reach) alertEnemy(e, x, y);
   }
+  larvaeHear(x, y, radius); // larvae.js: waiting larvae, and the pods
 }
 
 // How far this creature can see you right now. Unaware (idle, or searching
@@ -52,9 +113,13 @@ function makeNoise(x, y, radius) {
 // 0.3) is dark, under a strip light (about 1.3) is full sight.
 function creatureSightRange(enemy) {
   if (enemy.state !== 'idle' && enemy.state !== 'search') return CREATURE_SIGHT;
+  return CREATURE_SIGHT * playerVisibility();
+}
+
+// How visible the light makes you: DARK_SIGHT in the dark, up to 1 in full light.
+function playerVisibility() {
   const [r, g, b] = lightAt(player.x, player.y);
-  const lit = Math.min(1, Math.max(DARK_SIGHT, ((r + g + b) / 3 - 0.2) / 0.8));
-  return CREATURE_SIGHT * lit;
+  return Math.min(1, Math.max(DARK_SIGHT, ((r + g + b) / 3 - 0.2) / 0.8));
 }
 
 // Called by updateWalker when a melee creature is in reach and sees you.

@@ -440,6 +440,59 @@ function sfxLurcherSwipe(enemy) {
   noiseBurst(out, 'bandpass', 600, 2800, 0.2, 0.6);
 }
 
+// The spitter spotting you: a wet, rattling hiss.
+function sfxSpitterHiss(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 2500, 4000, 0.5, 0.35);
+  tone(out, 'sawtooth', 180, 140, 0.4, 0.06);
+}
+// A glob leaving its mouth: a thick hawk, then a wet whoosh.
+function sfxSpit(enemy) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 900, 300, 0.1, 0.6);
+  noiseBurst(out, 'bandpass', 1500, 600, 0.3, 0.4, 0.06);
+}
+// It lands: a splat, and a sizzle as the acid eats into the floor.
+function sfxAcidSplash(x, y) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(x, y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 1200, 200, 0.15, 0.7);
+  noiseBurst(out, 'highpass', 5000, 3500, 1.2, 0.25, 0.05);
+}
+// Larvae: a dry chitter as a pack wakes, a snap as one bites, and a squish as one bursts.
+function sfxLarvaChitter(l) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(l.x, l.y);
+  if (!out) return;
+  for (let i = 0; i < 6; i++) noiseBurst(out, 'bandpass', 3200, 2600, 0.02, 0.3, i * 0.045);
+}
+function sfxLarvaBite(l) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(l.x, l.y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 2400, 1200, 0.05, 0.6);
+  tone(out, 'square', 700, 300, 0.05, 0.08);
+}
+function sfxLarvaSquish(l) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(l.x, l.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 1600, 300, 0.12, 0.5);
+  drumHit(out, 'sine', 220, 90, 0.04, 0.08, 0.2);
+}
+// A pod spilling a larva: a wet tearing pop.
+function sfxPodBurst(pod) {
+  if (!audioReady()) return; // called from the game, not from watchTheGame
+  const out = placeAt(pod.outX, pod.outY);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 700, 1800, 0.15, 0.5);
+  drumHit(out, 'sine', 140, 60, 0.04, 0.15, 0.3);
+}
+
 function sfxPlayerStep() {
   drumHit(audio.master, 'sine', 110, 40, 0.04, 0.12, 0.25);
   tone(audio.master, 'sawtooth', 240, 320, 0.08, 0.03); // servo whirr
@@ -476,6 +529,7 @@ function metalClack(base, vol, delay) {
 // Pickups: synth chirps from the suit, a little tune for each kind (ammo clacks).
 function sfxPickup(type) {
   if (type === 'ammo') { metalClack(1300, 0.3, 0); metalClack(820, 0.4, 0.09); return; }
+  if (type === 'ammocrate') { metalClack(1100, 0.35, 0); metalClack(700, 0.4, 0.08); metalClack(900, 0.35, 0.17); return; }
   if (type === 'clip') { metalClack(1500, 0.25, 0); return; }
   const notes = {
     repair: [440, 554, 660, 880],
@@ -570,11 +624,14 @@ function updateSound(dt) {
   for (const e of enemies) {
     const charging = e.state === 'aim' && e.charge > 0;
     let v = robotWhines.get(e);
-    if (charging && !v) { v = makeVoice('triangle'); robotWhines.set(e, v); }
+    const creature = ROBOT_TYPES[e.type].creature;
+    if (charging && !v) { v = makeVoice(creature ? 'sawtooth' : 'triangle'); robotWhines.set(e, v); }
     if (!charging && v) { stopVoice(v); robotWhines.delete(e); continue; }
     if (v) {
       const f = e.charge / ROBOT_TYPES[e.type].charge;
-      steerVoice(v, e.x, e.y, 0.15, 300 + 900 * f);
+      // A spitter's sac swelling is a rising gurgle, lower and rougher than a robot's whine.
+      if (creature) steerVoice(v, e.x, e.y, 0.1, 80 + 220 * f + 25 * Math.sin(animTime * 40));
+      else steerVoice(v, e.x, e.y, 0.15, 300 + 900 * f);
     }
   }
 
@@ -659,7 +716,7 @@ function watchTheGame() {
     }
     if (e.state !== 'dead' && e.moving && step !== was.step) creature ? sfxCreatureStep(e) : sfxRobotStep(e);
     if (creature && e.state !== was.state) {
-      if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) sfxLurcherSnarl(e);
+      if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) e.type === 'spitter' ? sfxSpitterHiss(e) : sfxLurcherSnarl(e);
       if (e.state === 'windup') sfxLurcherRear(e);
       if (e.state === 'lunge') sfxLurcherSwipe(e);
     }

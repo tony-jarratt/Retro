@@ -11,6 +11,10 @@
 //   grate      no          yes    yes    yes
 // A shattered window is just its frame and jagged teeth: you still can't climb
 // through, but sight and bullets now pass.
+//
+// SPECIMEN TANK GLASS ('g', the lab) is glass in every way until it
+// shatters. Then it's gone completely: its cell becomes floor, so whatever was
+// in the tank can get out (creatures.js), and you can walk in.
 
 const GLASS_HITS = 2;          // hits to shatter a window: the first only cracks it
 const GLASS_BURST_TIME = 0.4;  // seconds the falling fragments are shown
@@ -27,7 +31,7 @@ const PANELS = findPanels();
 const glassBursts = [];
 
 function isPanelCell(cell) {
-  return cell === GLASS_CELL || cell === GRATE_CELL;
+  return cell === GLASS_CELL || cell === GRATE_CELL || cell === TANK_GLASS_CELL;
 }
 
 function findPanels() {
@@ -44,7 +48,7 @@ function findPanels() {
     if (!horizontal && !vertical) {
       throw new Error(`Panel at MAP[${y}][${x}] must be held by walls or panels at both ends, with floor on both faces.`);
     }
-    panels.push({ x, y, horizontal, kind: cell === GLASS_CELL ? 'glass' : 'grate', state: 'intact' });
+    panels.push({ x, y, horizontal, kind: cell === GRATE_CELL ? 'grate' : 'glass', tank: cell === TANK_GLASS_CELL, state: 'intact' });
   }));
   return panels;
 }
@@ -87,6 +91,10 @@ function shatterGlass(panel) {
   if (panel.state === 'shattered') return;
   panel.state = 'shattered';
   glassBursts.push({ x: panel.x + 0.5, y: panel.y + 0.5, time: 0 });
+  if (panel.tank) {
+    MAP[panel.y][panel.x] = 0; // nothing left in the frame: the tank is open
+    tankBroken(panel);         // creatures.js: whatever was inside is out
+  }
 }
 
 // A blast at (x, y) blows in every window within its radius that it can

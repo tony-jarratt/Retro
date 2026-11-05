@@ -50,14 +50,21 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //            nothing (creatures.js). Its weapon 'melee' uses aimRange as its
 //            reach to start an attack, and damage per lunge that connects.
 //
+// retreat    creatures that fight at range: closer than this, it backs away
+//            (and shows you its back) rather than fire, unless it's cornered
+//
 // THE LAB'S CREATURES (creatures.js):
 //   lurcher  slow and tough, melee only: rears up, then lunges. Back off or sidestep.
+//   spitter  frail, keeps its distance and lobs acid where you're standing
+//            (acid.js), leaving a burning pool. Its glands are on its back:
+//            hits there count double. Get close, and it backs off.
 const ROBOT_TYPES = {
   walker: { speed: 1.5, health: 4, aimRange: 3,   charge: 1.0, weapon: 'gun',    damage: 15, hitNear: 0.8,  hitFar: 0.3,  backHits: 1, mobile: true,  strafe: true,  weave: false, volley: 1, volleyGap: 0 },
   scout:  { speed: 3.0, health: 2, aimRange: 1.6, charge: 0.5, weapon: 'gun',    damage: 8,  hitNear: 0.7,  hitFar: 0.45, backHits: 1, mobile: true,  strafe: true,  weave: true,  volley: 1, volleyGap: 0 },
   heavy:  { speed: 0.8, health: 6, aimRange: 6,   charge: 1.8, weapon: 'rocket', damage: 0,  hitNear: 0,    hitFar: 0,    backHits: 2, mobile: true,  strafe: false, weave: false, volley: 1, volleyGap: 0 },
   turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 6,  hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false, strafe: false, weave: false, volley: 5, volleyGap: 0.12 },
-  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, charge: 0, weapon: 'melee', damage: 30, hitNear: 0, hitFar: 0, backHits: 1, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true },
+  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, charge: 0,   weapon: 'melee', damage: 30, hitNear: 0, hitFar: 0, backHits: 1, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true },
+  spitter: { speed: 1.0, health: 3, aimRange: 6,   charge: 1.3, weapon: 'lob',   damage: 15, hitNear: 0, hitFar: 0, backHits: 2, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true, retreat: 2.5 },
 };
 
 // The live robots, built once from the starting positions in the level file:
@@ -85,7 +92,9 @@ const enemies = ENEMIES.map((start) => ({
   x: start.x,
   y: start.y,
   angle: start.angle,
-  state: start.type === 'turret' ? 'dormant' : 'idle',
+  // Turrets sleep until a tripwire; creatures in a specimen tank (tank: true)
+  // sleep until its glass breaks (creatures.js).
+  state: start.type === 'turret' || start.tank ? 'dormant' : 'idle',
   lastSeenX: start.x,
   lastSeenY: start.y,
   moving: false,
@@ -242,6 +251,7 @@ function updateVolley(enemy, dt) {
   enemy.volleyLeft -= 1;
   enemy.volleyTimer = ROBOT_TYPES[enemy.type].volleyGap;
   if (canSee(enemy)) robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
+  else if (ROBOT_TYPES[enemy.type].weapon === 'lob') lobAcid(enemy, enemy.lastSeenX, enemy.lastSeenY); // a spitter lobs it where you were
   else { enemy.firedTime = ROBOT_FIRE_FLASH / 2; sfxRobotShot(enemy); } // still fires, at where you were
 }
 
@@ -297,16 +307,24 @@ function callForHelp(enemy) {
 //          were last seen, round corners if need be, then go idle
 function updateWalker(enemy, dt) {
   const type = ROBOT_TYPES[enemy.type];
+  if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
   const sees = canSee(enemy);
+  const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
     if (enemy.smart) callForHelp(enemy);
     enemy.lastSeenX = player.x;
     enemy.lastSeenY = player.y;
-    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
     enemy.state = dist <= type.aimRange ? 'aim' : 'chase';
   } else if (enemy.state === 'chase' || enemy.state === 'aim') {
     enemy.state = 'search';
+  }
+
+  // Too close for a ranged creature: it backs away instead of firing, if it can.
+  if (sees && type.retreat && dist < type.retreat && retreatStep(enemy, dt)) {
+    enemy.state = 'chase';
+    enemy.moving = true;
+    return;
   }
 
   if (enemy.state === 'aim' && type.weapon === 'melee') {
@@ -406,5 +424,5 @@ function enemyTexture(enemy, viewer) {
   let pose = 'stand';
   if (enemy.state === 'dormant' || enemy.state === 'offline') pose = 'dormant';
   else if (enemy.moving) pose = Math.floor(enemy.walkTime * WALK_FPS) % 2 === 0 ? 'walk1' : 'walk2';
-  return frames[view][pose];
+  return frames[view][pose] || frames[view].stand; // a creature asleep in its tank just stands
 }
