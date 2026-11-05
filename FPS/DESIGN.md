@@ -192,7 +192,13 @@ of the Veridian Group complex and fight your way UP: industrial sector
   HQ (lush sevenths, the pads wavering out of tune), lift (lift music),
   finale (C major at last). Silence when you die; a flourish at LEVEL
   COMPLETE. U toggles it.
-- Each level starts fresh (armour, ammo, single fire); its modules are in it.
+- **Your loadout carries up** (owner, 2026-11-05): the armour, ammo and gun
+  modules you have at LEVEL COMPLETE go with you into the next level, and
+  its briefing shows them. Keycards and the charge stay with their level.
+  Die, and you replay the level with what you arrived with. A level picked
+  from the play-test chooser starts with the usual kit.
+  Arriving breached (armour 0) is possible: the answer is level design,
+  not a top-up (owner): **every level's first room has armour and ammo**.
 
 Levels live in `levels/` as data, one file each, in play order
 (`levels/industrial.js`, `levels/lab.js`, `levels/hq.js`). Reaching the lift shows LEVEL

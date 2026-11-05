@@ -14,7 +14,10 @@
 //
 // Each level is its own page load (map.js reads ?level= once, at the start),
 // so the RUN (time, kills, rounds, failures) is kept between them in the
-// browser's sessionStorage, which lasts as long as the tab.
+// browser's sessionStorage, which lasts as long as the tab. So is your
+// LOADOUT: the armour, ammo and gun modules you take up in the lift go with
+// you into the next level (keycards and the charge belong to their level).
+// Die there, and you replay it with what you arrived with.
 //
 // Enter moves things on: handleEnter. The game's state is game.state
 // (combat.js): 'title', 'briefing', 'playing', 'dead', 'clear', 'lift', 'finale'.
@@ -39,9 +42,11 @@ const ENDING = [
 const ENDING_LINE_GAP = 2.2;     // seconds between the ending's lines appearing
 const RUN_KEY = 'veridian-run';
 
-// THE RUN so far: time (seconds playing), kills, shots (rounds fired), failures (times terminated).
+// THE RUN so far: time (seconds playing), kills, shots (rounds fired),
+// failures (times terminated), and loadout: what you took into the lift, as
+// { level (the id of the level it's for), armour, ammo, modes }, or null.
 function freshRun() {
-  return { time: 0, kills: 0, shots: 0, failures: 0 };
+  return { time: 0, kills: 0, shots: 0, failures: 0, loadout: null };
 }
 function loadRun() {
   try {
@@ -61,6 +66,21 @@ function saveRun() {
 }
 const run = loadRun();
 
+// Arriving by lift: you bring what you had. (Only into the level it was
+// packed for: picking another level from the play-test chooser starts fresh.)
+function applyLoadout() {
+  const kit = run.loadout;
+  if (!kit || kit.level !== CURRENT_LEVEL.id || game.state !== 'briefing') return;
+  const modesOk = Array.isArray(kit.modes) && kit.modes.length > 0 && kit.modes.every((m) => m in FIRE_MODES);
+  if (!Number.isFinite(kit.armour) || !Number.isFinite(kit.ammo) || !modesOk) {
+    console.warn(`The saved loadout for "${kit.level}" doesn't make sense (${JSON.stringify(kit)}): starting this level with the usual kit.`);
+    return;
+  }
+  player.armour = Math.max(0, Math.min(PLAYER_MAX_ARMOUR, kit.armour));
+  player.ammo = Math.max(0, kit.ammo);
+  player.modes = MODE_ORDER.filter((m) => kit.modes.includes(m)); // weapons.js: kept in spin-up order
+}
+
 // Everything you've destroyed on this level: robots and creatures (a downed
 // suit that would get up doesn't count), drones, larvae, moths.
 function levelKills() {
@@ -76,6 +96,7 @@ function countShot() {
 // How the page opens: the title if no level was asked for, else that level's briefing.
 // (With ?playtest and no level, main.js shows the level chooser instead.)
 game.state = PAGE_ARGS.has('level') ? 'briefing' : 'title';
+applyLoadout();
 let titleAwake = false; // the title waits for a first key or click: the browser won't play music before one
 let finaleTime = 0;
 playTrack(game.state === 'title' ? 'title' : THEME_NAME); // music.js: it starts once there's sound
@@ -96,10 +117,11 @@ function handleEnter() {
   } else if (game.state === 'briefing') {
     game.state = 'playing';
   } else if (game.state === 'clear') {
+    const next = nextLevel();
     run.kills += levelKills();
+    run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes] } : null;
     saveRun();
     game.state = 'lift';
-    const next = nextLevel();
     startLiftRide(CURRENT_LEVEL.floor, next ? next.floor : ROOF_FLOOR); // lift.js
     playTrack('lift');
   } else if (game.state === 'finale' && finaleTime > ENDING.length * ENDING_LINE_GAP + 2) {
@@ -172,7 +194,11 @@ function drawCampaignScreen(pixels) {
   drawTextCentred(pixels, floorName(CURRENT_LEVEL.floor), 30, HUD_GREEN, 1);
   drawTextCentred(pixels, CURRENT_LEVEL.name, 42, TITLE_GOLD, 4);
   (CURRENT_LEVEL.briefing || []).forEach((line, n) => drawTextCentred(pixels, line, 76 + n * 10, [200, 210, 200], 1));
-  drawTextCentred(pixels, OBJECTIVE_LOOK.goal, 128, HUD_WARN, 1); // core.js
+  drawTextCentred(pixels, OBJECTIVE_LOOK.goal, 126, HUD_WARN, 1); // core.js
+  // What you've brought with you.
+  const modules = player.modes.filter((m) => m !== 'single').map((m) => FIRE_MODES[m].name);
+  const kit = `ARMOUR ${player.armour}   ROUNDS ${player.ammo}` + (modules.length ? `   ${modules.join(' + ')}` : '');
+  drawTextCentred(pixels, kit, 138, HUD_GREEN, 1);
   if (Math.floor(performance.now() / 600) % 2 === 0) drawTextCentred(pixels, 'PRESS ENTER', 156, HUD_GREEN, 2);
 }
 

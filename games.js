@@ -75,6 +75,18 @@ const GAMES = [
     thumb: 'thumbs/p1.jpg',
     inspiredBy: 'Micro Machines (1991)',
   },
+  {
+    id: 'veridian',
+    title: 'Veridian',
+    folder: 'FPS/',
+    tag: 'Shooter',
+    blurb: 'Fight your way up a sealed corporate complex in an armoured suit: security robots in the sublevels, bred creatures in the lab, infected office staff at head office. Then take the lift.',
+    players: '1 PLAYER',
+    controls: 'WASD + MOUSE, P PAUSE',
+    accent: '#78ff96',
+    thumb: 'thumbs/veridian.jpg',
+    inspiredBy: 'Wolfenstein 3D (1992)',
+  },
   // Cocoa Cascade is hidden from the menu while it's in development. Uncomment to restore.
   // {
   //   id: 'cocoa',
