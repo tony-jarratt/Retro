@@ -137,6 +137,7 @@ function frame(now) {
       updateLarvae(dt);   // larvae.js
       updateAcid(dt);     // acid.js: globs in flight, pools burning
       updateCreatures(dt); // creatures.js: once the lab's loose, they always know where you are
+      updateCharge(dt);   // charge.js: setting the demolition charge, and its fuse
       updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
     }
     updateCombat(dt);

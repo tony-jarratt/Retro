@@ -535,6 +535,7 @@ function sfxPickup(type) {
     repair: [440, 554, 660, 880],
     redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
     burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319],
+    charge: [330, 330, 494],
   }[type] || [880];
   notes.forEach((f, i) => tone(audio.master, 'square', f, f, 0.08, 0.1, i * 0.06));
 }
@@ -556,6 +557,22 @@ function sfxCoreHit() {
   if (!out) return;
   clang(out, 210, 0.35, 0.4);
   noiseBurst(out, 'highpass', 6000, 3000, 0.15, 0.35);
+}
+// The demolition charge (charge.js). Set: a magnetic clunk onto the core and
+// a rising arming chirp. Its fuse: a hard little beep from where it is,
+// coming faster and faster (charge.js decides when).
+function sfxChargeSet(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  clang(out, 320, 0.2, 0.35);
+  [660, 880, 1320].forEach((f, i) => tone(out, 'square', f, f, 0.07, 0.12, 0.15 + i * 0.07));
+}
+function sfxChargeBeep(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  tone(out, 'square', 1800, 1800, 0.05, 0.16);
 }
 function sfxLiftOpen() {
   tone(audio.master, 'sine', 784, 784, 0.25, 0.2);

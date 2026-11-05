@@ -1,4 +1,5 @@
-// Pickups: ammo boxes, suit repair kits, keycards, gun modules, and clips dropped by destroyed robots.
+// Pickups: ammo boxes, suit repair kits, keycards, gun modules, the demolition
+// charge, and clips dropped by destroyed robots.
 // They're drawn as sprites (sprites.js) and collected by walking over them.
 // Where the starting ones lie is listed in the level file (levels/*.js, `pickups`).
 
@@ -39,6 +40,11 @@ const PICKUP_TYPES = {
   automod: {
     texture: AUTO_MODULE_TEXTURE,
     collect: () => { collectModule('auto'); return true; },
+  },
+  // The demolition charge (charge.js): carry it to the core and it's set.
+  charge: {
+    texture: CHARGE_TEXTURE,
+    collect: () => { player.charge = true; return true; },
   },
   // Keycards: 'redkey', 'bluekey'. Collecting one lets you through doors of
   // that colour (playerCanOpen in doors.js).

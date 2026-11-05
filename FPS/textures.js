@@ -916,6 +916,31 @@ function makeAmmoCrate() {
   });
 }
 
+// The DEMOLITION CHARGE (charge.js): a slab of grey-khaki plastic explosive,
+// bound with two bands of tape, with a little black detonator on top and
+// its red arming lamp. `top` is the detonator's top row: low for the one
+// lying on the floor as a pickup, mid-height for one stuck to the core.
+// `lit`: the lamp blinks once it's set, so it comes in lit and unlit.
+function makeCharge(top, lit) {
+  const putty = [168, 160, 122];
+  const TAPE = [64, 66, 70];
+  return makeTexture(putty, (x, y) => {
+    const dx = x + 0.5 - 32;
+    const row = y - top;
+    if (row < 0 || row >= 14) return null;
+    if (row < 4) {                                                   // the detonator
+      if (Math.abs(dx) > 4) return (dx < -4 && dx > -7 && row === 3) ? [200, 40, 30] : null; // a red wire into the slab
+      if (row >= 1 && row <= 2 && dx > 0.5 && dx < 2.5) return lit ? glowing([255, 40, 30]) : [90, 20, 18]; // the lamp
+      return brighten([40, 42, 46], row === 0 ? 1.4 : 1);
+    }
+    if (Math.abs(dx) > 10) return null;                               // the slab
+    if (Math.abs(dx) > 9 || row === 13) return brighten(putty, 0.55); // its edges
+    if (Math.abs(Math.abs(dx) - 5) < 1.5) return brighten(TAPE, 0.9 + 0.2 * noise(x, y, 23)); // tape
+    if (row === 4) return brighten(putty, 1.25);                      // top edge, lit from above
+    return brighten(putty, 0.85 + 0.15 * noise(x, y, 22));
+  });
+}
+
 // An energy cell, dropped by a destroyed robot: a small canister with a glowing band.
 function makeClip() {
   return makeTexture(DARK_STEEL, (x, y) => {
@@ -961,6 +986,8 @@ for (const colour in KEY_COLOURS) KEYCARD_TEXTURES[colour] = makeKeycard(KEY_COL
 
 const AMMO_BOX_TEXTURE = makeAmmoBox();
 const AMMO_CRATE_TEXTURE = makeAmmoCrate();
+const CHARGE_TEXTURE = makeCharge(49, false);                          // lying on the floor
+const CHARGE_SET_TEXTURES = { lit: makeCharge(26, true), unlit: makeCharge(26, false) }; // stuck to the core
 const CLIP_TEXTURE = makeClip();
 const REPAIR_KIT_TEXTURE = makeRepairKit();
 

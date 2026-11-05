@@ -38,7 +38,10 @@ rust, pipes, green-screen computers, sodium lamps, robots), then the **lab**
   interact (alarms, swarms, drums, steam), not one-off scripted moments.
 - **Every level has the same arc:** fight through to the **security core**,
   destroy it, then **escape to the lift** while the whole facility comes
-  after you.
+  after you. Two ways to destroy it: **shoot it** (18 hits: ammo and noise)
+  or find the level's **demolition charge** and set it (time and nerve:
+  2 s standing at the core, then 5 s to get clear). Shooting always works,
+  so missing the charge never blocks a level. (charge.js)
 
 ---
 
@@ -100,7 +103,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | `#` `H` `P` | Walls: steel, hazard bulkhead, pipes | |
 | `C` | Computer bank | Animated, green light |
 | `T` | Security terminal | Walk up to it: its zone's **cameras** shut down for good (not tripwires or turrets) |
-| `K` | Security core | The objective. Several `K` cells are one core, 18 hits (blasts count). Doesn't fight back |
+| `K` | Security core | The objective. Several `K` cells are one core, 18 hits (blasts count), or one **demolition charge**. Doesn't fight back |
 | `L` | Exit lift | Red lamp until the core is down, then green: reach it to finish |
 | `D` | Blast door | Opens on approach; may be locked (`LOCKED_DOORS`) |
 | `W` | Wired glass | See through; stops bullets; cracks then shatters; never walkable |
@@ -143,6 +146,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | A window is shot | Cracks, then shatters; robots firing at you through it hit the glass |
 | Armour reaches 0 | SUIT BREACH: the next hit kills |
 | The core is destroyed | Every turret, camera and tripwire in the facility goes dead. A **facility-wide alarm** that never stops: every hive opens, every pack wakes, every robot comes. The lift unlocks |
+| You stand at the core 2 s carrying the **charge** | It's **set** (silently; being hit doesn't stop you, walking away does). A 5 s fuse, beeping faster, that nothing stops. Then the core goes down in one and the biggest blast in the game goes off: within 1.5 cells of it you're **killed outright**, armour or not |
 | You reach the lift (core down) | **LEVEL COMPLETE** |
 | You reach the lift (core still up) | "LIFT LOCKED — DESTROY THE CORE" |
 

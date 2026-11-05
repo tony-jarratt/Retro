@@ -18,6 +18,7 @@ const player = {
   armour: PLAYER_MAX_ARMOUR, // 0 = breached: one more hit and it's over
   ammo: PLAYER_START_AMMO,
   keys: [],             // keycard colours collected, e.g. ['red']
+  charge: false,        // carrying the demolition charge (charge.js)
   modes: ['single'],    // fire modes your gun can spin up to (weapons.js), in the order found
   moving: false,        // walking this frame (it spoils your aim: MOVING_CONE)
   walkTime: 0,

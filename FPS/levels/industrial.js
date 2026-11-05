@@ -179,6 +179,7 @@ LEVELS.push({
   ],
 
   // Things to collect (pickups.js): 'ammo' (+8), 'repair' (+25 armour), 'redkey', 'bluekey',
+  // 'charge' (the demolition charge: charge.js),
   // and fire-mode modules for your gun: 'burstmod' (and 'automod', though that
   // comes from heavies). Destroyed robots also drop a 'clip' (+4) where they
   // fall; the first heavy you bring down drops the automatic module.
@@ -194,6 +195,7 @@ LEVELS.push({
     { type: 'ammo',    x: 16.5, y: 14.5 }, // corridor
     { type: 'ammo',    x: 29.5, y: 9.5 },  // workshop
     { type: 'repair',  x: 18.5, y: 15.5 }, // workshop
+    { type: 'charge',  x: 29.5, y: 15.5 }, // workshop, far corner: the demolition charge, for the core (charge.js)
     { type: 'repair',  x: 1.5,  y: 22.5 }, // hangar
     { type: 'ammo',    x: 30.5, y: 22.5 }, // hangar
     { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle

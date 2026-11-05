@@ -227,6 +227,14 @@ function drawKeys(pixels) {
     fillRect(pixels, x + 1, READOUT_Y + 1, 7, 4, KEY_COLOURS[colour]);
     fillRect(pixels, x + 1, READOUT_Y + 2, 7, 1, [235, 235, 235]); // stripe
   });
+  // The demolition charge, if you're carrying it (charge.js): a khaki block with a red lamp.
+  if (player.charge) {
+    const x = right - 9 - player.keys.length * 11;
+    fillRect(pixels, x, READOUT_Y, 9, 6, [0, 0, 0]);
+    fillRect(pixels, x + 1, READOUT_Y + 2, 7, 3, [168, 160, 122]);
+    fillRect(pixels, x + 3, READOUT_Y + 1, 3, 1, [60, 62, 66]);
+    fillRect(pixels, x + 4, READOUT_Y + 1, 1, 1, [255, 40, 30]);
+  }
 }
 
 // DEAD: the suit's display shuts down, one raster line at a time. Each row
@@ -273,6 +281,7 @@ function drawHud(pixels) {
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
+    drawChargeReadout(pixels); // charge.js: setting it, and the fuse
     if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
     if (securityMessageTime > 0) {
       const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === OBJECTIVE_LOOK.goal;

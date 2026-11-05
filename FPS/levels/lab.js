@@ -98,6 +98,7 @@ LEVELS.push({
     { type: 'ammo',      x: 12.5, y: 9.5 },  // specimen hall
     { type: 'automod',   x: 1.5,  y: 7.5 },  // side room, under the larvae
     { type: 'ammocrate', x: 1.5,  y: 10.5 }, // side room
+    { type: 'charge',    x: 1.5,  y: 9.5 },  // side room, past the larvae: the quiet way to burn the chamber (charge.js)
     { type: 'ammocrate', x: 21.5, y: 12.5 }, // lower lab
     { type: 'repair',    x: 1.5,  y: 14.5 }, // lower lab
   ],
