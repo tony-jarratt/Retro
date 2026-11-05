@@ -130,9 +130,17 @@ function buildLights() {
   return lights;
 }
 
-// Which ceiling cells have a strip light, and whether it's lit this frame:
-// the renderer shows the glowing fixture only where this is true.
-const ceilingLightOn = MAP.map((row) => row.map(() => false));
+// What each ceiling cell's strip light is doing this frame: 'off' (dead or
+// no light there), 'on', or 'alarm' (pulsing red). The renderer picks the
+// ceiling texture to match.
+const ceilingLightState = MAP.map((row) => row.map(() => 'off'));
+
+// ALARMS: a strip light inside a zone whose alarm is going turns red and
+// pulses. Rather than redo its shadows in a new colour, its precomputed
+// contribution is TINTED: each channel is scaled by alarm colour / normal
+// colour, which turns its white light into this red.
+const ALARM_COLOUR = [1.8, 0.12, 0.08];
+const ALARM_PULSE_SPEED = 6; // radians per second: about one pulse a second
 
 // FLICKER: time is cut into short slices, and each slice the light rolls a
 // repeatable random number (noise, from textures.js). Mostly it's on, with a
@@ -176,20 +184,29 @@ function updateLighting() {
     lightGrid[i + 1] = AMBIENT[1];
     lightGrid[i + 2] = AMBIENT[2];
   }
+  const pulse = 0.55 + 0.45 * Math.sin(animTime * ALARM_PULSE_SPEED);
   LIGHTS.forEach((light, n) => {
     light.level = light.flicker ? flickerLevel(n, animTime) : 1;
+    light.alarm = light.kind === 'ceiling' && zoneAlarmedAt(light.x, light.y);
+    // How much of each channel to add: the light's level, tinted red if alarmed.
+    const scale = light.alarm
+      ? ALARM_COLOUR.map((a, c) => pulse * a / light.colour[c])
+      : [light.level, light.level, light.level];
     // Only the samples inside the light's reach: on a big level, adding every
     // light across the whole grid every frame would be mostly adding zeros.
     const { sx0, sx1, sy0, sy1 } = light.box;
     for (let sy = sy0; sy <= sy1; sy++) {
-      for (let i = (sy * LIGHT_W + sx0) * 3; i < (sy * LIGHT_W + sx1 + 1) * 3; i++) {
-        lightGrid[i] += light.contribution[i] * light.level;
+      for (let i = (sy * LIGHT_W + sx0) * 3; i < (sy * LIGHT_W + sx1 + 1) * 3; i += 3) {
+        lightGrid[i] += light.contribution[i] * scale[0];
+        lightGrid[i + 1] += light.contribution[i + 1] * scale[1];
+        lightGrid[i + 2] += light.contribution[i + 2] * scale[2];
       }
     }
   });
-  // A strip light's tube glows only while its light is mostly on.
+  // A strip light's tube glows only while its light is mostly on, red in an alarm.
   for (const light of LIGHTS) {
-    if (light.kind === 'ceiling') ceilingLightOn[Math.floor(light.y)][Math.floor(light.x)] = light.level > 0.5;
+    if (light.kind !== 'ceiling') continue;
+    ceilingLightState[Math.floor(light.y)][Math.floor(light.x)] = light.alarm ? 'alarm' : light.level > 0.5 ? 'on' : 'off';
   }
 
   // Muzzle flashes, fading as their flash timers run down. Worked out fresh
@@ -200,10 +217,13 @@ function updateLighting() {
   for (const e of enemies) {
     if (e.firedTime > 0) addLight(lightGrid, e.x, e.y, ROBOT_FLASH.colour, ROBOT_FLASH.radius, e.firedTime / ROBOT_FIRE_FLASH);
   }
-  // Exploding drums: a big orange light that dies away with the fireball.
+  // Explosions: a big orange light that dies away with the fireball.
   for (const b of explosions) {
     addLight(lightGrid, b.x, b.y, BLAST_LIGHT.colour, BLAST_LIGHT.radius, 1 - b.time / EXPLOSION_TIME);
   }
+  // Rockets light their way as they fly: you see one coming down a dark corridor.
+  for (const r of rockets) addLight(lightGrid, r.x, r.y, ROCKET_LIGHT.colour, ROCKET_LIGHT.radius, 1);
+  addSecurityLights(lightGrid); // cameras' red spots (security.js)
 
   dilateIntoWalls(lightGrid);
 }

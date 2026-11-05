@@ -3,13 +3,9 @@
 
 const FIRE_COOLDOWN = 0.35;     // seconds between your shots
 const GUN_FLASH_TIME = 0.12;    // seconds the gun shows its muzzle flash and recoil
-const ROBOT_HEALTH = 3;         // hits to destroy a robot
 const HURT_FLASH_TIME = 0.1;    // seconds a hit robot flashes white
-const ROBOT_CHARGE_TIME = 1.0;  // seconds a robot charges (eye brightening) before firing
 const ROBOT_FIRE_FLASH = 0.15;  // seconds a robot shows its own muzzle flash
-const ROBOT_DAMAGE = 15;        // health you lose per robot hit
-const HIT_CHANCE_NEAR = 0.8;    // a robot's chance to hit you at 1 cell or closer...
-const HIT_CHANCE_FAR = 0.3;     // ...falling in a straight line to this at AIM_RANGE
+// (Each robot type's health, charge time, damage and odds are in ROBOT_TYPES, enemies.js.)
 const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hit
 
 // The whole game's state:
@@ -58,40 +54,52 @@ function playerFire() {
   gun.flash = GUN_FLASH_TIME;
   const target = thingUnderCrosshair();
   if (!target) return;
-  if (target.enemy && target.enemy.state !== 'dead') damageEnemy(target.enemy);
+  if (target.enemy && target.enemy.state !== 'dead') {
+    // A shot into a robot's back can count for more (the heavy's exposed vents).
+    const hits = isFacingAway(target.enemy) ? ROBOT_TYPES[target.enemy.type].backHits : 1;
+    damageEnemy(target.enemy, hits);
+  }
+  if (target.camera) shootCamera(target.camera); // security.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);
   }
 }
 
-function damageEnemy(enemy) {
-  enemy.health -= 1;
+// Take `hits` off a robot (1 unless given). Shot from somewhere it wasn't
+// watching, it now knows where you are; a sleeping turret wakes up.
+function damageEnemy(enemy, hits = 1) {
+  enemy.health -= hits;
   enemy.hurtTime = HURT_FLASH_TIME;
   if (enemy.health <= 0) {
     enemy.state = 'dead';
     enemy.moving = false;
     dropClip(enemy);
-  } else if (enemy.state === 'idle' || enemy.state === 'search') {
-    // Shot from somewhere it wasn't watching: it now knows where you are.
-    enemy.state = 'chase';
+    return;
+  }
+  wakeTurret(enemy);
+  if (enemy.state === 'idle' || enemy.state === 'search') {
+    if (ROBOT_TYPES[enemy.type].mobile) enemy.state = 'chase';
     enemy.lastSeenX = player.x;
     enemy.lastSeenY = player.y;
   }
 }
 
-// THE ODDS. A straight line from HIT_CHANCE_NEAR at 1 cell to HIT_CHANCE_FAR
-// at AIM_RANGE, held flat outside that range. Getting close to finish a robot
-// off is quicker for you but riskier, which is the point.
-function robotHitChance(dist) {
-  const t = Math.min(1, Math.max(0, (dist - 1) / (AIM_RANGE - 1)));
-  return HIT_CHANCE_NEAR + (HIT_CHANCE_FAR - HIT_CHANCE_NEAR) * t;
+// THE ODDS, for robots with guns. A straight line from the type's hitNear at
+// 1 cell to its hitFar at its aimRange, held flat outside that range. Getting
+// close to finish a robot off is quicker for you but riskier, which is the point.
+function robotHitChance(type, dist) {
+  const t = Math.min(1, Math.max(0, (dist - 1) / (type.aimRange - 1)));
+  return type.hitNear + (type.hitFar - type.hitNear) * t;
 }
 
-// Called by a robot when its charge completes (enemies.js).
+// Called by a robot when its charge completes (enemies.js). Guns are instant
+// with a chance to hit; the heavy's rocket is a real projectile you can dodge.
 function robotFires(enemy, dist) {
+  const type = ROBOT_TYPES[enemy.type];
   enemy.firedTime = ROBOT_FIRE_FLASH;
-  if (Math.random() < robotHitChance(dist)) damagePlayer(ROBOT_DAMAGE);
+  if (type.weapon === 'rocket') launchRocket(enemy); // explosions.js
+  else if (Math.random() < robotHitChance(type, dist)) damagePlayer(type.damage);
 }
 
 function damagePlayer(amount) {

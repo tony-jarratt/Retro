@@ -58,6 +58,9 @@ function checkMap() {
     }
   });
   enemies.forEach((enemy, n) => {
+    if (!ROBOT_TYPES[enemy.type]) {
+      throw new Error(`ENEMIES[${n}] has type "${enemy.type}", which is not in ROBOT_TYPES.`);
+    }
     if (MAP[Math.floor(enemy.y)]?.[Math.floor(enemy.x)] !== 0) {
       throw new Error(`ENEMIES[${n}] at (${enemy.x}, ${enemy.y}) is outside the map or not on a floor cell.`);
     }
@@ -90,7 +93,10 @@ function frame(now) {
   // Seconds since the last frame, so speed doesn't depend on frame rate.
   // Capped at 0.1s: after the tab has been in the background, rAF resumes
   // with a huge gap, and one giant step could carry the player through a wall.
-  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  // And never below 0: on the very first frame, rAF's timestamp can be a
+  // little EARLIER than the performance.now() taken at load, and a negative
+  // step would make every countdown timer count up instead.
+  const dt = Math.max(0, Math.min((now - lastTime) / 1000, 0.1));
   lastTime = now;
 
   animTime += dt; // drives animated walls (textures.js)
@@ -98,6 +104,7 @@ function frame(now) {
   if (game.state === 'playing') { // once you've won or died, everyone stops
     updatePlayer(dt);
     updatePickups();
+    updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
     updateEnemies(dt);
   }
   updateCombat(dt);

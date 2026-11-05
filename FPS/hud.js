@@ -25,7 +25,9 @@ const FONT = {
   'C': ['.##', '#..', '#..', '#..', '.##'],
   'D': ['##.', '#.#', '#.#', '#.#', '##.'],
   'E': ['###', '#..', '##.', '#..', '###'],
+  'F': ['###', '#..', '##.', '#..', '#..'],
   'H': ['#.#', '#.#', '###', '#.#', '#.#'],
+  'I': ['###', '.#.', '.#.', '.#.', '###'],
   'K': ['#.#', '#.#', '##.', '#.#', '#.#'],
   'L': ['#..', '#..', '#..', '#..', '###'],
   'M': ['#.#', '###', '###', '#.#', '#.#'],
@@ -176,8 +178,18 @@ function drawHud(pixels) {
   drawHealth(pixels);
   drawAmmo(pixels);
   drawKeys(pixels);
-  if (lockedDoorHint && game.state === 'playing') {
-    drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
+  if (game.state === 'playing') {
+    if (lockedDoorHint) {
+      drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
+    }
+    if (securityMessageTime > 0) {
+      const ok = securityMessage === 'SECURITY OFFLINE';
+      drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);
+    }
+    // While any alarm is going, a red ALARM blinks at the top of the screen.
+    if (Object.values(alarms).some((t) => t > 0) && Math.floor(animTime * 3) % 2 === 0) {
+      drawTextCentred(pixels, 'ALARM', 6, HUD_WARN, 1);
+    }
   }
   const left = enemies.filter((e) => e.state !== 'dead').length;
   const counter = 'ROBOTS ' + left;

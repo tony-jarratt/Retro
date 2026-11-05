@@ -15,6 +15,7 @@
 // The corridor and workshop in the middle link everything up.
 
 const DOOR_CELL = 9;
+const TERMINAL_CELL = 5;
 
 const LEGEND = {
   '.': 0,         // floor
@@ -22,6 +23,7 @@ const LEGEND = {
   'H': 2,         // hazard bulkhead
   'C': 3,         // computer bank (animated; gives off a little green light)
   'P': 4,         // pipes
+  'T': TERMINAL_CELL, // security terminal set into the wall (see TERMINALS below)
   'D': DOOR_CELL, // sliding blast door: must sit in a gap in a straight wall
 };
 
@@ -34,7 +36,7 @@ const LEVEL = [
   '#.......D....HH....#....P..P...#', //  3
   '#.......#....HH....D....P..P...#', //  4
   '#.......#..........#....P..P...#', //  5
-  '#.......#..........#.......P...#', //  6
+  '#.......T..........T.......P...#', //  6  terminals: depot (x8), pipe works (x19)
   '#.......#..........#.......P...#', //  7
   '####D##########D#########D######', //  8  red door (x4), to corridor (x15), to workshop (x25)
   '#............P...P.............#', //  9  server room | corridor | workshop
@@ -42,13 +44,13 @@ const LEVEL = [
   '#..C..C..C...P...P.......PP....#', // 11
   '#............P...D.......PP....#', // 12
   '#..C..C..C...P...P.......PP....#', // 13
-  '#............P...P.............#', // 14
+  '#............T...P.............#', // 14  terminal: server room (x13), reached from the corridor
   '#............P...P.............#', // 15
   '#HHHHHDHHHHHHHHDHHHHHHHHHHHHHHH#', // 16  blue doors (x6, x15) into the hangar
   '#..............................#', // 17  hangar hall
   '#..............................#', // 18
   '#.........H.........H..........#', // 19
-  '#.........H.........H..........#', // 20
+  'T.........H.........H..........#', // 20  terminal: hangar (x0)
   '#..............................#', // 21
   '#..............................#', // 22
   '################################', // 23
@@ -132,32 +134,75 @@ const CEILING_LIGHTS = [
   { x: 29, y: 22, flicker: true },
 ];
 
-// Sentry robots (enemies.js): where each starts and which way it faces.
+// Robots (enemies.js): type (a key of ROBOT_TYPES: walker, scout, heavy,
+// turret), where each starts, and which way it faces.
 // angle uses the player's convention: 0 = east, PI/2 = south, -PI/2 = north.
 const ENEMIES = [
   // Fuel depot
-  { x: 16.5, y: 2.5,  angle: Math.PI },      // watching the door in from the start bay
-  { x: 14.5, y: 6.5,  angle: -Math.PI / 2 },
+  { type: 'walker', x: 16.5, y: 2.5,  angle: Math.PI },      // watching the door in from the start bay
+  { type: 'scout',  x: 14.5, y: 6.5,  angle: -Math.PI / 2 },
   // Pipe works
-  { x: 22.5, y: 2.5,  angle: Math.PI },      // watching the door in from the depot
-  { x: 29.5, y: 2.5,  angle: Math.PI / 2 },  // guarding the red keycard
+  { type: 'walker', x: 22.5, y: 2.5,  angle: Math.PI },      // watching the door in from the depot
+  { type: 'heavy',  x: 29.5, y: 2.5,  angle: Math.PI / 2 },  // guarding the red keycard
+  { type: 'turret', x: 28.5, y: 1.5,  angle: Math.PI / 2 },  // asleep until the tripwire
   // Server room
-  { x: 10.5, y: 10.5, angle: Math.PI },
-  { x: 4.5,  y: 14.5, angle: -Math.PI / 2 },
+  { type: 'walker', x: 10.5, y: 10.5, angle: Math.PI },
+  { type: 'scout',  x: 4.5,  y: 14.5, angle: -Math.PI / 2 },
   // Workshop
-  { x: 28.5, y: 12.5, angle: Math.PI },
+  { type: 'heavy',  x: 28.5, y: 12.5, angle: Math.PI },
   // Hangar hall
-  { x: 12.5, y: 19.5, angle: -Math.PI / 2 },
-  { x: 8.5,  y: 21.5, angle: -Math.PI / 2 },
-  { x: 18.5, y: 18.5, angle: Math.PI },
-  { x: 27.5, y: 20.5, angle: Math.PI },
-  { x: 29.5, y: 17.5, angle: Math.PI / 2 },
+  { type: 'walker', x: 12.5, y: 19.5, angle: -Math.PI / 2 },
+  { type: 'scout',  x: 8.5,  y: 21.5, angle: -Math.PI / 2 },
+  { type: 'walker', x: 18.5, y: 18.5, angle: Math.PI },
+  { type: 'heavy',  x: 27.5, y: 20.5, angle: Math.PI },
+  { type: 'scout',  x: 29.5, y: 17.5, angle: Math.PI / 2 },
+  { type: 'turret', x: 10.5, y: 21.5, angle: -Math.PI / 2 }, // asleep until the corridor tripwire
+  { type: 'turret', x: 20.5, y: 18.5, angle: Math.PI },
+];
+
+// SECURITY (security.js). Each zone is a rectangle of cells; cameras,
+// tripwires and terminals each belong to one, and robots and turrets belong
+// to whichever zone they're standing in.
+const ZONES = [
+  { id: 'depot',     x: 9,  y: 1,  w: 10, h: 7 },
+  { id: 'pipeworks', x: 20, y: 1,  w: 11, h: 7 },
+  { id: 'server',    x: 1,  y: 9,  w: 12, h: 7 },
+  { id: 'workshop',  x: 18, y: 9,  w: 13, h: 7 },
+  { id: 'hangar',    x: 1,  y: 17, w: 30, h: 6 },
+];
+
+// Cameras on poles. angle is the middle of their sweep. Seeing you alerts
+// the walking robots in their zone. Shoot one, or use its zone's terminal.
+const CAMERAS = [
+  { x: 9.5,  y: 6.5,  angle: -0.6,      zone: 'depot' },
+  { x: 1.5,  y: 12.5, angle: 0,         zone: 'server' },
+  { x: 18.5, y: 9.5,  angle: 0.6,       zone: 'workshop' }, // no terminal for this one: shoot it
+  { x: 1.5,  y: 17.5, angle: 0.5,       zone: 'hangar' },
+  { x: 30.5, y: 21.5, angle: -2.6,      zone: 'hangar' },
+];
+
+// Tripwires: a laser across floor cells x0..x1 of row y, wall to wall.
+// Breaking one wakes the turrets in its zone, which needn't be where the beam is.
+const TRIPWIRES = [
+  { x0: 25, x1: 26, y: 4,  zone: 'pipeworks' }, // the narrow gap between the pipe runs
+  { x0: 14, x1: 16, y: 13, zone: 'hangar' },    // across the corridor: the hangar turrets hear you coming
+];
+
+// Security terminals: x, y is the 'T' wall cell. Walk up to one and its zone's
+// cameras, tripwires and turrets shut down for good.
+const TERMINALS = [
+  { x: 8,  y: 6,  zone: 'depot' },     // in the start bay wall: you can switch the depot off before going in
+  { x: 19, y: 6,  zone: 'pipeworks' }, // reachable from the depot side
+  { x: 13, y: 14, zone: 'server' },    // in the corridor wall: sneak round before using the red door
+  { x: 0,  y: 20, zone: 'hangar' },    // deep in the hangar, far left
 ];
 
 // Things to collect (pickups.js): 'ammo' (+8), 'health' (+25), 'redkey', 'bluekey'.
 // Destroyed robots also drop a 'clip' (+4) where they fall.
 const PICKUPS = [
   { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay
+  { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
+  { type: 'health',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
   { type: 'redkey',  x: 29.5, y: 6.5 },  // pipe works, far corner
   { type: 'ammo',    x: 20.5, y: 1.5 },  // pipe works
   { type: 'bluekey', x: 11.5, y: 14.5 }, // server room, far corner
@@ -167,6 +212,7 @@ const PICKUPS = [
   { type: 'health',  x: 18.5, y: 15.5 }, // workshop
   { type: 'health',  x: 1.5,  y: 22.5 }, // hangar
   { type: 'ammo',    x: 30.5, y: 22.5 }, // hangar
+  { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
 ];
 
 // Where the player starts. angle is in radians: 0 faces +x (east), and

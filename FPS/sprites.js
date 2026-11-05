@@ -36,18 +36,21 @@ function hitsSolidSprite(x, y, r) {
 //              charges; a flickering lamp's bulb dims with its light)
 //   enemy      the robot this is, or null
 //   prop       the prop (drum, strut, lamp) this is, or null
-//   effect     true for an explosion: you can see it, but shots pass through it
+//   camera     the security camera this is, or null
+//   effect     true for an explosion, rocket or laser beam: you can see it, but shots pass through
 function spriteThings(viewer) {
-  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, effect: false, ...extra });
+  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, effect: false, ...extra });
   return [
     ...props.map((p) => thing(p.x, p.y, p.state === 'exploded' ? DRUM_WRECK_TEXTURE : SPRITE_TYPES[p.type].texture,
       { glowShade: spriteGlow(p), prop: p })),
     ...enemies.map((e) => thing(e.x, e.y, enemyTexture(e, viewer), {
       shade: e.hurtTime > 0 ? 3 : 1,
-      glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ROBOT_CHARGE_TIME : 1,
+      glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ROBOT_TYPES[e.type].charge : 1,
       enemy: e,
     })),
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
+    ...securityThings(thing), // cameras and tripwire beams (security.js)
+    ...rockets.map((r) => thing(r.x, r.y, ROCKET_TEXTURE, { effect: true })),
     // Explosions come last: one drawn at the same spot as its drum's remains
     // ties on distance, and ties keep list order, so the fireball goes on top.
     ...explosions.map((b) => thing(b.x, b.y, explosionTexture(b), { effect: true })),

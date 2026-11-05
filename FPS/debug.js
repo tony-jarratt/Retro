@@ -56,6 +56,28 @@ function drawDebug(ctx, player, hits) {
     else ctx.stroke();
   }
 
+  // Security: zone outlines (red while alarmed), tripwire beams, terminals,
+  // and each camera's view cone.
+  for (const z of ZONES) {
+    ctx.strokeStyle = alarms[z.id] > 0 ? 'rgba(255, 60, 40, 0.8)' : 'rgba(120, 200, 255, 0.25)';
+    ctx.strokeRect(z.x * s + 1, z.y * s + 1, z.w * s - 2, z.h * s - 2);
+  }
+  ctx.strokeStyle = '#f33';
+  for (const t of tripwires) if (t.state === 'armed') line(ctx, t.x0 * s, (t.y + 0.5) * s, (t.x1 + 1) * s, (t.y + 0.5) * s);
+  for (const term of terminals) {
+    ctx.fillStyle = term.state === 'safe' ? '#4f8' : '#f44';
+    ctx.fillRect((term.x + 0.25) * s, (term.y + 0.25) * s, 0.5 * s, 0.5 * s);
+  }
+  for (const c of cameras) {
+    ctx.strokeStyle = ctx.fillStyle = c.state === 'watching' ? '#f66' : '#666';
+    ctx.fillRect((c.x - 0.15) * s, (c.y - 0.15) * s, 0.3 * s, 0.3 * s);
+    if (c.state !== 'watching') continue;
+    for (const side of [-1, 1]) {
+      const a = c.angle + side * CAMERA_CONE / 2;
+      line(ctx, c.x * s, c.y * s, (c.x + Math.cos(a) * CAMERA_RANGE) * s, (c.y + Math.sin(a) * CAMERA_RANGE) * s);
+    }
+  }
+
   // Lights: a small cross coloured by kind, dim while it's flickering off.
   const LIGHT_COLOURS = { lamp: '#fa4', ceiling: '#cdf', screen: '#4f8' };
   for (const light of LIGHTS) {
@@ -75,7 +97,7 @@ function drawDebug(ctx, player, hits) {
 
   // Robots: a dot coloured by state, with a line showing which way each faces,
   // and a dashed line through the cells of the path it's following (pathfinding.js).
-  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555' };
+  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555', dormant: '#775', offline: '#333' };
   for (const enemy of enemies) {
     if (enemy.path && enemy.path.length > 0) {
       ctx.strokeStyle = STATE_COLOURS[enemy.state];

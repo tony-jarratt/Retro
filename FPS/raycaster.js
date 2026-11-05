@@ -97,7 +97,7 @@ function castRay(px, py, rayX, rayY) {
       // Facing west, your right is -y, so wallX shrinks left to right; flip it.
       if ((side === 0 && rayX < 0) || (side === 1 && rayY > 0)) wallX = 1 - wallX;
 
-      return { dist, side, cell, hitX, hitY, wallX };
+      return { dist, side, cell, hitX, hitY, wallX, cellX: mapX, cellY: mapY };
     }
   }
 }
@@ -165,6 +165,15 @@ function castRays(player) {
   return hits;
 }
 
+// Which picture a wall hit shows. A door shows its own lock colour, a
+// security terminal whether it's armed or safe, and an animated wall this
+// frame's picture.
+function textureForHit(hit) {
+  if (hit.door) return doorTexture(hit.door);
+  if (hit.cell === TERMINAL_CELL) return terminalTexture(hit.cellX, hit.cellY);
+  return wallTexture(hit.cell);
+}
+
 // Draw the whole 3D view into the ImageData: floor and ceiling first, then
 // a textured wall strip for every column on top of them, then sprites.
 function renderView(image, hits, player) {
@@ -185,8 +194,7 @@ function renderView(image, hits, player) {
     const top = Math.max(0, Math.ceil(wallTop - 0.5));
     const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
 
-    // A door shows its own lock colour; animated walls show this frame's picture.
-    const tex = hit.door ? doorTexture(hit.door) : wallTexture(hit.cell);
+    const tex = textureForHit(hit);
     // The Math.min guards against wallX rounding to exactly 1.0, which would
     // index one column past the edge of the texture.
     const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
@@ -265,9 +273,10 @@ function renderFloorCeiling(pixels, player) {
       const light = lightAt(floorX, floorY);
       copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, light, fog);
 
-      // Only cells with a working strip light show one; the rest have a dark fixture.
-      const lit = ceilingLightOn[Math.floor(floorY)]?.[Math.floor(floorX)] === true;
-      const ceiling = lit ? CEILING_TEXTURE : CEILING_DARK_TEXTURE;
+      // Only cells with a working strip light show one lit (red in an alarm);
+      // the rest have a dark fixture.
+      const state = ceilingLightState[Math.floor(floorY)]?.[Math.floor(floorX)];
+      const ceiling = state === 'on' ? CEILING_TEXTURE : state === 'alarm' ? CEILING_ALARM_TEXTURE : CEILING_DARK_TEXTURE;
       if (glows(ceiling, texX, texY)) {
         copyTexel(pixels, col, ceilingRow, ceiling, texX, texY, FULL_LIGHT, 0);
       } else {
