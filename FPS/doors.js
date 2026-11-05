@@ -13,7 +13,12 @@ const DOOR_TRIGGER_RANGE = 1.3;  // cells from the door's centre: about one cell
 //   open        how far it has slid away: 0 = shut, 1 = fully open
 //   state       'closed' -> 'opening' -> 'open' -> 'closing' -> 'closed'
 //   timer       seconds left before an open door starts closing
+//   lock        null, or the colour of keycard it needs ('red', 'blue'), from LOCKED_DOORS
 const DOORS = findDoors();
+
+// The key colour of the locked door you're standing at without its card, or
+// null. The HUD shows "RED KEYCARD NEEDED" while this is set.
+let lockedDoorHint = null;
 
 function findDoors() {
   const isSolid = (x, y) => { const c = MAP[y]?.[x]; return c !== undefined && c !== 0 && c !== DOOR_CELL; };
@@ -29,9 +34,25 @@ function findDoors() {
     if (!horizontal && !vertical) {
       throw new Error(`Door at MAP[${y}][${x}] must have walls on two opposite sides and floor on the other two.`);
     }
-    doors.push({ x, y, horizontal, open: 0, state: 'closed', timer: 0 });
+    const locked = LOCKED_DOORS.find((l) => l.x === x && l.y === y);
+    doors.push({ x, y, horizontal, open: 0, state: 'closed', timer: 0, lock: locked ? locked.key : null });
   }));
+  // Every lock in the map must sit on a real door, and need a real key.
+  for (const l of LOCKED_DOORS) {
+    if (MAP[l.y]?.[l.x] !== DOOR_CELL) {
+      throw new Error(`LOCKED_DOORS entry at cell (${l.x}, ${l.y}) is not on a door (MAP value ${DOOR_CELL}).`);
+    }
+    if (!KEY_COLOURS[l.key]) {
+      throw new Error(`LOCKED_DOORS entry at cell (${l.x}, ${l.y}) needs key "${l.key}", which is not in KEY_COLOURS.`);
+    }
+  }
   return doors;
+}
+
+// Can the player open this door? Unlocked doors always; locked ones only
+// once you're carrying the matching keycard.
+function playerCanOpen(door) {
+  return door.lock === null || player.keys.includes(door.lock);
 }
 
 function doorAt(x, y) {
@@ -62,10 +83,14 @@ function playerNearDoor(door) {
 //   open     -> closing  DOOR_OPEN_TIME after you've moved away, if the doorway is clear
 //   closing  -> opening  if you come back near before it shuts
 //   closing  -> closed   once shut
+// A locked door ignores you until you have its keycard: that's the only
+// difference, one extra condition on the very first step.
 function updateDoors(dt) {
+  lockedDoorHint = null;
   for (const door of DOORS) {
     const near = playerNearDoor(door);
-    if (near && (door.state === 'closed' || door.state === 'closing')) door.state = 'opening';
+    if (near && !playerCanOpen(door)) lockedDoorHint = door.lock;
+    if (near && playerCanOpen(door) && (door.state === 'closed' || door.state === 'closing')) door.state = 'opening';
 
     if (door.state === 'opening') {
       door.open = Math.min(1, door.open + DOOR_SPEED * dt);

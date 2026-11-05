@@ -2,7 +2,7 @@
 // Drawn with ordinary canvas calls on its own full-resolution canvas,
 // so it stays crisp while the 3D view is chunky.
 
-const DEBUG_CELL = 16; // pixels per map cell
+const DEBUG_CELL = 10; // pixels per map cell (the 32x24 level makes a 320x240 map)
 
 function drawDebug(ctx, player, hits) {
   const rows = MAP.length;
@@ -21,10 +21,11 @@ function drawDebug(ctx, player, hits) {
     }
   }
 
-  // Doors: a thick line across the middle of the cell, for the part not yet slid away.
-  ctx.strokeStyle = `rgb(${TEXTURES[DOOR_CELL].colour.join(',')})`;
+  // Doors: a thick line across the middle of the cell, for the part not yet
+  // slid away. Locked doors are drawn in their key's colour.
   ctx.lineWidth = 3;
   for (const door of DOORS) {
+    ctx.strokeStyle = `rgb(${(door.lock ? KEY_COLOURS[door.lock] : TEXTURES[DOOR_CELL].colour).join(',')})`;
     if (door.horizontal) line(ctx, (door.x + door.open) * s, (door.y + 0.5) * s, (door.x + 1) * s, (door.y + 0.5) * s);
     else line(ctx, (door.x + 0.5) * s, (door.y + door.open) * s, (door.x + 0.5) * s, (door.y + 1) * s);
   }
@@ -65,15 +66,26 @@ function drawDebug(ctx, player, hits) {
     ctx.globalAlpha = 1;
   }
 
-  // Pickups: small squares, gold for ammo, white for health.
+  // Pickups: small squares, gold for ammo, white for health, keycards in their colour.
+  const PICKUP_COLOURS = { health: '#fff', redkey: '#f44', bluekey: '#48f' };
   for (const p of pickups) {
-    ctx.fillStyle = p.type === 'health' ? '#fff' : '#fc4';
+    ctx.fillStyle = PICKUP_COLOURS[p.type] || '#fc4';
     ctx.fillRect((p.x - 0.15) * s, (p.y - 0.15) * s, 0.3 * s, 0.3 * s);
   }
 
-  // Robots: a dot coloured by state, with a line showing which way each faces.
+  // Robots: a dot coloured by state, with a line showing which way each faces,
+  // and a dashed line through the cells of the path it's following (pathfinding.js).
   const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555' };
   for (const enemy of enemies) {
+    if (enemy.path && enemy.path.length > 0) {
+      ctx.strokeStyle = STATE_COLOURS[enemy.state];
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(enemy.x * s, enemy.y * s);
+      for (const cell of enemy.path) ctx.lineTo((cell.x + 0.5) * s, (cell.y + 0.5) * s);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.fillStyle = ctx.strokeStyle = STATE_COLOURS[enemy.state];
     ctx.beginPath();
     ctx.arc(enemy.x * s, enemy.y * s, ENEMY_RADIUS * s, 0, Math.PI * 2);

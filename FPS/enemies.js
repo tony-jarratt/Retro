@@ -20,6 +20,7 @@ const WALK_FPS = 4;                         // walk animation frames per second
 //   health                 hits left (combat.js)
 //   charge                 seconds spent charging its shot while aiming
 //   hurtTime, firedTime    seconds left of its white hit flash / muzzle flash
+//   path                   the cells it's following this frame (pathfinding.js), or null
 const enemies = ENEMIES.map((start) => ({
   x: start.x,
   y: start.y,
@@ -33,6 +34,7 @@ const enemies = ENEMIES.map((start) => ({
   charge: 0,
   hurtTime: 0,
   firedTime: 0,
+  path: null,
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -85,15 +87,29 @@ function stepTowards(enemy, targetX, targetY, dt) {
   return moved;
 }
 
+// Walk towards (targetX, targetY) by the shortest route through the grid
+// (pathfinding.js): head for the middle of the next cell on the path, or
+// straight at the target once in the same cell. Returns false if it didn't
+// move, including when there's no route at all (say, a closed door between).
+// The path is kept on the robot so the debug map can draw it.
+function moveAlongPath(enemy, targetX, targetY, dt) {
+  enemy.path = findPath(enemy.x, enemy.y, targetX, targetY);
+  if (enemy.path === null) return false;
+  if (enemy.path.length === 0) return stepTowards(enemy, targetX, targetY, dt);
+  return stepTowards(enemy, enemy.path[0].x + 0.5, enemy.path[0].y + 0.5, dt);
+}
+
 // THE ROBOT STATE MACHINE.
 //   idle   stand still, facing a fixed way, watching the cone in front
-//   chase  saw you: walk straight at you (no pathfinding, so it can snag on corners)
+//   chase  saw you: follow the shortest path to you
 //   aim    within AIM_RANGE and in sight: stop, face you, charge, fire
-//   search lost sight of you: walk to where you were last seen, then go idle
+//   search lost sight of you: follow the path to where you were last seen,
+//          round corners if need be, then go idle
 //   dead   a wreck on the floor; does nothing ever again
 function updateEnemy(enemy, dt) {
   enemy.hurtTime = Math.max(0, enemy.hurtTime - dt);
   enemy.firedTime = Math.max(0, enemy.firedTime - dt);
+  enemy.path = null; // only set while it's following one this frame
   if (enemy.state === 'dead') return;
 
   const sees = canSee(enemy);
@@ -119,12 +135,12 @@ function updateEnemy(enemy, dt) {
       robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
     }
   } else if (enemy.state === 'chase') {
-    // Blocked while chasing (snagged on a corner)? Keep trying: you might move.
-    enemy.moving = stepTowards(enemy, player.x, player.y, dt);
+    // No route (a door shut between you)? It waits, still watching.
+    enemy.moving = moveAlongPath(enemy, player.x, player.y, dt);
   } else if (enemy.state === 'search') {
     const arrived = Math.hypot(enemy.lastSeenX - enemy.x, enemy.lastSeenY - enemy.y) < 0.2;
-    enemy.moving = !arrived && stepTowards(enemy, enemy.lastSeenX, enemy.lastSeenY, dt);
-    // Got there, or completely stuck on the way: give up and stand guard here.
+    enemy.moving = !arrived && moveAlongPath(enemy, enemy.lastSeenX, enemy.lastSeenY, dt);
+    // Got there, or no way through / completely stuck: give up and stand guard here.
     if (!enemy.moving) enemy.state = 'idle';
   }
 
@@ -132,6 +148,7 @@ function updateEnemy(enemy, dt) {
 }
 
 function updateEnemies(dt) {
+  buildWalkableCells(); // doors and drums change, so the walkable map is redone each frame
   for (const enemy of enemies) updateEnemy(enemy, dt);
 }
 

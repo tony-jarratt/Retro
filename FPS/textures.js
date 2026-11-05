@@ -98,6 +98,9 @@ const SODIUM = [255, 170, 60];
 const PHOSPHOR = [90, 240, 120];
 const AMBER = [255, 176, 40];
 
+// Keycard colours. A locked door (LOCKED_DOORS in map.js) names one of these.
+const KEY_COLOURS = { red: [220, 40, 40], blue: [60, 110, 255] };
+
 // WALLS ---------------------------------------------------------------------
 
 // Riveted steel plates, 32x32, with rust streaking down from the seams.
@@ -200,15 +203,20 @@ function makePipes() {
 }
 
 // A blast door: steel with ribs, hazard chevrons along its leading (left)
-// edge, and a green status light. As before, the leading edge is the one that
+// edge, and a status light. As before, the leading edge is the one that
 // moves as the door slides open (see hitDoor in raycaster.js).
-function makeBlastDoor() {
+// `lock` is null for an ordinary door (green light), or a key colour: then
+// the light shows that colour and a stripe of it is painted across the door,
+// so you can tell from a distance which keycard it wants.
+function makeBlastDoor(lock) {
+  const band = lock ? KEY_COLOURS[lock] : null;
   return makeTexture([84, 90, 98], (x, y) => {
     if (x < 10) return hazard(x, y, false);
     if (x === 10 || x >= 62 || y < 2 || y >= 62) return DARK_STEEL;
     const light = Math.hypot(x + 0.5 - 16, y + 0.5 - 32);
-    if (light < 2) return glowing([80, 255, 120]);
+    if (light < 2) return glowing(band ? brighten(band, 1.3) : [80, 255, 120]);
     if (light < 3) return DARK_STEEL;
+    if (band && y >= 40 && y < 47 && x > 22) return brighten(band, 0.85 + 0.15 * noise(x, y, 56)); // painted stripe
     const rib = y % 12;
     if (rib === 0) return brighten([84, 90, 98], 1.35);
     if (rib === 1) return brighten([84, 90, 98], 0.5);
@@ -595,6 +603,20 @@ function makeMedkit() {
   });
 }
 
+// A keycard lying on the floor. It glows, so you can spot it in the dark.
+function makeKeycard(colour) {
+  return makeTexture(colour, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y < 55 || y >= 62 || Math.abs(dx) > 7) return null;
+    if (y === 57) return glowing([235, 235, 235]);              // magnetic stripe
+    if (dx > 3 && y > 58) return glowing([230, 200, 90]);       // chip
+    return glowing(brighten(colour, y === 55 ? 1.3 : 1));
+  });
+}
+
+const KEYCARD_TEXTURES = {};
+for (const colour in KEY_COLOURS) KEYCARD_TEXTURES[colour] = makeKeycard(KEY_COLOURS[colour]);
+
 const AMMO_BOX_TEXTURE = makeAmmoBox();
 const CLIP_TEXTURE = makeClip();
 const MEDKIT_TEXTURE = makeMedkit();
@@ -628,10 +650,18 @@ const TEXTURES = {
   2: makeBulkhead(),
   3: COMPUTER_FRAMES[0],
   4: makePipes(),
-  [DOOR_CELL]: makeBlastDoor(),
+  [DOOR_CELL]: makeBlastDoor(null),
 };
 
 function wallTexture(cell) {
   const frames = ANIMATED_WALLS[cell];
   return frames ? frames[Math.floor(animTime * ANIMATION_FPS) % frames.length] : TEXTURES[cell];
+}
+
+// Doors look different depending on their lock: one texture per key colour.
+const LOCKED_DOOR_TEXTURES = {};
+for (const colour in KEY_COLOURS) LOCKED_DOOR_TEXTURES[colour] = makeBlastDoor(colour);
+
+function doorTexture(door) {
+  return door.lock ? LOCKED_DOOR_TEXTURES[door.lock] : TEXTURES[DOOR_CELL];
 }

@@ -1,4 +1,4 @@
-// Pickups: ammo boxes, health packs, and clips dropped by destroyed robots.
+// Pickups: ammo boxes, health packs, keycards, and clips dropped by destroyed robots.
 // They're drawn as sprites (sprites.js) and collected by walking over them.
 // Where the starting ones lie is listed in map.js (PICKUPS).
 
@@ -24,6 +24,16 @@ const PICKUP_TYPES = {
       player.health = Math.min(PLAYER_MAX_HEALTH, player.health + 25);
       return true;
     },
+  },
+  // Keycards: 'redkey', 'bluekey'. Collecting one lets you through doors of
+  // that colour (playerCanOpen in doors.js).
+  redkey: {
+    texture: KEYCARD_TEXTURES.red,
+    collect: () => { player.keys.push('red'); return true; },
+  },
+  bluekey: {
+    texture: KEYCARD_TEXTURES.blue,
+    collect: () => { player.keys.push('blue'); return true; },
   },
 };
 

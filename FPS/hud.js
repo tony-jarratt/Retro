@@ -26,14 +26,18 @@ const FONT = {
   'D': ['##.', '#.#', '#.#', '#.#', '##.'],
   'E': ['###', '#..', '##.', '#..', '###'],
   'H': ['#.#', '#.#', '###', '#.#', '#.#'],
+  'K': ['#.#', '#.#', '##.', '#.#', '#.#'],
   'L': ['#..', '#..', '#..', '#..', '###'],
   'M': ['#.#', '###', '###', '#.#', '#.#'],
+  'N': ['###', '#.#', '#.#', '#.#', '#.#'],
   'O': ['.#.', '#.#', '#.#', '#.#', '.#.'],
   'P': ['##.', '#.#', '##.', '#..', '#..'],
   'R': ['##.', '#.#', '##.', '#.#', '#.#'],
   'S': ['.##', '#..', '.#.', '..#', '##.'],
   'T': ['###', '.#.', '.#.', '.#.', '.#.'],
+  'U': ['#.#', '#.#', '#.#', '#.#', '###'],
   'V': ['#.#', '#.#', '#.#', '#.#', '.#.'],
+  'Y': ['#.#', '#.#', '.#.', '.#.', '.#.'],
   ' ': ['...', '...', '...', '...', '...'],
 };
 
@@ -146,6 +150,16 @@ function drawAmmo(pixels) {
   drawText(pixels, text, SCREEN_W - 6 - textWidth(text, 1), SCREEN_H - 20, colour, 1);
 }
 
+// The keycards you're carrying: a small card in each colour, under the ammo count.
+function drawKeys(pixels) {
+  player.keys.forEach((colour, n) => {
+    const x = SCREEN_W - 6 - 9 - n * 11;
+    fillRect(pixels, x, SCREEN_H - 12, 9, 6, [0, 0, 0]);
+    fillRect(pixels, x + 1, SCREEN_H - 11, 7, 4, KEY_COLOURS[colour]);
+    fillRect(pixels, x + 1, SCREEN_H - 10, 7, 1, [235, 235, 235]); // stripe
+  });
+}
+
 function drawHud(pixels) {
   if (game.state !== 'dead') {
     drawGun(pixels);
@@ -161,6 +175,10 @@ function drawHud(pixels) {
 
   drawHealth(pixels);
   drawAmmo(pixels);
+  drawKeys(pixels);
+  if (lockedDoorHint && game.state === 'playing') {
+    drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
+  }
   const left = enemies.filter((e) => e.state !== 'dead').length;
   const counter = 'ROBOTS ' + left;
   drawText(pixels, counter, SCREEN_W - 6 - textWidth(counter, 1), 6, HUD_GREEN, 1);

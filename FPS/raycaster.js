@@ -131,7 +131,7 @@ function hitDoor(door, px, py, rayX, rayY) {
   // No mirror flip here (unlike walls): seen from either side, the handle
   // drawn at the leading edge stays at the edge that moves, as a real one would.
   const wallX = along - door.open;
-  return { dist, side: door.horizontal ? 1 : 0, cell: DOOR_CELL, hitX, hitY, wallX };
+  return { dist, side: door.horizontal ? 1 : 0, cell: DOOR_CELL, hitX, hitY, wallX, door };
 }
 
 // Cast one ray per screen column and return the hits (also used by the
@@ -185,7 +185,8 @@ function renderView(image, hits, player) {
     const top = Math.max(0, Math.ceil(wallTop - 0.5));
     const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
 
-    const tex = wallTexture(hit.cell); // for animated walls, this frame's picture
+    // A door shows its own lock colour; animated walls show this frame's picture.
+    const tex = hit.door ? doorTexture(hit.door) : wallTexture(hit.cell);
     // The Math.min guards against wallX rounding to exactly 1.0, which would
     // index one column past the edge of the texture.
     const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));

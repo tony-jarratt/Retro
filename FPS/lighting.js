@@ -41,11 +41,18 @@ function isSolidCell(x, y) {
 // Add one light into a grid. Brightness falls off smoothly to nothing at the
 // light's radius ((1 - d/r) squared), and nothing reaches a sample that a wall
 // shadows. Samples inside walls are skipped here; dilateIntoWalls fills them.
+// The rectangle of samples a light at (x, y) can possibly reach.
+function lightBox(x, y, radius) {
+  return {
+    sx0: Math.max(0, Math.floor((x - radius) * LIGHT_RES)),
+    sx1: Math.min(LIGHT_W - 1, Math.ceil((x + radius) * LIGHT_RES)),
+    sy0: Math.max(0, Math.floor((y - radius) * LIGHT_RES)),
+    sy1: Math.min(LIGHT_H - 1, Math.ceil((y + radius) * LIGHT_RES)),
+  };
+}
+
 function addLight(grid, x, y, colour, radius, strength) {
-  const sx0 = Math.max(0, Math.floor((x - radius) * LIGHT_RES));
-  const sx1 = Math.min(LIGHT_W - 1, Math.ceil((x + radius) * LIGHT_RES));
-  const sy0 = Math.max(0, Math.floor((y - radius) * LIGHT_RES));
-  const sy1 = Math.min(LIGHT_H - 1, Math.ceil((y + radius) * LIGHT_RES));
+  const { sx0, sx1, sy0, sy1 } = lightBox(x, y, radius);
   for (let sy = sy0; sy <= sy1; sy++) {
     for (let sx = sx0; sx <= sx1; sx++) {
       const px = (sx + 0.5) / LIGHT_RES; // where this sample sits in the world
@@ -110,7 +117,10 @@ function buildLights() {
   const add = (x, y, kind, settings, flicker, sprite) => {
     const contribution = newLightGrid();
     addLight(contribution, x, y, settings.colour, settings.radius, 1);
-    lights.push({ x, y, kind, colour: settings.colour, radius: settings.radius, flicker, sprite, contribution, level: 1 });
+    lights.push({
+      x, y, kind, colour: settings.colour, radius: settings.radius, flicker, sprite, contribution, level: 1,
+      box: lightBox(x, y, settings.radius), // only these samples can be lit by it
+    });
   };
   for (const p of props) if (p.type === 'lamp') add(p.x, p.y, 'lamp', LAMP_LIGHT, p.flicker, p);
   for (const c of CEILING_LIGHTS) add(c.x + 0.5, c.y + 0.5, 'ceiling', CEILING_LIGHT, c.flicker === true, null);
@@ -168,7 +178,14 @@ function updateLighting() {
   }
   LIGHTS.forEach((light, n) => {
     light.level = light.flicker ? flickerLevel(n, animTime) : 1;
-    for (let i = 0; i < lightGrid.length; i++) lightGrid[i] += light.contribution[i] * light.level;
+    // Only the samples inside the light's reach: on a big level, adding every
+    // light across the whole grid every frame would be mostly adding zeros.
+    const { sx0, sx1, sy0, sy1 } = light.box;
+    for (let sy = sy0; sy <= sy1; sy++) {
+      for (let i = (sy * LIGHT_W + sx0) * 3; i < (sy * LIGHT_W + sx1 + 1) * 3; i++) {
+        lightGrid[i] += light.contribution[i] * light.level;
+      }
+    }
   });
   // A strip light's tube glows only while its light is mostly on.
   for (const light of LIGHTS) {
