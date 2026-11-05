@@ -5,6 +5,7 @@
 
 const HUD_GREEN = [120, 255, 150];
 const HUD_WARN = [255, 96, 64];
+const CONTROLS_HINT_TIME = 5; // seconds 'PRESS P FOR CONTROLS' shows as a level starts
 
 // A BITMAP FONT. Each character is a 3x5 grid of pixels: '#' on, '.' off.
 // Drawing text is just stamping these grids side by side, 1 pixel apart.
@@ -42,7 +43,9 @@ const FONT = {
   'U': ['#.#', '#.#', '#.#', '#.#', '###'],
   'V': ['#.#', '#.#', '#.#', '#.#', '.#.'],
   'X': ['#.#', '#.#', '.#.', '#.#', '#.#'],
+  'W': ['#.#', '#.#', '###', '###', '#.#'],
   'Y': ['#.#', '#.#', '.#.', '.#.', '.#.'],
+  '/': ['..#', '..#', '.#.', '#..', '#..'],
   ' ': ['...', '...', '...', '...', '...'],
 };
 
@@ -248,7 +251,7 @@ function displayShutdown(pixels, t) {
 }
 
 function drawHud(pixels) {
-  if (game.state !== 'dead') {
+  if (game.state !== 'dead' && !paused) {
     drawGun(pixels);
     drawCrosshair(pixels);
   }
@@ -263,6 +266,7 @@ function drawHud(pixels) {
 
   drawArmour(pixels);
   drawKeys(pixels);
+  if (paused) { drawPauseScreen(pixels); return; } // pause.js: the controls, instead of any messages
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);
   if (game.state === 'playing') {
     if (liftHint) drawTextCentred(pixels, OBJECTIVE_LOOK.liftHint, 40, HUD_WARN, 1); // core.js
@@ -279,6 +283,9 @@ function drawHud(pixels) {
       drawTextCentred(pixels, 'ALARM', 1, HUD_WARN, 1); // on the visor's top rim
     }
   }
+
+  // For the first few seconds, how to find the controls.
+  if (game.state === 'playing' && animTime < CONTROLS_HINT_TIME) drawTextCentred(pixels, 'PRESS P FOR CONTROLS', 66, HUD_GREEN, 1);
 
   if (game.state === 'dead' && game.endTime > SHUTDOWN_TIME) {
     drawTextCentred(pixels, 'TERMINATED', 70, HUD_WARN, 4);

@@ -271,8 +271,9 @@ chamber). Still to build: a per-level enemy roster and ambience (sound).
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · M map · V visor · C CRT · N sound · R restart ·
-Enter next level (after LEVEL COMPLETE) · with `?playtest`: L level chooser.
+fire (hold to spin up) · M map · V visor (off by default) · C CRT · N sound · R restart ·
+Enter next level (after LEVEL COMPLETE) · P pause (shows these controls; the
+page itself has no help text) · with `?playtest`: L level chooser.
 
 ---
 

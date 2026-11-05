@@ -75,7 +75,7 @@ function shotTarget(angle) {
 // round goes now; a burst's other rounds follow, `gap` seconds apart, from
 // updateCombat. Each round costs one ammo, so a burst can run dry part-way.
 function playerFire() {
-  if (game.state !== 'playing' || gun.cooldown > 0 || gun.burstLeft > 0) return;
+  if (paused || game.state !== 'playing' || gun.cooldown > 0 || gun.burstLeft > 0) return;
   if (player.ammo === 0) {
     // Empty: a dry click (sound.js) on each pull, with a short pause after it
     // so fast pulls don't pile the clicks on top of each other.

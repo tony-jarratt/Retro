@@ -88,6 +88,14 @@ function audioReady() {
   return audio.ctx && audio.ctx !== 'unavailable' && !audio.muted;
 }
 
+// Paused (pause.js): suspending the audio context freezes every sound
+// mid-note, loops and all, and resuming picks them up where they were.
+function pauseSound(on) {
+  if (!audio.ctx || audio.ctx === 'unavailable') return; // not started yet, or no Web Audio
+  if (on) audio.ctx.suspend();
+  else audio.ctx.resume();
+}
+
 function toggleSound() {
   audio.muted = !audio.muted;
   if (audio.master) audio.master.gain.value = audio.muted ? 0 : MASTER_VOLUME;

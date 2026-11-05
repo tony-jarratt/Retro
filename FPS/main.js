@@ -89,6 +89,7 @@ setupInput(screenCanvas, {
   toggleSound,
   nextLevel: goToNextLevel,
   levelChooser: () => { if (PLAYTEST) location.search = '?playtest'; },
+  togglePause, // pause.js
 });
 
 // LEVEL COMPLETE -> Enter loads the next level (map.js), if there is one.
@@ -124,23 +125,27 @@ function frame(now) {
   const dt = Math.max(0, Math.min((now - lastTime) / 1000, 0.1));
   lastTime = now;
 
-  animTime += dt; // drives animated walls (textures.js)
-  updateDoors(dt);
-  if (game.state === 'playing') { // once you've won or died, everyone stops
-    updatePlayer(dt);
-    updatePickups();
-    updateSteam(dt);    // before security and robots, so they see this frame's plumes
-    updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
-    updateEnemies(dt);
-    updateDrones(dt);
-    updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
+  // Paused (pause.js): nothing updates, so nothing moves and no timer runs,
+  // but the frozen view is still drawn, with the controls over it.
+  if (!paused) {
+    animTime += dt; // drives animated walls (textures.js)
+    updateDoors(dt);
+    if (game.state === 'playing') { // once you've won or died, everyone stops
+      updatePlayer(dt);
+      updatePickups();
+      updateSteam(dt);    // before security and robots, so they see this frame's plumes
+      updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
+      updateEnemies(dt);
+      updateDrones(dt);
+      updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
+    }
+    updateCombat(dt);
+    updateWeapons(dt);
+    updatePanels(dt); // falling glass
+    updateExplosions(dt); // outside the "playing" check, so a fireball finishes even if it killed you
+    updateLighting(); // after combat, so this frame's muzzle flashes light the scene
+    updateSound(dt);  // the sounds that keep going: whines, buzzes, beeps (sound.js)
   }
-  updateCombat(dt);
-  updateWeapons(dt);
-  updatePanels(dt); // falling glass
-  updateExplosions(dt); // outside the "playing" check, so a fireball finishes even if it killed you
-  updateLighting(); // after combat, so this frame's muzzle flashes light the scene
-  updateSound(dt);  // the sounds that keep going: whines, buzzes, beeps (sound.js)
   const hits = castRays(player);
   renderView(frameImage, hits, player);
   drawHud(frameImage.data); // flat on top of the 3D view, same buffer

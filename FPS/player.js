@@ -46,6 +46,7 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyN') on.toggleSound();
       if (e.code === 'Enter') on.nextLevel();
       if (e.code === 'KeyL') on.levelChooser();
+      if (e.code === 'KeyP') on.togglePause();
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });
