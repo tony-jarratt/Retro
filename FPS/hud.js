@@ -237,9 +237,18 @@ function drawKeys(pixels) {
     fillRect(pixels, x + 1, READOUT_Y + 1, 7, 4, KEY_COLOURS[colour]);
     fillRect(pixels, x + 1, READOUT_Y + 2, 7, 1, [235, 235, 235]); // stripe
   });
+  // The lift key, once it's yours (core.js): a gold card.
+  const held = player.keys.length;
+  const liftKey = OBJECTIVE === 'liftkey' && core.state === 'destroyed';
+  if (liftKey) {
+    const x = right - 9 - held * 11;
+    fillRect(pixels, x, READOUT_Y, 9, 6, [0, 0, 0]);
+    fillRect(pixels, x + 1, READOUT_Y + 1, 7, 4, LIFT_KEY_COLOUR);
+    fillRect(pixels, x + 1, READOUT_Y + 2, 7, 1, [235, 235, 235]);
+  }
   // The demolition charge, if you're carrying it (charge.js): a khaki block with a red lamp.
   if (player.charge) {
-    const x = right - 9 - player.keys.length * 11;
+    const x = right - 9 - (held + (liftKey ? 1 : 0)) * 11;
     fillRect(pixels, x, READOUT_Y, 9, 6, [0, 0, 0]);
     fillRect(pixels, x + 1, READOUT_Y + 2, 7, 3, [168, 160, 122]);
     fillRect(pixels, x + 3, READOUT_Y + 1, 3, 1, [60, 62, 66]);

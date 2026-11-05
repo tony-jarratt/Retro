@@ -1,4 +1,7 @@
-// LEVEL 1: THE INDUSTRIAL SECTOR, 32 cells wide and 24 tall. (A test sandbox for now.)
+// LEVEL 2: THE HANGAR, sublevel 5, 32 cells wide and 24 tall. The second
+// industrial level: everything the workshops taught, and now the security
+// network too: cameras and their alarms, smart robots that call for help,
+// heavies and their rockets, drones from hives, two keycards, and the CORE.
 //
 // The route: start bay (top left) -> fuel depot -> pipe works, where the RED
 // keycard is -> back to the red door from the start bay -> server room, where
@@ -7,15 +10,15 @@
 
 LEVELS.push({
   id: 'industrial',
-  name: 'INDUSTRIAL SECTOR',
+  name: 'THE HANGAR',
   // Where it is in the complex (lift.js: below 0 is a sublevel), and the
   // briefing shown as it opens (campaign.js).
-  floor: -6,
+  floor: -5,
   briefing: [
-    'THE VERIDIAN GROUP COMPLEX WENT INTO LOCKDOWN',
-    'THREE DAYS AGO. NOTHING HAS COME OUT SINCE.',
-    'ITS SECURITY NETWORK HAS TURNED ON EVERYONE.',
-    'THE CORE THAT RUNS IT IS DOWN HERE.',
+    'THE HANGAR. THE SECURITY NETWORK RUNS FROM HERE:',
+    'CAMERAS, TURRETS, AND THE CORE THAT DRIVES THEM.',
+    'A CAMERA THAT SEES YOU RAISES THE ALARM. A',
+    'TERMINAL SHUTS ITS CAMERAS DOWN. KILL THE CORE.',
   ],
 
   rows: [
@@ -193,7 +196,8 @@ LEVELS.push({
   // comes from heavies). Destroyed robots also drop a 'clip' (+4) where they
   // fall; the first heavy you bring down drops the automatic module.
   pickups: [
-    { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay
+    { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay: the first room's ammo...
+    { type: 'repair',  x: 1.5,  y: 6.5 },  // ...and armour
     { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
     { type: 'burstmod', x: 17.5, y: 1.5 }, // fuel depot, far corner, behind the walker watching the door
     { type: 'repair',  x: 25.5, y: 1.5 },  // pipe works, top of the gap

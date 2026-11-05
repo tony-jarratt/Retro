@@ -206,16 +206,41 @@ COMPLETE; Enter goes on to the next. All are **test sandboxes** for now, not
 designed levels. Play-testing: `index.html?playtest` opens a level chooser,
 and L in a game goes back to it; `index.html?level=lab` jumps straight in.
 
-Planned progression (each level teaches one thing on top of the last). The
-exact order is still to settle: drones were planned for level 2, and the lab
-is now the second sandbox.
+THE SIX LEVELS (owner, 2026-11-05: two per setting; the first of each pair
+teaches that setting's rules gently with a simpler objective, the LIFT KEY;
+the second combines them and ends in a core, chamber or plant). Each is a
+journey in and a race back out: the lift is near the start, and the
+objective sets the level on you. Every level's first room has armour and ammo.
 
-1. **Industrial, first** — dumb walkers and scouts, turrets. Learn to tap for
-   precision, dodge volleys, use cover and steam. No drones.
-2. **Industrial, deeper** — drones arrive. Holding for automatic becomes
-   essential; backing off while the gun spins up becomes a skill.
-3. **Later** — smart robots mixed in, hives tied to cameras: stealth and
-   target priority together.
+1. **The Workshops** (sublevel 6, `levels/workshops.js`, lift key). Dumb
+   walkers and scouts, steam, drums, a tripwire turret, the red keycard and
+   the burst module. A lone walker with its back to you; a drum stack; a
+   window that gets shot out; a tripwire you can walk round; the night shift
+   asleep in the locker room, seen through a grille, and awake when you come
+   back that way with the key. Secret: the paint store by the turret.
+2. **The Hangar** (sublevel 5, `levels/industrial.js`, the core). Cameras and
+   terminals, smart robots, heavies, drones and hives, red and blue keycards.
+3. **Specimen Storage** (sublevel 4, `levels/storage.js`, lift key). Lurchers
+   only, and darkness. A lit lurcher at the end of a corridor; a dark tank
+   hall with three asleep; a drum between two tanks. The key breaks every
+   tank: back through the hall, or the pitch-dark service passage.
+4. **Genetics** (sublevel 3, `levels/lab.js`, the breeding chamber).
+   Spitters, larvae and pods, tanks.
+5. **The Offices** (floor 11, `levels/offices.js`, lift key). Suits and
+   bloomers, and the sprinklers. A lone lit suit to shoot down and finish; an
+   open plan with a solvent drum to set the sprinklers off from the door; a
+   bloomer just inside a meeting room. Back through the meeting rooms, or
+   west through the kitchen and print room.
+6. **The Atrium** (floor 12, `levels/hq.js`, the mother plant). Moths and
+   everything else.
+
+All six are checked to be solvable: every key, the objective, the lift and
+every pickup can be reached in order.
+
+**The lift-key objective** (`objective: 'liftkey'`, core.js): no K cells, one
+`liftkey` pickup (a gold card). The lift won't go without it; taking it raises
+every zone's alarm for good and, on a creature level, sets the creatures loose
+(every tank breaks). Unlike the core, the security stays on.
 
 ### The lab (planned)
 

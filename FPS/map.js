@@ -115,6 +115,6 @@ const THEME = THEMES[THEME_NAME];
 
 // THE OBJECTIVE: what the level's K cells are, and so what you're told to
 // destroy (core.js). The mechanics are the same either way.
-const OBJECTIVE_KINDS = ['core', 'chamber', 'motherplant'];
+const OBJECTIVE_KINDS = ['core', 'chamber', 'motherplant', 'liftkey'];
 const OBJECTIVE = CURRENT_LEVEL.objective || 'core';
 if (!OBJECTIVE_KINDS.includes(OBJECTIVE)) throw new Error(`Level "${CURRENT_LEVEL.id}" has objective "${OBJECTIVE}". Objectives: ${OBJECTIVE_KINDS.join(', ')}.`);

@@ -46,6 +46,11 @@ const PICKUP_TYPES = {
     texture: CHARGE_TEXTURE,
     collect: () => { player.charge = true; return true; },
   },
+  // The lift key (core.js): a lift-key level's objective.
+  liftkey: {
+    texture: LIFT_KEY_TEXTURE,
+    collect: () => { takeLiftKey(); return true; },
+  },
   // Keycards: 'redkey', 'bluekey'. Collecting one lets you through doors of
   // that colour (playerCanOpen in doors.js).
   redkey: {

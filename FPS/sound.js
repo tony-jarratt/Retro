@@ -611,6 +611,7 @@ function sfxPickup(type) {
     redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
     burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319],
     charge: [330, 330, 494],
+    liftkey: [784, 988, 1175, 1568],
   }[type] || [880];
   notes.forEach((f, i) => tone(audio.master, 'square', f, f, 0.08, 0.1, i * 0.06));
 }

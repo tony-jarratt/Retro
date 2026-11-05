@@ -1205,6 +1205,9 @@ function makeKeycard(colour) {
 
 const KEYCARD_TEXTURES = {};
 for (const colour in KEY_COLOURS) KEYCARD_TEXTURES[colour] = makeKeycard(KEY_COLOURS[colour]);
+// The LIFT KEY (core.js, levels whose objective is 'liftkey'): a gold card.
+const LIFT_KEY_COLOUR = [240, 190, 50];
+const LIFT_KEY_TEXTURE = makeKeycard(LIFT_KEY_COLOUR);
 
 const AMMO_BOX_TEXTURE = makeAmmoBox();
 const AMMO_CRATE_TEXTURE = makeAmmoCrate();

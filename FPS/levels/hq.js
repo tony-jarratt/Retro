@@ -1,4 +1,5 @@
-// LEVEL 3: THE HQ, 28 cells wide and 22 tall. A test sandbox. The company's
+// LEVEL 6: THE ATRIUM, floor 12, 28 cells wide and 22 tall. The last level:
+// everything head office has, and the moths, and the MOTHER PLANT. The company's
 // headquarters, where the plant virus got out of the atrium garden: offices
 // going green, daylight through the skylights, and the staff still at work,
 // in a way. Its enemies are the INFECTED (infected.js): suits that grab and
@@ -15,13 +16,13 @@
 
 LEVELS.push({
   id: 'hq',
-  name: 'THE HQ',
+  name: 'THE ATRIUM',
   floor: 12,
   briefing: [
-    "HEAD OFFICE. THE ATRIUM GARDEN WAS THE CHAIRMAN'S",
-    'PRIDE. THE STAFF NEVER WENT HOME.',
-    'FINISH THEM ON THE FLOOR, OR THEY GET UP.',
-    'AND MIND THE FLOWERS.',
+    "THE ATRIUM GARDEN WAS THE CHAIRMAN'S PRIDE.",
+    'IT IS WHERE THE INFECTION BEGAN, AND WHERE IT',
+    'GREW THE MOTHER PLANT. THE MOTHS UP HERE COME',
+    'TO LIGHT: EVERY SHOT YOU FIRE IS A LAMP.',
   ],
   theme: 'hq',              // floor, ceiling and lighting (map.js)
   objective: 'motherplant', // the K cells are the mother plant (core.js)
@@ -156,7 +157,8 @@ LEVELS.push({
 
   // The infected drop nothing, so, as in the lab, the ammo comes in crates.
   pickups: [
-    { type: 'ammocrate', x: 1.5,  y: 7.5 },  // behind the front desk
+    { type: 'ammocrate', x: 1.5,  y: 7.5 },  // behind the front desk: the first room's ammo...
+    { type: 'repair',    x: 4.5,  y: 7.5 },  // ...and armour
     { type: 'burstmod',  x: 16.5, y: 1.5 },  // open plan, far corner
     { type: 'ammo',      x: 7.5,  y: 1.5 },
     { type: 'repair',    x: 26.5, y: 4.5 },  // exec lounge

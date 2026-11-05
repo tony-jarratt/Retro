@@ -6,6 +6,12 @@
 // below), but it's the same thing underneath: K cells that take CORE_HEALTH
 // hits (or one demolition charge: charge.js), and everything below works the same.
 //
+// The first level of each pair has a simpler objective, the LIFT KEY
+// ('liftkey'): no K cells, but a 'liftkey' pickup somewhere in the level.
+// The lift won't go without it, and taking it is noticed: the whole level
+// comes for you, just as if a core had gone down (but the security stays
+// on: turrets, cameras and tripwires keep working).
+//
 // The CORE is a stretch of wall ('K' cells in a level's rows; several cells are one
 // core) running the facility's security network. Every turret is wired to
 // it: terminals can blind a zone's cameras, but only the core going down
@@ -41,6 +47,13 @@ const OBJECTIVE_LOOKS = {
     goal: 'BURN THE MOTHER PLANT', done: 'MOTHER PLANT BURNT  GET TO THE LIFT', liftHint: 'LIFT LOCKED  BURN THE PLANT',
     creatures: true,
   },
+  // No textures or light: there are no K cells. Whether creatures come loose
+  // depends on the level: yes if it has any.
+  liftkey: {
+    textures: null, dead: null, light: null,
+    goal: 'FIND THE LIFT KEY', done: 'LIFT KEY TAKEN  GET TO THE LIFT', liftHint: 'LIFT LOCKED  FIND THE LIFT KEY',
+    creatures: enemies.some((e) => ENEMY_TYPES[e.type].creature),
+  },
 };
 const OBJECTIVE_LOOK = OBJECTIVE_LOOKS[OBJECTIVE];
 
@@ -61,7 +74,14 @@ MAP.forEach((row, y) => row.forEach((cell, x) => {
   const entry = { x, y, front: { x: x + 0.5 + dx * 0.55, y: y + 0.5 + dy * 0.55 } };
   (cell === CORE_CELL ? core.cells : liftCells).push(entry);
 }));
-if (core.cells.length === 0) throw new Error(`The level has no ${OBJECTIVE} (K cells in its rows).`);
+const LIFT_KEYS = PICKUPS.filter((p) => p.type === 'liftkey').length;
+if (OBJECTIVE === 'liftkey') {
+  if (core.cells.length > 0) throw new Error(`The level's objective is the lift key, but it has K cells in its rows: K cells are for a core, chamber or plant.`);
+  if (LIFT_KEYS !== 1) throw new Error(`The level's objective is the lift key, so it needs exactly one 'liftkey' pickup; it has ${LIFT_KEYS}.`);
+} else {
+  if (core.cells.length === 0) throw new Error(`The level has no ${OBJECTIVE} (K cells in its rows).`);
+  if (LIFT_KEYS > 0) throw new Error(`The level has a 'liftkey' pickup, but its objective is "${OBJECTIVE}": only lift-key levels have one.`);
+}
 if (liftCells.length === 0) throw new Error('The level has no exit lift (L cells in its rows).');
 
 showSecurityMessage(OBJECTIVE_LOOK.goal); // the objective, as the level starts
@@ -109,7 +129,18 @@ function destroyCore() {
   for (const c of cameras) if (c.state === 'watching') c.state = 'offline';
   for (const t of tripwires) t.state = 'offline';
   for (const e of enemies) if (e.type === 'turret' && e.state !== 'dead') e.state = 'offline';
-  // And the whole facility knows. Infinity: this alarm never runs down.
+  objectiveDone();
+}
+
+// The lift key picked up (pickups.js): the lift will go, and everything knows.
+function takeLiftKey() {
+  core.state = 'destroyed'; // the objective's done: the lift unlocks (updateCore)
+  objectiveDone();
+}
+
+// Either way, the objective's done.
+function objectiveDone() {
+  // The whole facility knows. Infinity: this alarm never runs down.
   for (const z of ZONES) {
     raiseAlarm(z.id);
     alarms[z.id] = Infinity;
@@ -131,7 +162,7 @@ function updateCore() {
 
 // The core's heart (or the chamber's eggs) throws a pulsing light into the room (lighting.js).
 function addCoreLights(grid) {
-  if (core.state !== 'online') return;
+  if (core.state !== 'online' || core.cells.length === 0) return; // a lift-key level has nothing to glow
   const level = 0.6 + 0.4 * Math.sin(animTime * [2, 4, 8][coreDamage()] * Math.PI);
   const { colour, radius } = OBJECTIVE_LOOK.light;
   for (const c of core.cells) addLight(grid, c.front.x, c.front.y, colour, radius, level);

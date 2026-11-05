@@ -1,4 +1,6 @@
-// LEVEL 2: THE LAB, 24 cells wide and 16 tall. A test sandbox. It has the
+// LEVEL 4: GENETICS, sublevel 3, 24 cells wide and 16 tall. The second lab
+// level: the lurchers again, and now the spitters, the larvae and their pods,
+// and the BREEDING CHAMBER. It has the
 // lab's own look (stained white tiles, bench cabinets, cold fluorescents,
 // slime), its own objective, the BREEDING CHAMBER, and its own enemies: the
 // lab's CREATURES (creatures.js), which hear you rather than watch for you,
@@ -12,13 +14,13 @@
 
 LEVELS.push({
   id: 'lab',
-  name: 'THE LAB',
+  name: 'GENETICS',
   floor: -3,
   briefing: [
-    'GENETICS. THE CAMERAS DOWN HERE WENT DARK',
-    'LONG BEFORE THE LOCKDOWN.',
-    'WHATEVER THEY WERE BREEDING IS LOOSE.',
-    "IT CAN'T SEE YOU IN THE DARK. IT CAN HEAR YOU.",
+    'GENETICS. THIS IS WHERE THEY WERE BRED.',
+    'SOME SPIT ACID: MOVE WHEN THE FLOOR GLOWS.',
+    'THE SMALL ONES COME IN SWARMS, AND THE PODS',
+    'ON THE WALLS BURST AT A NOISE. BURN THE CHAMBER.',
   ],
   theme: 'lab',         // floor, ceiling and lighting (map.js)
   objective: 'chamber', // the K cells are the breeding chamber (core.js)
@@ -99,7 +101,8 @@ LEVELS.push({
 
   // Creatures drop nothing, so the lab's ammo comes in big supply crates (+20).
   pickups: [
-    { type: 'ammocrate', x: 8.5,  y: 1.5 },  // start room
+    { type: 'ammocrate', x: 8.5,  y: 1.5 },  // start room: the first room's ammo...
+    { type: 'repair',    x: 1.5,  y: 5.5 },  // ...and armour
     { type: 'repair',    x: 22.5, y: 1.5 },
     { type: 'burstmod',  x: 12.5, y: 5.5 },
     { type: 'ammo',      x: 12.5, y: 9.5 },  // specimen hall
