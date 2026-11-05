@@ -15,13 +15,22 @@ const player = {
   health: PLAYER_MAX_HEALTH,
   ammo: PLAYER_START_AMMO,
   keys: [],             // keycard colours collected, e.g. ['red']
+  weapons: ['pistol'],  // weapons carried (weapons.js), in the order picked up
+  weapon: 'pistol',     // the one in your hands
   walkTime: 0,
 };
 
 const keys = {};   // e.code -> true while that key is held, e.g. keys.KeyW
 let mouseTurn = 0; // mouse pixels moved since the last frame
+let mouseHeld = false; // left button down (with the mouse captured): for automatic weapons
 
-// on: the functions to call for one-off actions: { toggleDebug, fire, restart, toggleFilter, toggleVisor }.
+// Is the trigger held down right now (Up arrow or left mouse button)?
+function triggerHeld() {
+  return keys.ArrowUp === true || mouseHeld;
+}
+
+// on: the functions to call for one-off actions:
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor, cycleWeapon, weaponKey }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -31,6 +40,8 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyR') on.restart();
       if (e.code === 'KeyC') on.toggleFilter();
       if (e.code === 'KeyV') on.toggleVisor();
+      if (e.code === 'KeyQ') on.cycleWeapon();
+      if (e.code.startsWith('Digit')) on.weaponKey(e.code);
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });
@@ -40,6 +51,7 @@ function setupInput(canvas, on) {
   // player would walk forever. Treat losing focus as releasing everything.
   window.addEventListener('blur', () => {
     for (const code in keys) keys[code] = false;
+    mouseHeld = false;
   });
 
   // Mouse look needs pointer lock: click the view to capture the mouse,
@@ -52,8 +64,12 @@ function setupInput(canvas, on) {
   // Left click fires, but only once the mouse is captured: the first click
   // just captures it, so it doesn't waste a shot.
   document.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement === canvas && e.button === 0) on.fire();
+    if (document.pointerLockElement === canvas && e.button === 0) {
+      mouseHeld = true;
+      on.fire();
+    }
   });
+  document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseHeld = false; });
 }
 
 function isWall(x, y) {

@@ -86,6 +86,11 @@ setupInput(screenCanvas, {
   restart: restartGame,
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
   toggleVisor: () => { visorOn = !visorOn; },
+  cycleWeapon,
+  weaponKey: (code) => {
+    const id = WEAPON_ORDER.find((w) => WEAPONS[w].key === code);
+    if (id) selectWeapon(id); // does nothing for a weapon you don't have yet
+  },
 });
 
 let lastTime = performance.now();
@@ -110,6 +115,7 @@ function frame(now) {
     updateEnemies(dt);
   }
   updateCombat(dt);
+  updateWeapons(dt);
   updatePanels(dt); // falling glass
   updateExplosions(dt); // outside the "playing" check, so a fireball finishes even if it killed you
   updateLighting(); // after combat, so this frame's muzzle flashes light the scene

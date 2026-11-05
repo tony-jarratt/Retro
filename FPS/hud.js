@@ -106,12 +106,12 @@ function drawGun(pixels) {
   const scale = 2;
   const bobX = Math.round(Math.sin(player.walkTime * 6) * 4);
   const bobY = Math.round(Math.abs(Math.cos(player.walkTime * 6)) * 4);
-  const recoil = gun.flash > 0 ? 6 : 0;
+  const recoil = gun.flash > 0 ? currentWeapon().recoil : 0;
   const x = SCREEN_W / 2 - TEX_SIZE * scale / 2 + bobX;
   // +26 sinks the gun so its muzzle sits well below the crosshair, with the
   // hand's bottom edge off screen.
   const y = SCREEN_H - TEX_SIZE * scale + 26 + bobY + recoil;
-  drawTextureFlat(pixels, gun.flash > 0 ? GUN_FLASH_TEXTURE : GUN_TEXTURE, x, y, scale);
+  drawTextureFlat(pixels, currentWeapon().textures[gun.flash > 0 ? 1 : 0], x, y, scale);
 }
 
 // A small gap-centred cross on the exact centre pixel the shot tests.
@@ -154,13 +154,14 @@ function drawHealth(pixels) {
   }
 }
 
-// Bottom right; red when you're out.
+// Bottom right: the weapon in your hands and the ammo; red when there's not
+// enough for its next shot.
 function ammoText() {
-  return 'AMMO ' + player.ammo;
+  return currentWeapon().short + ' ' + player.ammo;
 }
 
 function drawAmmo(pixels) {
-  const colour = player.ammo === 0 ? HUD_WARN : HUD_GREEN;
+  const colour = player.ammo < currentWeapon().cost ? HUD_WARN : HUD_GREEN;
   drawText(pixels, ammoText(), SCREEN_W - READOUT_MARGIN - textWidth(ammoText(), 1), READOUT_Y, colour, 1);
 }
 
@@ -199,6 +200,7 @@ function drawHud(pixels) {
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
+    if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
     if (securityMessageTime > 0) {
       const ok = securityMessage === 'SECURITY OFFLINE';
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);

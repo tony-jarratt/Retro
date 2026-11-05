@@ -375,22 +375,6 @@ function makeSteam(frame, sputter) {
   });
 }
 
-// A pressure valve on a standpipe: shoot the red wheel to vent steam. The
-// wheel is at eye height (texture row 32), because that's the only height
-// the crosshair ever points at (see thingUnderCrosshair in combat.js).
-function makeValve() {
-  const red = [200, 40, 30];
-  return makeTexture(red, (x, y) => {
-    const px = x + 0.5, py = y + 0.5;
-    const r = Math.hypot(px - 32, py - 32);
-    if (r > 6 && r < 9.5) return brighten(red, py < 32 ? 1.15 : 0.8);                       // the wheel's rim, lit from above
-    if (r <= 6 && (Math.abs(px - 32) < 1 || Math.abs(py - 32) < 1)) return brighten(red, 0.7); // spokes
-    if (y >= 60 && Math.abs(px - 32) < 6) return DARK_STEEL;                                  // floor flange
-    if (y >= 32 && Math.abs(px - 32) < 2.5) return brighten(STEEL, roundShade((px - 32) / 2.5)); // the standpipe
-    return null;
-  });
-}
-
 // FLOOR AND CEILING -----------------------------------------------------------
 
 // Diamond-plate steel: a lattice of small raised diamonds, with oil stains.
@@ -902,15 +886,99 @@ function makeGun(flash) {
         return brighten([64, 68, 78], roundShade(dx / halfW) * 1.1);
       }
     }
-    if (y >= 47) {                                                        // black-gloved hand
-      const halfW = 9 + (y - 47) * 0.25;
-      if (Math.abs(dx) <= halfW) {
-        let f = 0.9 + 0.15 * noise(x, y, 45) - 0.3 * Math.abs(dx / halfW);
-        if ((y - 47) % 5 === 0 && dx > -4) f *= 0.6;                      // knuckle creases
-        return brighten([58, 54, 52], f);
+    if (y >= 47) return gunHand(x, y, dx);
+    return null;
+  });
+}
+
+// The black-gloved hand holding every gun, from row 47 down.
+function gunHand(x, y, dx) {
+  const halfW = 9 + (y - 47) * 0.25;
+  if (Math.abs(dx) > halfW) return null;
+  let f = 0.9 + 0.15 * noise(x, y, 45) - 0.3 * Math.abs(dx / halfW);
+  if ((y - 47) % 5 === 0 && dx > -4) f *= 0.6; // knuckle creases
+  return brighten([58, 54, 52], f);
+}
+
+// The scatter cannon: three stubby barrels side by side on a heavy body with
+// a hazard band. Its flash is a wide orange fan: the spread of the shot.
+function makeScatterCannon(flash) {
+  const body = [92, 78, 54];
+  return makeTexture(body, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (flash && y < 16) {
+      const spread = 6 + (16 - y) * 1.3; // wider further from the muzzles
+      if (Math.abs(dx) < spread * 0.5 && noise(x, y, 46) < 0.8) return glowing([255, 240, 190]);
+      if (Math.abs(dx) < spread && noise(x, y, 47) < 0.55) return glowing([255, 150, 50]);
+    }
+    for (const bx of [-8, 0, 8]) {
+      if (y >= 14 && y < 31 && Math.abs(dx - bx) < 3) {                  // barrels
+        if (y < 16) return [14, 14, 16];                                  // muzzle
+        if (y === 22) return DARK_STEEL;                                  // clamp
+        return brighten(STEEL, roundShade((dx - bx) / 3));
       }
     }
+    if (y >= 29 && y < 47) {                                              // body
+      const halfW = 13 + (y - 29) * 0.12;
+      if (Math.abs(dx) <= halfW) {
+        if (y >= 34 && y < 38) return hazard(x, y, false);               // hazard band
+        if (y < 31) return brighten(body, 1.5);                           // top edge
+        return brighten(body, roundShade(dx / halfW) * (0.95 + 0.1 * noise(x, y, 48)));
+      }
+    }
+    if (y >= 47) return gunHand(x, y, dx);
     return null;
+  });
+}
+
+// The autocannon: a cluster of three long barrels held by clamps, and a drum
+// magazine on the left. `spin` (0 or 1) shows the barrels a third of a turn
+// on: alternating the two frames while firing makes them seem to rotate.
+function makeAutocannon(flash, spin) {
+  const body = [70, 74, 64];
+  return makeTexture(body, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (flash && y < 9) {
+      const r = Math.hypot(dx, y + 0.5 - 4);
+      if (r < 2.5) return glowing([255, 255, 210]);
+      if (r < 4.5 + 2 * Math.abs(Math.cos(3 * Math.atan2(y + 0.5 - 4, dx)))) return glowing([255, 200, 60]);
+    }
+    if (y >= 3 && y < 30) {                                               // barrels
+      if (y === 9 || y === 19) { if (Math.abs(dx) < 6.5) return DARK_STEEL; } // clamps
+      for (let b = 0; b < 3; b++) {
+        const bx = (b - 1) * 4;
+        if (Math.abs(dx - bx) < 1.5) {
+          if (y < 5) return [14, 14, 16];
+          return brighten(STEEL, (b + spin) % 3 === 0 ? 1.4 : 0.8);       // the lit barrel moves round
+        }
+      }
+    }
+    // Drum magazine, left of the body.
+    const mr = Math.hypot(dx + 15, y + 0.5 - 38);
+    if (mr < 8) return mr > 6.5 ? DARK_STEEL : brighten(body, 0.9 + 0.25 * (y < 36 ? 1 : 0));
+    if (y >= 28 && y < 47) {                                              // body
+      const halfW = 8 + (y - 28) * 0.12;
+      if (Math.abs(dx) <= halfW) {
+        if (y < 30) return brighten(body, 1.6);
+        if (y >= 40 && y < 42 && Math.abs(dx) < 3) return glowing(AMBER);  // round counter
+        return brighten(body, roundShade(dx / halfW));
+      }
+    }
+    if (y >= 47) return gunHand(x, y, dx);
+    return null;
+  });
+}
+
+// A weapon lying on the floor, to pick up: a dark case with the weapon's
+// colour stencilled on it and an amber beacon, so you spot it from afar.
+function makeWeaponPickup(colour) {
+  return makeTexture(colour, (x, y) => {
+    if (y < 46 || y >= 62 || x < 14 || x >= 50) return null;
+    if (y < 48 && Math.abs(x + 0.5 - 32) < 2) return glowing(AMBER);       // beacon
+    if (y < 48) return null;
+    if (y === 48 || y === 61 || x === 14 || x === 49) return DARK_STEEL;   // case edge
+    if (y >= 52 && y < 57 && x > 18 && x < 46) return brighten(colour, 0.9 + 0.2 * noise(x, y, 49)); // stencilled gun shape
+    return brighten([46, 50, 44], 0.9 + 0.15 * noise(x, y, 50));
   });
 }
 
@@ -978,8 +1046,13 @@ const ROCKET_TEXTURE = makeRocket();
 const CAMERA_TEXTURES = { watching: makeCamera('watching'), offline: makeCamera('offline'), destroyed: makeCamera('destroyed') };
 const BEAM_TEXTURE = makeBeam();
 const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true) };
-const GUN_TEXTURE = makeGun(false);
-const GUN_FLASH_TEXTURE = makeGun(true);
+// Each weapon's first-person picture: [normal, firing] (weapons.js).
+// The autocannon's second frame also turns its barrels.
+const PISTOL_TEXTURES = [makeGun(false), makeGun(true)];
+const SCATTER_TEXTURES = [makeScatterCannon(false), makeScatterCannon(true)];
+const AUTOCANNON_TEXTURES = [makeAutocannon(false, 0), makeAutocannon(true, 1)];
+const SCATTER_PICKUP_TEXTURE = makeWeaponPickup([210, 140, 50]);
+const AUTOCANNON_PICKUP_TEXTURE = makeWeaponPickup([150, 200, 90]);
 
 const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
 const GRATE_TEXTURE = makeGrate();
@@ -991,7 +1064,6 @@ for (let f = 0; f < STEAM_FRAMES; f++) {
   STEAM_BURST_FRAMES.push(makeSteam(f, false));
   STEAM_SPUTTER_FRAMES.push(makeSteam(f, true));
 }
-const VALVE_TEXTURE = makeValve();
 
 const DRUM_TEXTURE = makeDrum();
 const DRUM_WRECK_TEXTURE = makeDrumWreck();

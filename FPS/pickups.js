@@ -25,6 +25,15 @@ const PICKUP_TYPES = {
       return true;
     },
   },
+  // Weapons (weapons.js): new ones go straight into your hands.
+  scatter: {
+    texture: SCATTER_PICKUP_TEXTURE,
+    collect: () => { collectWeapon('scatter'); return true; },
+  },
+  autocannon: {
+    texture: AUTOCANNON_PICKUP_TEXTURE,
+    collect: () => { collectWeapon('autocannon'); return true; },
+  },
   // Keycards: 'redkey', 'bluekey'. Collecting one lets you through doors of
   // that colour (playerCanOpen in doors.js).
   redkey: {
@@ -54,8 +63,12 @@ function updatePickups() {
 }
 
 // A destroyed robot drops a clip on its wreck. Both sprites then sit at the
-// same distance; the sort in renderSprites keeps ties in list order, and
+// same distance; the sort in placeSprites keeps ties in list order, and
 // pickups come after robots in that list, so the clip is drawn on top.
+// A heavy drops its AUTOCANNON instead, if you haven't got one yet (and
+// there isn't one already lying about): bring down a heavy and you're armed.
 function dropClip(enemy) {
-  pickups.push({ type: 'clip', x: enemy.x, y: enemy.y });
+  const wantAutocannon = enemy.type === 'heavy' && !player.weapons.includes('autocannon') &&
+    !pickups.some((p) => p.type === 'autocannon');
+  pickups.push({ type: wantAutocannon ? 'autocannon' : 'clip', x: enemy.x, y: enemy.y });
 }

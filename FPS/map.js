@@ -201,11 +201,14 @@ const TERMINALS = [
   { x: 0,  y: 20, zone: 'hangar' },    // deep in the hangar, far left
 ];
 
-// Things to collect (pickups.js): 'ammo' (+8), 'health' (+25), 'redkey', 'bluekey'.
-// Destroyed robots also drop a 'clip' (+4) where they fall.
+// Things to collect (pickups.js): 'ammo' (+8), 'health' (+25), 'redkey', 'bluekey',
+// and weapons: 'scatter' (and 'autocannon', though that comes from heavies).
+// Destroyed robots also drop a 'clip' (+4) where they fall; the first heavy
+// you bring down drops its autocannon.
 const PICKUPS = [
   { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay
   { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
+  { type: 'scatter', x: 17.5, y: 1.5 },  // fuel depot, far corner, behind the walker watching the door
   { type: 'health',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
   { type: 'redkey',  x: 29.5, y: 6.5 },  // pipe works, far corner
   { type: 'ammo',    x: 20.5, y: 1.5 },  // pipe works
@@ -221,14 +224,13 @@ const PICKUPS = [
 
 // Steam vents (steam.js): floor cells that blow scalding, sight-blocking
 // steam on a cycle. delay = seconds before the first burst's warning, so they
-// don't all go off together. A valve is a red wheel you can shoot to make the
-// vent blow a long burst at once; x, y are positions like the player's.
+// don't all go off together.
 const VENTS = [
   { x: 15, y: 4,  delay: 0.5 },                               // fuel depot, out in the open
-  { x: 15, y: 11, delay: 2.0, valve: { x: 16.7, y: 9.3 } },   // corridor: slip past at the sides
-  { x: 22, y: 11, delay: 1.0, valve: { x: 19.3, y: 13.6 } },  // workshop: blind the camera by the door
+  { x: 15, y: 11, delay: 2.0 },                               // corridor: slip past at the sides
+  { x: 22, y: 11, delay: 1.0 },                               // workshop: blinds the camera by the door
   { x: 18, y: 19, delay: 2.5 },                               // hangar, in front of the turret
-  { x: 9,  y: 21, delay: 0.2, valve: { x: 7.3, y: 22.6 } },   // hangar, by the scout and the other turret
+  { x: 9,  y: 21, delay: 0.2 },                               // hangar, by the scout and the other turret
 ];
 
 // Hand-placed DECALS (decals.js): the signs and scenes that tell a story. The

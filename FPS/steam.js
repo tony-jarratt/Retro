@@ -8,16 +8,12 @@
 //   - SCALDS anyone standing in it, you and robots alike: lure one in.
 // It never stops bullets: you can shoot through it, if you can see what's there.
 //
-// Some vents have a VALVE: a red wheel on a pipe nearby. Shoot it and the vent
-// blows a long burst at once: a smokescreen on demand, or a trap.
-//
 // The plume is drawn as a sprite with PART-transparent texels (alpha between
 // 0 and 255), which sprites.js blends over the scene, the same way as glass.
 
 const STEAM_IDLE_TIME = 3.0;      // seconds quiet between bursts
 const STEAM_SPUTTER_TIME = 0.7;   // seconds of warning puffs before a burst
 const STEAM_BURST_TIME = 2.0;     // seconds a burst lasts
-const VALVE_BURST_TIME = 5.0;     // seconds a burst lasts when you shoot its valve
 const STEAM_RADIUS = 0.45;        // how far from the vent's centre the plume reaches, in cells
 const STEAM_ANIM_FPS = 10;        // frames per second of billowing
 const SCALD_DAMAGE = 5;           // your health lost per scald tick...
@@ -28,15 +24,9 @@ const ROBOT_SCALD_TICK = 1.0;     // a robot in the plume takes 1 hit this often
 //   x, y      the middle of its cell (where the plume stands)
 //   state     'idle', 'sputter' or 'burst'
 //   timer     seconds left in this state
-//   valve     null, or { x, y, vent } for its shootable wheel
 const vents = VENTS.map((v, n) => {
   if (MAP[v.y]?.[v.x] !== 0) throw new Error(`VENTS[${n}] at cell (${v.x}, ${v.y}) is not a floor cell.`);
-  if (v.valve && MAP[Math.floor(v.valve.y)]?.[Math.floor(v.valve.x)] !== 0) {
-    throw new Error(`VENTS[${n}]'s valve at (${v.valve.x}, ${v.valve.y}) is not on a floor cell.`);
-  }
-  const vent = { x: v.x + 0.5, y: v.y + 0.5, cellX: v.x, cellY: v.y, state: 'idle', timer: v.delay, valve: null };
-  if (v.valve) vent.valve = { x: v.valve.x, y: v.valve.y, vent };
-  return vent;
+  return { x: v.x + 0.5, y: v.y + 0.5, cellX: v.x, cellY: v.y, state: 'idle', timer: v.delay };
 });
 
 // Seconds each thing has spent in steam towards its next scald tick.
@@ -51,12 +41,6 @@ function inPlume(vent, x, y, r) {
 // segmentDistance (textures.js) is the closest the line comes to the vent.
 function steamBlocksSight(x1, y1, x2, y2) {
   return vents.some((v) => v.state === 'burst' && segmentDistance(v.x, v.y, x1, y1, x2, y2) < STEAM_RADIUS);
-}
-
-// Shot valve: blow a long burst now (or stretch the one going).
-function openValve(vent) {
-  vent.state = 'burst';
-  vent.timer = Math.max(vent.timer, VALVE_BURST_TIME);
 }
 
 function updateSteam(dt) {
@@ -96,15 +80,13 @@ function updateSteam(dt) {
   }
 }
 
-// Plumes and valves, as sprites for sprites.js. Plumes are effects (shots
-// pass through); valves aren't, so the crosshair can land on one.
+// Plumes, as sprites for sprites.js. They're effects: shots pass through.
 function steamThings(thing) {
   const frame = Math.floor(animTime * STEAM_ANIM_FPS) % STEAM_FRAMES;
   const list = [];
   for (const v of vents) {
     if (v.state === 'burst') list.push(thing(v.x, v.y, STEAM_BURST_FRAMES[frame], { effect: true }));
     if (v.state === 'sputter') list.push(thing(v.x, v.y, STEAM_SPUTTER_FRAMES[frame], { effect: true }));
-    if (v.valve) list.push(thing(v.valve.x, v.valve.y, VALVE_TEXTURE, { valve: v.valve }));
   }
   return list;
 }

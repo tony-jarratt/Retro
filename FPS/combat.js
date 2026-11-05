@@ -1,8 +1,7 @@
 // Combat: your gun, what the crosshair hits, robots charging and firing back
 // with distance-based odds, your health, and winning or losing.
 
-const FIRE_COOLDOWN = 0.35;     // seconds between your shots
-const GUN_FLASH_TIME = 0.12;    // seconds the gun shows its muzzle flash and recoil
+const GUN_FLASH_TIME = 0.12;    // longest a muzzle flash and recoil show (each weapon's own cooldown is in weapons.js)
 const HURT_FLASH_TIME = 0.1;    // seconds a hit robot flashes white
 const ROBOT_FIRE_FLASH = 0.15;  // seconds a robot shows its own muzzle flash
 // (Each robot type's health, charge time, damage and odds are in ROBOT_TYPES, enemies.js.)
@@ -18,47 +17,71 @@ const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0 };
 // cooldown: seconds until you can fire again; flash: seconds of muzzle flash left.
 const gun = { cooldown: 0, flash: 0 };
 
-// What's under the crosshair, the exact centre of the screen? The shot is one
-// ray straight ahead. castRay gives the nearest wall along it, and the panels
-// on the way: the first unbroken window is where the bullet stops instead.
-// (Grates and broken windows let it straight through.) Then each
-// sprite is placed on screen exactly as for drawing (placeOnScreen), and we
-// ask which texel of its current picture sits under the centre pixel. If that
-// texel is see-through the shot passes it by; otherwise it's a candidate, and
-// the nearest candidate in front of the wall is what gets hit.
+// What does a shot fired at `angle` hit? For the straight-ahead shot that's
+// whatever is under the crosshair; the scatter cannon's pellets and the
+// autocannon's wobble fire at angles a little to either side. Either way the
+// question is the same, asked as if we were looking along that angle: a
+// `viewer` standing where you are, facing it, so the shot runs through the
+// exact centre of ITS screen.
 //
-// Because the crosshair is always at eye height (halfway up a wall), it
-// always lands on texture row 32: a robot's hull, or the top of a drum.
-// So in practice this asks "is the crosshair on its silhouette?" at hull
-// height. The walker's hull is a long box, so it's a slightly wider target
-// side-on than face-on.
-function thingUnderCrosshair() {
-  const ray = castRay(player.x, player.y, Math.cos(player.angle), Math.sin(player.angle));
+// castRay gives the nearest wall along the shot, and the panels on the way:
+// the first unbroken window is where the bullet stops instead. (Grates and
+// broken windows let it straight through.) Then each sprite is placed on that
+// viewer's screen exactly as for drawing (placeOnScreen), and we ask which
+// texel of its picture sits on the centre pixel. If that texel is
+// see-through the shot passes it by; otherwise it's a candidate, and the
+// nearest candidate in front of the wall is what gets hit.
+//
+// Because the centre is always at eye height (halfway up a wall), it always
+// lands on texture row 32: a robot's hull, or the top of a drum. So in
+// practice this asks "is the shot on its silhouette?" at hull height. The
+// walker's hull is a long box, so it's a slightly wider target side-on than face-on.
+//
+// Returns { target, dist }: target is a sprite thing, { panel } for a window,
+// or null for a wall; dist is how far away it is (for the scatter's range).
+function shotTarget(angle) {
+  const viewer = { x: player.x, y: player.y, angle };
+  const ray = castRay(player.x, player.y, Math.cos(angle), Math.sin(angle));
   const glass = firstBulletStop(ray.panes, ray.dist); // panels.js
   const stopDist = glass ? glass.dist : ray.dist;
   let best = null;
   for (const thing of spriteThings(player)) {
-    if (thing.effect) continue; // a fireball is just light and smoke: shots go straight through
-    const spot = placeOnScreen(thing, player);
+    if (thing.effect) continue; // a fireball, beam or plume of steam: shots go straight through
+    const spot = placeOnScreen(thing, viewer);
     if (!spot || spot.forward > stopDist) continue; // behind us, or behind the wall or window
     const texX = Math.floor((SCREEN_W / 2 - spot.left) / spot.size * TEX_SIZE);
     const texY = Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
-    if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // crosshair is outside its square
+    if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // the shot misses its square
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
     if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward };
   }
-  if (best) return best.thing;
-  return glass ? { panel: glass.panel } : null; // nothing nearer: the window takes it
+  if (best) return { target: best.thing, dist: best.forward };
+  if (glass) return { target: { panel: glass.panel }, dist: glass.dist }; // nothing nearer: the window takes it
+  return { target: null, dist: ray.dist };
 }
 
+// Fire the weapon in your hands (weapons.js): pay its ammo, then send each of
+// its pellets out at its own angle. A scatter cannon's five pellets are
+// fanned evenly across its spread; the autocannon's one round wobbles by a
+// random amount up to its jitter. Each pellet hits whatever shotTarget finds,
+// if that's within the weapon's range.
 function playerFire() {
   if (game.state !== 'playing' || gun.cooldown > 0) return;
-  if (player.ammo === 0) return; // empty: nothing happens (the HUD shows the count in red)
-  player.ammo -= 1;
-  gun.cooldown = FIRE_COOLDOWN;
-  gun.flash = GUN_FLASH_TIME;
-  const target = thingUnderCrosshair();
-  if (!target) return;
+  const weapon = currentWeapon();
+  if (player.ammo < weapon.cost) return; // not enough: nothing happens (the HUD shows the count in red)
+  player.ammo -= weapon.cost;
+  gun.cooldown = weapon.cooldown;
+  gun.flash = Math.min(GUN_FLASH_TIME, weapon.cooldown * 0.6); // a fast gun's flash has to end before its next shot
+  for (let n = 0; n < weapon.pellets; n++) {
+    const fan = weapon.pellets === 1 ? 0 : -weapon.spread / 2 + weapon.spread * n / (weapon.pellets - 1);
+    const wobble = (Math.random() * 2 - 1) * weapon.jitter;
+    const shot = shotTarget(player.angle + fan + wobble);
+    if (shot.target && shot.dist <= weapon.range) shotHits(shot.target);
+  }
+}
+
+// One bullet (or pellet) arriving at what it hit.
+function shotHits(target) {
   if (target.panel) { hitGlass(target.panel); return; } // panels.js
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
@@ -66,7 +89,6 @@ function playerFire() {
     damageEnemy(target.enemy, hits);
   }
   if (target.camera) shootCamera(target.camera); // security.js
-  if (target.valve) openValve(target.valve.vent); // steam.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);
@@ -122,6 +144,9 @@ function damagePlayer(amount) {
 
 function updateCombat(dt) {
   gun.cooldown = Math.max(0, gun.cooldown - dt);
+  // An automatic weapon keeps firing while the trigger is held; playerFire's
+  // cooldown check spaces the shots out.
+  if (currentWeapon().auto && triggerHeld()) playerFire();
   gun.flash = Math.max(0, gun.flash - dt);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
   game.pickupFlash = Math.max(0, game.pickupFlash - dt);
