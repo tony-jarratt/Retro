@@ -2,7 +2,7 @@
 // the HUD's green, like a display inside the helmet. P again carries on.
 //
 // While paused, main.js skips every update (nothing moves, no timer runs)
-// but keeps drawing, so V and C still change the look. The sound is
+// but keeps drawing, so V and C (play-testing) still change the look. The sound is
 // suspended too (sound.js), and a click won't fire.
 
 let paused = false;
@@ -14,20 +14,18 @@ function togglePause() {
   mouseTurn = 0;       // player.js: don't turn by however far the mouse moved meanwhile
 }
 
-// The controls, as [keys, what they do]. The level chooser only exists when play-testing.
+// The controls, as [keys, what they do]. The map, visor and CRT keys, and
+// the level chooser, only exist when play-testing (main.js). R and Enter
+// aren't listed: the screens where they do something say so.
 const CONTROLS = [
   ['WASD', 'MOVE'],
   ['LEFT / RIGHT', 'TURN'],
   ['CLICK / UP', 'FIRE  HOLD TO SPIN UP'],
   ['CLICK VIEW', 'CAPTURE MOUSE'],
   ['ESC', 'FREE MOUSE'],
-  ['M', 'MAP'],
-  ['V', 'VISOR'],
-  ['C', 'CRT'],
+  ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT']] : []),
   ['N', 'SOUND'],
   ['U', 'MUSIC'],
-  ['R', 'RESTART'],
-  ['ENTER', 'CARRY ON'],
   ...(PLAYTEST ? [['L', 'LEVEL CHOOSER']] : []),
 ];
 

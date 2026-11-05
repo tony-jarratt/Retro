@@ -20,7 +20,7 @@ const VISOR_SIDE = 7;           // ...at the sides
 const VISOR_BOTTOM = 10;        // ...and at the bottom, just deep enough for one line of readouts
 const VIGNETTE_WIDTH = 18;      // how far into the glass the darkening reaches
 
-let visorOn = true; // on by default; V turns it off
+let visorOn = true; // on by default; V turns it off (when play-testing)
 
 // Distance from (px, py) to the edge of a rounded rectangle centred on (cx, cy)
 // with half-sizes (hw, hh) and corner radius r: negative inside, positive outside.

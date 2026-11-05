@@ -75,14 +75,17 @@ function checkMap() {
 
 checkMap();
 setupInput(screenCanvas, {
+  // M (the map), C (the CRT look) and V (the visor) are play-testing tools:
+  // in the game proper the keys do nothing.
   toggleDebug: () => {
+    if (!PLAYTEST) return;
     debugOn = !debugOn;
     debugCanvas.style.display = debugOn ? 'block' : 'none';
   },
   fire: playerFire,
   restart: restartLevel, // campaign.js: R, once it's over
-  toggleFilter: () => { crtFilterOn = !crtFilterOn; },
-  toggleVisor: () => { visorOn = !visorOn; },
+  toggleFilter: () => { if (PLAYTEST) crtFilterOn = !crtFilterOn; },
+  toggleVisor: () => { if (PLAYTEST) visorOn = !visorOn; },
   toggleSound,
   toggleMusic, // music.js
   enter: handleEnter, // campaign.js: on to whatever's next

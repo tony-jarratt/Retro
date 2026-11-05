@@ -377,10 +377,11 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · M map · V visor · C CRT · N sound · U music ·
-R restart (once you've died) · Enter carry on (title, briefing, LEVEL
-COMPLETE, finale) · P pause (shows these controls; the page itself has no
-help text) · with `?playtest`: L level chooser.
+fire (hold to spin up) · N sound · U music · R restart (once you've died) ·
+Enter carry on (title, briefing, LEVEL COMPLETE, finale) · P pause (shows
+the controls; R and Enter aren't listed, the screens that use them say so;
+the page itself has no help text) · with `?playtest` only: M map, V visor,
+C CRT, L level chooser.
 
 ---
 
