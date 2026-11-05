@@ -83,6 +83,7 @@ function creaturesComeLoose() {
   looseTimer = 0;
   for (const panel of PANELS) if (panel.tank) shatterGlass(panel);
   burstAllPods(); // larvae.js
+  wakeAllMoths(); // pollinators.js
 }
 
 function updateCreatures(dt) {

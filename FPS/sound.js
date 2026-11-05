@@ -499,6 +499,22 @@ function sfxSprinklerHiss(x, y) {
   noiseBurst(out, 'highpass', 4000, 5000, 0.5, 0.15);
 }
 
+// THE MOTHS (pollinators.js). A sting: a sharp little stab of noise. Shot:
+// a dry, papery crunch.
+function sfxMothSting(m) {
+  if (!audioReady()) return;
+  const out = placeAt(m.x, m.y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 5000, 2500, 0.06, 0.35);
+  tone(out, 'sawtooth', 900, 500, 0.06, 0.06);
+}
+function sfxMothSplat(m) {
+  if (!audioReady()) return;
+  const out = placeAt(m.x, m.y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 3000, 1200, 0.08, 0.4);
+}
+
 // The spitter spotting you: a wet, rattling hiss.
 function sfxSpitterHiss(enemy) {
   const out = placeAt(enemy.x, enemy.y);
@@ -648,6 +664,7 @@ function sfxHiveRelease(hive) {
 
 const robotWhines = new Map();   // robot -> voice, while it's charging a shot
 const droneBuzzes = new Map();   // drone -> voice, while it's out and about
+const mothBuzzes = new Map();    // moth -> voice, while it's swarming
 let spinWhine = null;            // your gun winding up
 let lastLit = 1;                 // coils lit last frame, to hear one lock on
 let breachTimer = 0;             // seconds to the next breach beep
@@ -721,6 +738,15 @@ function updateSound(dt) {
     if (v) steerVoice(v, d.x, d.y, 0.06, 170 + 40 * Math.sin(d.phase) + 15 * Math.sin(animTime * 9 + d.phase));
   }
 
+  // MOTHS: a low, soft flutter each, wavering fast with the wingbeat.
+  for (const m of moths) {
+    const alive = m.state === 'swarm' || m.state === 'recoil';
+    let v = mothBuzzes.get(m);
+    if (alive && !v) { v = makeVoice('triangle'); mothBuzzes.set(m, v); }
+    if (!alive && v) { stopVoice(v); mothBuzzes.delete(m); continue; }
+    if (v) steerVoice(v, m.x, m.y, 0.07, 75 + 12 * Math.sin(m.phase) + 25 * Math.sin(animTime * 70 + m.phase));
+  }
+
   // BREACHED: the suit beeps at you twice a second until you find a repair kit.
   if (game.state === 'playing' && player.armour === 0) {
     breachTimer -= dt;
@@ -737,7 +763,7 @@ function updateSound(dt) {
 const LOOP_FADE = 0.6;
 function fadeOutLoops() {
   const t = audio.ctx.currentTime;
-  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...ventHisses.values(), spinWhine, siren, ...(ambience || [])];
+  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...mothBuzzes.values(), ...ventHisses.values(), spinWhine, siren, ...(ambience || [])];
   for (const v of all) {
     if (!v) continue;
     v.gain.gain.cancelScheduledValues(t);
@@ -746,6 +772,7 @@ function fadeOutLoops() {
   }
   robotWhines.clear();
   droneBuzzes.clear();
+  mothBuzzes.clear();
   ventHisses.clear();
   spinWhine = siren = ambience = null;
 }

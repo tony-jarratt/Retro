@@ -47,6 +47,7 @@ function explodeAt(x, y, blast) {
   stampBlastScorch(x, y); // decals.js: the floor, ceiling and nearby walls are scorched
   if (!blast.spareDrones) blastDrones(x, y, blast.radius); // drones.js
   blastLarvae(x, y, blast.radius); // larvae.js
+  blastMoths(x, y, blast.radius);  // pollinators.js
   blastCore(x, y, blast); // core.js: a drum set off by the core hurts it
 
   // Robots take up to BLAST_ROBOT_HITS hits: point blank destroys most outright.

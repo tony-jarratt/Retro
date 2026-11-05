@@ -102,6 +102,7 @@ function fireRound() {
   player.ammo -= 1;
   sfxPlayerShot(gun.pullMode); // sound.js
   makeNoise(player.x, player.y, SHOT_NOISE[gun.pullMode]); // the lab's creatures hear it (creatures.js)
+  mothsSeeFlash(player.x, player.y);                        // and the HQ's moths see the flash (pollinators.js)
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
@@ -125,6 +126,7 @@ function shotHits(target) {
   if (target.camera) shootCamera(target.camera); // security.js
   if (target.drone) destroyDrone(target.drone);   // drones.js
   if (target.larva) destroyLarva(target.larva);   // larvae.js
+  if (target.moth) destroyMoth(target.moth);      // pollinators.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);

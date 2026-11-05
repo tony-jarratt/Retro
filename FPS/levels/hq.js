@@ -5,7 +5,8 @@
 // hold on, and get back up unless you finish them on the floor; and
 // bloomers, rooted where they stood, that burst in clouds of spores
 // (spores.js) when you come close, or when the sprinklers water them
-// (sprinklers.js).
+// (sprinklers.js); and the pollinators, packs of infected moths circling the
+// skylights, that your muzzle flash brings down on you (pollinators.js).
 //
 // The route: the lift and the front desk (top left) -> the open-plan office
 // -> through the atrium garden -> the boardroom at the back, where the
@@ -124,6 +125,17 @@ LEVELS.push({
     { type: 'bloomer', x: 17.5, y: 13.5, angle: 0 },
     { type: 'bloomer', x: 20.5, y: 12.5, angle: 0 },
     { type: 'bloomer', x: 17.5, y: 20.5, angle: 0 },
+  ],
+
+  // POLLINATORS (pollinators.js): packs of moths, each circling a skylight
+  // (put them on a ceiling light's cell). A shot in plain view of them, or
+  // coming too close, brings the whole pack. A small one over the open-plan
+  // desks; the big one in the atrium, where the automatic module is; one
+  // over the boardroom.
+  moths: [
+    { x: 9.5,  y: 2.5,  count: 4 },
+    { x: 14.5, y: 11.5, count: 7 },
+    { x: 18.5, y: 19.5, count: 5 },
   ],
 
   // SPRINKLER heads (sprinklers.js), floor cells under them. The atrium's

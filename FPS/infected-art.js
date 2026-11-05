@@ -373,6 +373,51 @@ function makeSprinklerRain(frame) {
 const RAIN_FRAMES = [];
 for (let f = 0; f < RAIN_FRAMES_COUNT; f++) RAIN_FRAMES.push(makeSprinklerRain(f));
 
+// THE POLLINATORS (pollinators.js): moths the infection has grown huge, as big as
+// a dog, fat and furry. Dusty wings with a glowing green
+// eyespot on each, so a swarm in the dark is a cloud of green eyes.
+// MOTH_FRAMES[0] wings up, [1] wings down (it flaps between the two). They
+// fly at eye height, so a shot tests them where it always does.
+const MOTH_WING = [140, 120, 96];
+const MOTH_FUR = [176, 156, 124];
+
+function makeMoth(up) {
+  return makeTexture(MOTH_WING, (x, y) => {
+    const dx = x + 0.5 - 32, yy = y + 0.5;
+    // Antennae, feathery.
+    for (const s of [-1, 1]) {
+      const d = segmentDistance(dx, yy, s * 1, 23, s * 6, 15);
+      if (d < 0.5 || (d < 1.6 && (y & 1) === 0 && Math.abs(dx) > 2)) return brighten(MOTH_FUR, 0.7);
+    }
+    // The head, with its eyes.
+    if (Math.hypot(dx, yy - 25) < 2.8) return Math.abs(dx) > 0.8 && yy < 25.5 ? glowing(SPORE_GLOW) : brighten(MOTH_FUR, 0.9);
+    // The fat, banded body.
+    const body = inEllipse(dx, y, 0, 35, 3.4, 8.5);
+    if (body !== null) return brighten(MOTH_FUR, (1.15 - 0.4 * body) * ((y & 3) === 0 ? 0.75 : 1));
+    // The wings: a forewing and a hindwing each side, raised or lowered.
+    for (const s of [-1, 1]) {
+      const tilt = s * (up ? -0.45 : 0.3);
+      for (const [cx, cy, rx, ry, fore] of [[s * 12, up ? 27 : 32, 11, 6.5, true], [s * 8.5, up ? 37 : 40, 7, 4.5, false]]) {
+        const ux = dx - cx, uy = yy - cy;
+        const u = (ux * Math.cos(tilt) + uy * Math.sin(tilt)) / rx;
+        const v = (-ux * Math.sin(tilt) + uy * Math.cos(tilt)) / ry;
+        const r = u * u + v * v;
+        if (r >= 1) continue;
+        if (fore) {
+          const spot = Math.hypot(u * rx - s * 1.5, v * ry);
+          if (spot < 1.2) return [30, 26, 20];                 // the eyespot's pupil
+          if (spot < 2.8) return glowing(SPORE_GLOW);          // its glowing ring
+        }
+        if (r > 0.75) return brighten(MOTH_WING, 0.55);         // the dark wing edge
+        const band = Math.abs(Math.sin(u * 5 + v)) < 0.18;      // the wavy markings
+        return brighten(MOTH_WING, (band ? 0.7 : 1) * (0.9 + 0.15 * noise(x, y, 450)));
+      }
+    }
+    return null;
+  });
+}
+const MOTH_FRAMES = [makeMoth(true), makeMoth(false)];
+
 ROBOT_FRAMES.suit = makeSuitFrames();
 ROBOT_FRAMES.bloomer = makeBloomerFrames();
 const DOWNED_TEXTURES = { suit: { down: makeSuitDown('down'), twitch: makeSuitDown('twitch') } };

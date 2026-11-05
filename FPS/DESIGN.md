@@ -249,7 +249,7 @@ cameras, tripwires or terminals (owner, 2026-11-05).
   and the automatic module lies in the larvae's nest. They can't open doors
   and are never smart.
 
-### The HQ (third theme, stages 1 and 2 built)
+### The HQ (third theme, built)
 
 The company's headquarters, where a **plant/fungal virus** got out of the
 atrium garden and into the air conditioning (owner's idea: "zombies,
@@ -292,8 +292,17 @@ Infected only: no robots (owner, 2026-11-05).
   FLOWERS at once. The HQ's chain reaction: shoot the solvent drums at the
   bottom of the atrium from the doorway, and its bloomers all go off while
   you're out of reach, but the blast brings every suit in earshot.
-- **Still to build:** stage 3, the **pollinators** (a moth/wasp swarm, the
-  drones' role).
+- **The pollinators** (stage 3; `pollinators.js`, a level's `moths`): the
+  drones' role, in the air. Moths the infection has grown huge, glowing
+  green eyespots on their wings. 1 hit each, speed 2.8. A pack CIRCLES a
+  skylight until something brighter catches it: your MUZZLE FLASH (every
+  round fired within 7 cells, in plain view) or you coming within 2.5.
+  They don't hear: noise, spores and blasts round a corner leave them be.
+  Swarming, they flutter from side to side and spread out; close in, one
+  STINGS (3) and flutters back for 0.8s. Seven against a player who stands
+  still: about 39 armour in 4s. Blasts kill them; burning the mother plant
+  sets them all loose. HQ: 4 over the open-plan desks, 7 in the atrium
+  (where the automatic module is), 5 over the boardroom.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of
