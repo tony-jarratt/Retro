@@ -23,10 +23,12 @@
 //   SPECIMEN TANKS. A creature listed with tank: true sleeps in a tank (one
 //     floor cell walled in by tank glass, 'g') until a pane of it breaks:
 //     your stray shot, a blast, or a spitter's acid. Then it comes for you.
-//   THE LAB COMES LOOSE. Burning the breeding chamber (core.js) breaks every
-//     tank, bursts every pod, wakes every larva, and from then on every
-//     creature always knows where you are. The lights go red. Run.
-// The spitter's acid is in acid.js; the larvae and their pods in larvae.js.
+//   THE CREATURES COME LOOSE. Burning the breeding chamber or the mother
+//     plant (core.js) breaks every tank, bursts every pod, wakes every larva,
+//     and from then on every creature always knows where you are. The
+//     lights go red. Run.
+// The spitter's acid is in acid.js; the larvae and their pods in larvae.js;
+// the HQ's infected suits in infected.js.
 
 // How far each noise carries, in cells.
 const SHOT_NOISE = { single: 4, burst: 6, auto: 9 }; // one round, by the gun's mode
@@ -47,7 +49,7 @@ const LURCHER_RECOVER = 0.7;      // seconds it stands there afterwards: shoot i
 const ATTACK_STATES = ['windup', 'lunge', 'recover'];
 const LOOSE_CALL_GAP = 1.5; // once the lab is loose: seconds between creatures being told where you are
 
-let labLoose = false;
+let creaturesLoose = false;
 let looseTimer = 0;
 
 // A tank creature must have tank glass beside it, or nothing could ever wake it.
@@ -76,15 +78,15 @@ function tankBroken(panel) {
 }
 
 // The chamber is burning (core.js).
-function labComesLoose() {
-  labLoose = true;
+function creaturesComeLoose() {
+  creaturesLoose = true;
   looseTimer = 0;
   for (const panel of PANELS) if (panel.tank) shatterGlass(panel);
   burstAllPods(); // larvae.js
 }
 
 function updateCreatures(dt) {
-  if (!labLoose) return;
+  if (!creaturesLoose) return;
   looseTimer -= dt;
   if (looseTimer > 0) return;
   looseTimer = LOOSE_CALL_GAP;

@@ -800,6 +800,228 @@ function makeChamber(damage, pulse, dead) {
   });
 }
 
+// THE HQ ------------------------------------------------------------------------
+// The company's headquarters, where the infection got out of the atrium
+// garden and into the air conditioning. Corporate offices slowly turning into
+// a greenhouse: beige walls and wood panelling with ivy creeping up and down
+// them, carpet tiles going to moss, roots cracking through, daylight falling
+// through the atrium's skylights. Levels with theme 'hq' use its floor and
+// ceiling; its walls are their own cells ('o', 'v').
+
+const LEAF = [64, 112, 44];
+const LEAF_DARK = [34, 64, 28];
+const ROOT = [86, 62, 40];
+const OFFICE_PAINT = [178, 170, 150];
+const OFFICE_WOOD = [112, 76, 48];
+
+// LEAVES, scattered over a texture: one leaf (maybe) in each 8x8 square, at a
+// random spot and angle, so they overlap like real foliage. `density(y)` is
+// the chance of a leaf at height y, so ivy can thin out up a wall. The
+// squares wrap round the edges, so the texture still tiles. Returns the
+// leaf's colour, or null where there's no leaf.
+function leafAt(x, y, seed, density) {
+  const gx = x >> 3, gy = y >> 3;
+  let best = null, bestTop = -1;
+  for (let j = -1; j <= 1; j++) {
+    for (let i = -1; i <= 1; i++) {
+      const cx = (gx + i + 8) % 8, cy = (gy + j + 8) % 8; // this square, wrapped
+      const lx = cx * 8 + 1 + 6 * noise(cx, cy, seed + 1);
+      const ly = cy * 8 + 1 + 6 * noise(cx, cy, seed + 2);
+      if (noise(cx, cy, seed) >= density(ly)) continue;
+      const dx = ((x + 0.5 - lx + 96) % 64) - 32, dy = ((y + 0.5 - ly + 96) % 64) - 32; // the shortest way, round the wrap
+      const a = noise(cx, cy, seed + 3) * Math.PI * 2;
+      const len = 4.5 + 2 * noise(cx, cy, seed + 4);
+      const u = (dx * Math.cos(a) + dy * Math.sin(a)) / len;        // along the leaf
+      const v = (-dx * Math.sin(a) + dy * Math.cos(a)) / (len * 0.45); // across it
+      const r = u * u + v * v;
+      if (r >= 1) continue;
+      const top = noise(cx, cy, seed + 5); // which leaf lies on top where two overlap
+      if (top < bestTop) continue;
+      bestTop = top;
+      const tint = mix(LEAF, [110, 140, 50], noise(cx, cy, seed + 6) * 0.5); // some younger and yellower
+      best = Math.abs(v) < 0.18 && Math.abs(u) < 0.8 ? brighten(tint, 1.25)  // the midrib
+        : brighten(tint, 0.7 + 0.45 * (1 - r) + 0.15 * u);                  // lit towards its tip
+    }
+  }
+  return best;
+}
+
+// Office wall: beige paint over wood panelling, with a dado rail between,
+// and ivy creeping up from the floor and down from the ceiling.
+function makeOfficeWall() {
+  const ivy = (y) => y > 40 ? 0.75 * (y - 40) / 23 : y < 14 ? 0.6 * (14 - y) / 14 : 0;
+  return makeTexture(OFFICE_PAINT, (x, y) => {
+    const leaf = leafAt(x, y, 300, ivy);
+    if (leaf) return leaf;
+    // A stem or two winding up through it.
+    const stem = 9 + 44 * noise(x >> 5, 0, 301) + 2.5 * Math.sin(y * 0.3 + x);
+    if (Math.abs(x + 0.5 - stem) < 0.7 && (y > 46 || y < 8)) return LEAF_DARK;
+    if (y >= 62) return brighten(OFFICE_WOOD, 0.4);                                // skirting
+    if (y >= 38 && y < 41) return brighten(OFFICE_WOOD, y === 38 ? 1.35 : 0.85);   // dado rail
+    if (y >= 41) {                                                                  // panelling
+      const px = x % 16;
+      if (px === 0) return brighten(OFFICE_WOOD, 0.5);
+      if (px === 1 || y === 41) return brighten(OFFICE_WOOD, 1.2);
+      return brighten(OFFICE_WOOD, 0.8 + 0.12 * noise(x >> 1, y >> 3, 302) + 0.06 * Math.sin(x * 1.7 + y * 0.2)); // grain
+    }
+    // Paint, with a faint stripe in the wallpaper and damp running down it.
+    const f = (x % 8 === 0 ? 0.94 : 1) * (0.92 + 0.06 * noise(x, y, 303));
+    const damp = noise(x >> 1, 0, 304) > 0.82 ? 0.35 * (1 - y / 38) * noise(x >> 1, y >> 3, 305) : 0;
+    return mix(brighten(OFFICE_PAINT, f), [120, 128, 90], damp);
+  });
+}
+
+// Overgrown: a wall (or one of the atrium's planters) gone under the leaves
+// entirely, two layers of them, with dark gaps and the odd pale flower.
+function makeOvergrownWall() {
+  return makeTexture(LEAF, (x, y) => {
+    const n = noise(x >> 1, y >> 1, 310);
+    if (n < 0.025) return brighten([230, 200, 210], 0.9 + 0.2 * noise(x, y, 311)); // a flower
+    return leafAt(x, y, 312, () => 0.9) || brighten(leafAt(x, y, 316, () => 0.95) || LEAF_DARK, 0.6);
+  });
+}
+
+// Carpet tiles, the pile laid alternate ways, with moss spreading across them
+// and roots cracking through.
+function makeHqFloor() {
+  const carpet = [84, 90, 102];
+  return makeTexture(carpet, (x, y) => {
+    const root = 20 + 6 * Math.sin(x * Math.PI * 2 / 64 * 2) + 3 * Math.sin(x * Math.PI * 2 / 64 * 5);
+    if (Math.abs(y + 0.5 - root) < 1.4 - 0.6 * noise(x >> 2, 0, 320)) return brighten(ROOT, 0.8 + 0.3 * noise(x, y, 321));
+    const moss = 0.6 * noise(x >> 3, y >> 3, 322) + 0.4 * noise(x >> 1, y >> 1, 323);
+    if (moss > 0.66) return brighten([66, 104, 42], 0.75 + 0.4 * noise(x, y, 324));
+    if (x % 32 === 0 || y % 32 === 0) return brighten(carpet, 0.6);                  // seams
+    const along = ((x >> 5) + (y >> 5)) % 2 === 0 ? x : y;                           // the pile's direction
+    const f = (along % 3 === 0 ? 0.9 : 1) * (0.88 + 0.1 * noise(x, y, 325));
+    return mix(brighten(carpet, f), [70, 90, 50], moss > 0.55 ? 0.35 : 0);           // the moss's green creeping in
+  });
+}
+
+// Ceiling tiles, warm off-white. Where there's a light, a SKYLIGHT in the
+// middle: daylight in `glow`'s colour through panes and a cross of mullions.
+// With no light (null), just the tiles. Ivy trails from the T-bars.
+function makeHqCeiling(glow) {
+  const tile = [180, 176, 160];
+  return makeTexture(tile, (x, y) => {
+    if (glow && x >= 14 && x < 50 && y >= 14 && y < 50) {
+      if (x === 14 || x === 49 || y === 14 || y === 49 || x === 31 || x === 32 || y === 31 || y === 32) return [60, 62, 58];
+      return glowing(brighten(glow, 0.92 + 0.08 * noise(x >> 2, y >> 2, 331)));
+    }
+    const leaf = leafAt(x, y, 332, (ly) => (ly < 12 || ly > 52) ? 0.35 : 0);
+    if (leaf) return brighten(leaf, 0.8);
+    if (x % 32 < 2 || y % 32 < 2) return brighten([130, 126, 112], x % 32 === 0 || y % 32 === 0 ? 0.7 : 1); // T-bars
+    if (noise(x >> 1, y >> 1, 333) < 0.12) return brighten(tile, 0.8);                                     // the fissured pattern
+    return mix(brighten(tile, 0.9 + 0.08 * noise(x, y, 334)), [130, 120, 80], noise(x >> 4, y >> 4, 335) < 0.25 ? 0.3 : 0); // water stains
+  });
+}
+
+// THE MOTHER PLANT (core.js, levels whose objective is 'motherplant'): where
+// the infection began. A wall of woven roots, with a great fleshy BLOOM at its
+// heart, gold at the centre, that pulses. Somewhere in it is the chief
+// executive: a red tie hangs from under the bloom, and a hand reaches out of
+// the roots. `damage` 0-2 wilts the petals and splits it, bleeding sap;
+// `pulse` 0-3 is how bright its heart is this moment; `dead`, burnt out.
+const BLOOM = [214, 104, 120];
+const BLOOM_HEART = [255, 214, 90];
+const SAP = [220, 170, 40];
+
+function makeMotherPlant(damage, pulse, dead) {
+  const cx = 32, cy = 26;
+  const char = (c) => mix(c, [14, 10, 8], 0.8);
+  return makeTexture(ROOT, (x, y) => {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+    const r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    // The bloom: five petals round a heart.
+    const petal = 12 + 4 * Math.cos(5 * a + 0.4);
+    if (r < 5.5) {
+      if (dead) return noise(x, y, 340) < 0.15 ? glowing([255, 120, 30]) : [30, 24, 18]; // embers
+      return glowing(brighten(BLOOM_HEART, 0.45 + 0.17 * pulse + 0.3 * (1 - r / 5.5)));
+    }
+    if (r < petal) {
+      const t = (r - 5.5) / (petal - 5.5);
+      // Splits in the petals with damage, and sap welling out of them.
+      if (damage > 0 && Math.abs(Math.sin(a * 5 + 1.3)) < 0.06 * damage) return dead ? [10, 8, 6] : brighten(SAP, 0.9);
+      const wilt = damage * 0.28;
+      let c = mix(brighten(BLOOM, 1.15 - 0.45 * t), [110, 70, 40], wilt);
+      if (Math.abs(Math.sin(a * 5 + 0.4)) < 0.1) c = brighten(c, 0.75);                  // the groove down each petal
+      if (dead) return char(c);
+      return t < 0.3 ? glowing(brighten(c, 0.85 + 0.08 * pulse)) : c;                    // the inner petals glow
+    }
+    // The tie, hanging out from under the bloom, and the collar above it.
+    if (y >= 38 && y < 41 && Math.abs(dx) < 5 - (y - 38)) return dead ? [40, 38, 34] : [214, 210, 196];
+    if (y >= 41 && y < 58) {
+      const half = y < 43 ? 1.4 : 1.4 + (y - 43) * 0.12;
+      if (Math.abs(dx) < half) return dead ? [34, 14, 12] : brighten([150, 28, 30], Math.abs(dx) < 0.6 ? 1.2 : 0.85);
+    }
+    // A hand reaching out of the roots, bottom left.
+    const palm = Math.hypot((x + 0.5 - 13) / 3.6, (y + 0.5 - 52) / 3);
+    let hand = palm < 1;
+    for (const [fx, fy] of [[-3, -5], [-1, -6], [1, -6], [3, -5]]) {
+      if (segmentDistance(x + 0.5, y + 0.5, 13 + fx * 0.6, 50, 13 + fx, 52 + fy) < 0.8) hand = true;
+    }
+    if (segmentDistance(x + 0.5, y + 0.5, 16, 53, 20, 51) < 1) hand = true; // thumb
+    if (hand) return dead ? [40, 34, 30] : brighten([168, 170, 148], 0.85 + 0.2 * noise(x, y, 341));
+    // Sap running down from the splits, once it's hurt.
+    if (!dead && damage > 0 && y > cy && noise(x, 0, 342) < 0.1 * damage && y < 40 + 18 * noise(x, 1, 342)) return brighten(SAP, 0.7);
+    // The roots, woven: two wavy sets of strands crossing.
+    const w1 = Math.abs(Math.sin(x * 0.42 + 2.2 * Math.sin(y * 0.14)));
+    const w2 = Math.abs(Math.sin(y * 0.36 + 2.0 * Math.sin(x * 0.12 + 1)));
+    let c;
+    if (w1 < 0.3) c = brighten(ROOT, 1.15 - w1);
+    else if (w2 < 0.3) c = brighten(ROOT, 0.95 - w2);
+    else c = noise(x >> 2, y >> 2, 343) < 0.35 ? brighten(LEAF_DARK, 0.9) : [26, 20, 14]; // leaves, and the dark between
+    // Glowing seed-sacs dotted about the roots: one (maybe) in each 8x8 square, round, somewhere in it.
+    const sx = (x >> 3) * 8 + 2 + 4 * noise(x >> 3, y >> 3, 345), sy = (y >> 3) * 8 + 2 + 4 * noise(x >> 3, y >> 3, 346);
+    if (!dead && noise(x >> 3, y >> 3, 344) < 0.3 && Math.hypot(x + 0.5 - sx, y + 0.5 - sy) < 1.8 && Math.hypot(sx - cx, sy - cy) > 17) {
+      return glowing(brighten(BLOOM_HEART, 0.4 + 0.12 * pulse));
+    }
+    return dead ? char(c) : c;
+  });
+}
+
+// OFFICE FURNITURE (sprites.js). A planter, the corporate kind, with a ficus
+// that's grown wild; and a desk with its green-screen terminal still on.
+function makePottedPlant() {
+  const pot = [196, 194, 186];
+  return makeTexture(LEAF, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y >= 46) {
+      if (Math.abs(dx) > 10 - (y - 46) * 0.12) return null;
+      if (y < 48) return brighten(pot, y === 46 ? 1.3 : 0.6);                       // the rim
+      return brighten(pot, roundShade(dx / 10) * (0.9 + 0.08 * noise(x, y, 350)));
+    }
+    if (Math.abs(dx + 1.5 * Math.sin(y * 0.2)) < 1.4 && y > 24) return brighten(ROOT, 0.9); // the trunk
+    const crown = Math.hypot(dx / 17, (y + 0.5 - 24) / 19);
+    if (crown >= 1) return null;
+    return leafAt(x, y, 352, () => 0.95) || (crown < 0.75 ? brighten(LEAF_DARK, 0.7) : null);
+  });
+}
+
+function makeDesk() {
+  const laminate = [150, 122, 84], beige = [184, 176, 150];
+  return makeTexture(laminate, (x, y) => {
+    const dx = x + 0.5 - 32;
+    // The terminal on it: a beige box and its green screen.
+    if (dx > -14 && dx < 4 && y >= 19 && y < 37) {
+      if (dx > -12 && dx < 2 && y >= 21 && y < 33) {
+        const text = (y - 22) % 3 === 0 && dx < -4 + 8 * noise(y, 0, 353) && dx > -11;
+        return glowing(text ? [120, 255, 140] : [20, 70, 36]);
+      }
+      return brighten(beige, y === 19 ? 1.25 : 0.85 + 0.1 * noise(x, y, 354));
+    }
+    if (dx > -8 && dx < -2 && y >= 37 && y < 40) return brighten(beige, 0.7);     // its stand
+    if (Math.abs(dx) > 26) return null;
+    if (y >= 40 && y < 43) return brighten(laminate, y === 40 ? 1.3 : 1);            // the desktop
+    if (y >= 43 && y < 62) {
+      if (Math.abs(dx) > 23) return brighten(laminate, 0.55);                        // the ends
+      if (y < 56) return brighten(laminate, 0.42 + 0.06 * noise(x, y, 355));         // the modesty panel, in shadow
+    }
+    // Ivy up one leg.
+    if (y >= 43 && dx > 20) { const leaf = leafAt(x, y, 356, () => 0.8); if (leaf) return leaf; }
+    return null;
+  });
+}
+
 // THE PLAYER'S GUN ----------------------------------------------------------------
 // A chunky pulse gun seen from behind, with three coils round the barrel.
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
@@ -1000,6 +1222,9 @@ const CORE_DEAD_TEXTURE = makeCore(2, 0, true);
 // The lab's breeding chamber, the same way: CHAMBER_TEXTURES[damage][pulse], and the wreck.
 const CHAMBER_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeChamber(damage, pulse, false)));
 const CHAMBER_DEAD_TEXTURE = makeChamber(2, 0, true);
+// The HQ's mother plant, the same way: MOTHER_PLANT_TEXTURES[damage][pulse], and the wreck.
+const MOTHER_PLANT_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeMotherPlant(damage, pulse, false)));
+const MOTHER_PLANT_DEAD_TEXTURE = makeMotherPlant(2, 0, true);
 const LIFT_TEXTURES = { locked: makeLift(false), open: makeLift(true) };
 // The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
 // GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
@@ -1024,6 +1249,8 @@ const DRUM_WRECK_TEXTURE = makeDrumWreck();
 const FIREBALL_FRAMES = [0, 1, 2, 3, 4].map(makeFireball);
 const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
+const POTTED_PLANT_TEXTURE = makePottedPlant();
+const DESK_TEXTURE = makeDesk();
 
 // The floor and ceiling come with the level's theme (map.js: THEMES): the
 // ceiling three times, with its lights on, off, and red for an alarm.
@@ -1056,6 +1283,8 @@ const TEXTURES = {
   [DOOR_CELL]: makeBlastDoor(null),
   [LAB_TILE_CELL]: makeLabTiles(),
   [LAB_CABINET_CELL]: makeLabCabinet(),
+  [OFFICE_WALL_CELL]: makeOfficeWall(),
+  [OVERGROWN_CELL]: makeOvergrownWall(),
 };
 
 function wallTexture(cell) {

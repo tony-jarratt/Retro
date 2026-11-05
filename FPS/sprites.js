@@ -10,6 +10,8 @@ const SPRITE_TYPES = {
   drum:   { texture: DRUM_TEXTURE,   solid: true,  explosive: true },
   strut:  { texture: STRUT_TEXTURE,  solid: true,  explosive: false },
   lamp:   { texture: LAMP_TEXTURE,   solid: false, explosive: false },
+  plant:  { texture: POTTED_PLANT_TEXTURE, solid: true, explosive: false }, // the HQ's
+  desk:   { texture: DESK_TEXTURE,   solid: true,  explosive: false },
 };
 
 const SOLID_SPRITE_RADIUS = 0.3; // half-width of a solid sprite's collision box, in cells
@@ -53,6 +55,7 @@ function spriteThings(viewer) {
       shade: e.hurtTime > 0 ? 3 : 1,
       glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ENEMY_TYPES[e.type].charge : 1,
       enemy: e,
+      aimRow: e.state === 'dead' && e.downTime > 0 ? SUIT_DOWN_AIM_ROW : null, // a downed suit, on the floor (infected-art.js)
     })),
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
     ...securityThings(thing), // cameras and tripwire beams (security.js)

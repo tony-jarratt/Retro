@@ -75,6 +75,16 @@ function makeOil(v) {
 // THE LAB'S SPILLS: a pool of green slime, something that leaked out of a
 // tank. Glossy, so like water it mirrors the room (reflections.js), with a
 // paler crust round its edge where it's drying.
+// Fallen leaves (the HQ's spill), dried and browning, in a loose drift.
+function makeLeaves(v) {
+  return makeTexture([110, 100, 50], (x, y) => {
+    if (blobT(x, y, 31 + v * 3, 33, 20 + v * 3, v * 1.9 + 0.4) >= 1) return null;
+    const leaf = leafAt(x, y, 360 + v * 10, () => 0.55); // textures.js
+    if (!leaf) return null;
+    return seeThrough(mix(leaf, [140, 104, 50], 0.35 + 0.4 * noise(x >> 3, y >> 3, 361 + v)), 235);
+  });
+}
+
 function makeSlime(v) {
   const shape = (x, y) => blobT(x, y, 31 + v * 3, 32, 18 + v * 3, v * 2.3 + 0.7);
   const water = new Uint8Array(TEX_SIZE * TEX_SIZE);
@@ -309,6 +319,7 @@ const STENCIL_WHITE = [205, 200, 185];
 const STENCIL_YELLOW = [215, 175, 40];
 const STENCIL_RED = [190, 50, 35];
 const STENCIL_GREEN = [90, 170, 50];
+const STENCIL_BRASS = [206, 170, 86]; // the HQ's brass lettering
 
 // Every kind of decal: its variant pictures, and which surfaces it may go on.
 // Hand-placed decals in a level file name one of these as `type`.
@@ -340,6 +351,7 @@ const DECAL_TYPES = {
   rearm:      { surfaces: ['wall'], text: true, frames: [makeStencil([['REARM', 2, 20], ['REPAIR', 2, 34]], STENCIL_WHITE)] },
   // The lab's.
   slime:      { surfaces: ['floor'],            frames: [0, 1, 2].map(makeSlime) },
+  leaves:     { surfaces: ['floor'],            frames: [0, 1, 2].map(makeLeaves) },
   acid:       { surfaces: ['floor'],            frames: [0, 1].map(makeAcidPool) },
   pod:        { surfaces: ['wall'],             frames: [makePod(true)], text: true },
   podEmpty:   { surfaces: ['wall'],             frames: [makePod(false)], text: true },
@@ -347,6 +359,13 @@ const DECAL_TYPES = {
   genetics:   { surfaces: ['wall'], text: true, frames: [makeStencil([['GENETICS', 2, 20], ['LAB 2', 2, 34]], STENCIL_GREEN)] },
   specimens:  { surfaces: ['wall'], text: true, frames: [makeStencil([['SPECIMEN', 2, 20], ['HALL', 2, 34]], STENCIL_GREEN)] },
   keepOut:    { surfaces: ['wall'], text: true, frames: [makeStencil([['DANGER', 2, 20], ['KEEP OUT', 2, 34]], STENCIL_RED)] },
+  // The HQ's signs, in brass, and the company's cheerful slogans.
+  company:    { surfaces: ['wall'], text: true, frames: [makeStencil([['VERIDIAN', 2, 20], ['GROUP', 2, 34]], STENCIL_BRASS)] },
+  frontDesk:  { surfaces: ['wall'], text: true, frames: [makeStencil([['FRONT', 2, 20], ['DESK', 2, 34]], STENCIL_BRASS)] },
+  execSuite:  { surfaces: ['wall'], text: true, frames: [makeStencil([['EXEC', 2, 20], ['SUITE', 2, 34]], STENCIL_BRASS)] },
+  boardRoom:  { surfaces: ['wall'], text: true, frames: [makeStencil([['BOARD', 2, 20], ['ROOM', 2, 34]], STENCIL_BRASS)] },
+  atrium:     { surfaces: ['wall'], text: true, frames: [makeStencil([['ATRIUM', 2, 26]], STENCIL_BRASS)] },
+  growWithUs: { surfaces: ['wall'], text: true, frames: [makeStencil([['GROW', 2, 20], ['WITH US', 2, 34]], STENCIL_GREEN, true)] },
 };
 
 // WHERE THEY ARE -------------------------------------------------------------
@@ -367,7 +386,7 @@ const FACE_STEPS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
 // Plain walls carry decals; computer banks, terminals, doors, panels and
 // the lab's cabinets (they have their own placard) don't.
 function takesWallDecals(cell) {
-  return cell === 1 || cell === 2 || cell === 4 || cell === LAB_TILE_CELL;
+  return cell === 1 || cell === 2 || cell === 4 || cell === LAB_TILE_CELL || cell === OFFICE_WALL_CELL;
 }
 
 // Put decal `type` on a surface. `pick` (0..1) chooses the variant, and the
@@ -427,6 +446,7 @@ function scatterDecals() {
       else if (cell === 1 && r < 0.1) placeDecal('wall', x, y, face, 'rust', noise(x, y, 115));
       else if (cell === 1 && r < 0.17) placeDecal('wall', x, y, face, 'damp', noise(x, y, 116));
       else if (cell === LAB_TILE_CELL && r < 0.12) placeDecal('wall', x, y, face, 'damp', noise(x, y, 118));
+      else if (cell === OFFICE_WALL_CELL && r < 0.1) placeDecal('wall', x, y, face, 'damp', noise(x, y, 119));
     }
   }));
 }

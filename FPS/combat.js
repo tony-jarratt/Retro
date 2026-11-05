@@ -116,6 +116,7 @@ function fireRound() {
 function shotHits(target) {
   if (target.panel) { hitGlass(target.panel); return; } // panels.js
   if (target.core) { damageCore(1); return; }          // core.js
+  if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
     const hits = isFacingAway(target.enemy) ? ENEMY_TYPES[target.enemy.type].backHits : 1;
@@ -141,8 +142,10 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
     enemy.state = 'dead';
     enemy.moving = false;
     if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
+    knockedDown(enemy); // infected.js: a suit is only down
     return;
   }
+  if (enemy.state === 'grab') loseGrip(enemy); // infected.js: shot, it lets go of you
   if (!byPlayer) return;
   wakeTurret(enemy);
   turnTowardsPlayer(enemy);

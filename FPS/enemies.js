@@ -44,12 +44,17 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //            (acid.js), leaving a burning pool. Its glands are on its back:
 //            hits there count double. Get close, and it backs off.
 //
+// THE HQ'S INFECTED (infected.js):
+//   suit     an office worker the plant virus took. Shambles, GRABS and holds
+//            on, and GETS BACK UP unless you finish it while it's down.
+//
 // Every type gives these:
 //   speed      cells per second (the player does 3)
 //   health     hits to destroy
 //   aimRange   how close it gets before it stops and aims (for 'melee', its
 //              reach to start an attack)
-//   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js, acid.js)
+//   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js,
+//              acid.js), or 'grab' (infected.js: aimRange is its reach)
 // and these only if it differs from ENEMY_DEFAULTS:
 //   charge     seconds of charging (visor brightening) before each shot
 //   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
@@ -64,9 +69,10 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //              nothing (creatures.js)
 //   retreat    creatures that fight at range: closer than this, it backs away
 //              (and shows you its back) rather than fire, unless it's cornered
+//   rises      shot down, it gets back up unless finished off (infected.js)
 const ENEMY_DEFAULTS = {
   charge: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
-  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0,
+  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false,
 };
 const ENEMY_REQUIRED = ['speed', 'health', 'aimRange', 'weapon'];
 const ENEMY_TYPES = {
@@ -76,6 +82,7 @@ const ENEMY_TYPES = {
   turret:  { speed: 0,   health: 4, aimRange: 8,   weapon: 'gun',    charge: 1.2, damage: 6,  hitNear: 0.75, hitFar: 0.35, mobile: false, volley: 5, volleyGap: 0.12 },
   lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true },
   spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
+  suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
 };
 // Fill in the defaults, so the rest of the code can read any field of any type.
 // A misspelt field would otherwise be silently ignored, so it's an error.
@@ -135,6 +142,7 @@ const enemies = ENEMIES.map((start) => ({
   volleyTimer: 0,
   attackTime: 0, // creatures: seconds into the current stage of a melee attack (creatures.js)
   lungeLeft: 0,  // creatures: cells of lunge still to go
+  downTime: 0,   // a downed suit: seconds until it gets up; 0 if it never will (infected.js)
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -332,6 +340,7 @@ function updateWalker(enemy, dt) {
   const type = ENEMY_TYPES[enemy.type];
   if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
+  if (updateInfected(enemy, dt)) return; // grabbing, staggering or getting up (infected.js)
   const sees = canSee(enemy);
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
@@ -352,6 +361,8 @@ function updateWalker(enemy, dt) {
 
   if (enemy.state === 'aim' && type.weapon === 'melee') {
     startMeleeAttack(enemy); // creatures.js: it rears up
+  } else if (enemy.state === 'aim' && type.weapon === 'grab') {
+    startGrab(enemy);        // infected.js: it takes hold
   } else if (enemy.state === 'aim') {
     aimAndFire(enemy, dt);
     if (enemy.smart && type.strafe) enemy.moving = strafeStep(enemy, dt);
@@ -389,7 +400,7 @@ function updateEnemy(enemy, dt) {
   enemy.firedTime = Math.max(0, enemy.firedTime - dt);
   enemy.path = null; // only set while it's following one this frame
   enemy.moving = false;
-  if (enemy.state === 'dead') return;
+  if (enemy.state === 'dead') { updateDowned(enemy, dt); return; } // infected.js: a downed suit may get up
 
   updateVolley(enemy, dt); // a volley under way keeps firing whatever else happens
 
@@ -425,10 +436,13 @@ function beaconLit(enemy) {
 }
 
 function enemyTexture(enemy, viewer) {
-  if (enemy.state === 'dead') return CORPSE_TEXTURES[enemy.type] || WRECK_TEXTURE; // a heap looks the same from every side
+  if (enemy.state === 'dead') {
+    if (enemy.downTime > 0) return downedTexture(enemy); // infected.js: down, but getting up again
+    return CORPSE_TEXTURES[enemy.type] || WRECK_TEXTURE; // a heap looks the same from every side
+  }
   const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off'] : ROBOT_FRAMES[enemy.type];
   // A creature's attack faces you throughout, so it's only ever seen from the front.
-  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand' }[enemy.state];
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise' }[enemy.state];
   if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.

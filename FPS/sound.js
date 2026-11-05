@@ -440,6 +440,35 @@ function sfxLurcherSwipe(enemy) {
   noiseBurst(out, 'bandpass', 600, 2800, 0.2, 0.6);
 }
 
+// THE HQ'S SUITS. Spotting you: a long, hollow moan, two voices a fraction
+// apart. Taking hold: a wet grunt and cloth tearing. Getting up: a slow,
+// creaking groan rising. Finished off: a soft pop, and spores hissing out.
+function sfxSuitMoan(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'triangle', 140, 105, 1.1, 0.16);
+  tone(out, 'triangle', 143, 101, 1.1, 0.11);
+  noiseBurst(out, 'bandpass', 380, 260, 0.9, 0.18);
+}
+function sfxSuitGrab(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 120, 80, 0.25, 0.12);
+  noiseBurst(out, 'highpass', 1800, 3500, 0.18, 0.4, 0.05);
+}
+function sfxSuitRise(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 70, 150, SUIT_RISE_TIME, 0.1);
+  tone(out, 'sawtooth', 72, 147, SUIT_RISE_TIME, 0.07);
+}
+function sfxSuitFinished(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  drumHit(out, 'sine', 160, 60, 0.04, 0.1, 0.4);
+  noiseBurst(out, 'highpass', 3000, 1500, 0.6, 0.3, 0.04);
+}
+
 // The spitter spotting you: a wet, rattling hiss.
 function sfxSpitterHiss(enemy) {
   const out = placeAt(enemy.x, enemy.y);
@@ -695,7 +724,7 @@ function fadeOutLoops() {
 function rememberState() {
   for (const d of DOORS) last.doors.set(d, d.state);
   for (const p of PANELS) last.panels.set(p, p.state);
-  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS) });
+  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime });
   last.pickups = new Set(pickups);
   for (const h of hives) last.hives.set(h, h.left);
   for (const t of terminals) last.terminals.set(t, t.state);
@@ -731,9 +760,16 @@ function watchTheGame() {
       if (creature) e.state === 'dead' ? sfxCreatureDown(e) : sfxCreatureHit(e);
       else e.state === 'dead' ? sfxRobotDown(e) : sfxRobotHit(e);
     }
+    if (e.state === 'dead' && was.downTime > 0 && e.downTime === 0) sfxSuitFinished(e); // infected.js
     if (e.state !== 'dead' && e.moving && step !== was.step) creature ? sfxCreatureStep(e) : sfxRobotStep(e);
     if (creature && e.state !== was.state) {
-      if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) e.type === 'spitter' ? sfxSpitterHiss(e) : sfxLurcherSnarl(e);
+      if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) {
+        if (e.type === 'spitter') sfxSpitterHiss(e);
+        else if (e.type === 'suit') sfxSuitMoan(e);
+        else sfxLurcherSnarl(e);
+      }
+      if (e.state === 'grab') sfxSuitGrab(e);
+      if (e.state === 'rising') sfxSuitRise(e);
       if (e.state === 'windup') sfxLurcherRear(e);
       if (e.state === 'lunge') sfxLurcherSwipe(e);
     }

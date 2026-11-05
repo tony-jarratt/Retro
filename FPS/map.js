@@ -90,6 +90,15 @@ const THEMES = {
     ventGas: true,
     spill: 'slime',
   },
+  hq: {
+    ambient: [0.3, 0.33, 0.25],                              // warm, close, green
+    ceilingLight: { colour: [1.15, 1.1, 0.88], radius: 4 },   // daylight through the skylights
+    floor: () => makeHqFloor(),
+    ceiling: (glow) => makeHqCeiling(glow),
+    ceilingGlow: [240, 240, 205],
+    ventGas: true,
+    spill: 'leaves',
+  },
 };
 const THEME_NAME = CURRENT_LEVEL.theme || 'industrial';
 if (!(THEME_NAME in THEMES)) throw new Error(`Level "${CURRENT_LEVEL.id}" has theme "${THEME_NAME}". Themes: ${Object.keys(THEMES).join(', ')}.`);
@@ -97,6 +106,6 @@ const THEME = THEMES[THEME_NAME];
 
 // THE OBJECTIVE: what the level's K cells are, and so what you're told to
 // destroy (core.js). The mechanics are the same either way.
-const OBJECTIVE_KINDS = ['core', 'chamber'];
+const OBJECTIVE_KINDS = ['core', 'chamber', 'motherplant'];
 const OBJECTIVE = CURRENT_LEVEL.objective || 'core';
 if (!OBJECTIVE_KINDS.includes(OBJECTIVE)) throw new Error(`Level "${CURRENT_LEVEL.id}" has objective "${OBJECTIVE}". Objectives: ${OBJECTIVE_KINDS.join(', ')}.`);

@@ -1,9 +1,10 @@
 // THE OBJECTIVE: destroy the security core, then reach the exit lift.
 //
 // In the lab the objective is the BREEDING CHAMBER instead (a level's
-// objective: 'chamber', map.js). It looks, lights and reads differently
-// (OBJECTIVE_LOOKS below), but it's the same thing underneath: K cells
-// that take CORE_HEALTH hits, and everything below works the same.
+// objective: 'chamber', map.js), and in the HQ the MOTHER PLANT
+// ('motherplant'). They look, light and read differently (OBJECTIVE_LOOKS
+// below), but it's the same thing underneath: K cells that take CORE_HEALTH
+// hits (or one demolition charge: charge.js), and everything below works the same.
 //
 // The CORE is a stretch of wall ('K' cells in a level's rows; several cells are one
 // core) running the facility's security network. Every turret is wired to
@@ -24,6 +25,7 @@ const LIFT_RANGE = 1.0;          // cells from the lift's face: walk up to it
 //   textures   [damage][pulse] live frames, and the wreck
 //   light      the colour its heart throws into the room
 //   goal       shown as the level starts; done, when it goes; liftHint, at a locked lift
+//   creatures  its level's enemies are creatures: when it goes, they come loose (creatures.js)
 const OBJECTIVE_LOOKS = {
   core: {
     textures: CORE_TEXTURES, dead: CORE_DEAD_TEXTURE, light: { colour: [1.2, 0.15, 0.1], radius: 3 },
@@ -32,6 +34,12 @@ const OBJECTIVE_LOOKS = {
   chamber: {
     textures: CHAMBER_TEXTURES, dead: CHAMBER_DEAD_TEXTURE, light: { colour: [0.25, 0.7, 0.15], radius: 3 },
     goal: 'BURN THE BREEDING CHAMBER', done: 'CHAMBER BURNT  GET TO THE LIFT', liftHint: 'LIFT LOCKED  BURN THE CHAMBER',
+    creatures: true,
+  },
+  motherplant: {
+    textures: MOTHER_PLANT_TEXTURES, dead: MOTHER_PLANT_DEAD_TEXTURE, light: { colour: [1.3, 0.85, 0.35], radius: 3.5 },
+    goal: 'BURN THE MOTHER PLANT', done: 'MOTHER PLANT BURNT  GET TO THE LIFT', liftHint: 'LIFT LOCKED  BURN THE PLANT',
+    creatures: true,
   },
 };
 const OBJECTIVE_LOOK = OBJECTIVE_LOOKS[OBJECTIVE];
@@ -107,7 +115,7 @@ function destroyCore() {
     alarms[z.id] = Infinity;
   }
   showSecurityMessage(OBJECTIVE_LOOK.done);
-  if (OBJECTIVE === 'chamber') labComesLoose(); // creatures.js: every tank breaks, every pod bursts
+  if (OBJECTIVE_LOOK.creatures) creaturesComeLoose(); // creatures.js: every tank breaks, every pod bursts, everything hunts you
 }
 
 // The lift's hint while you stand at it with the core still running.

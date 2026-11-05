@@ -58,6 +58,8 @@ function explodeAt(x, y, blast) {
     damageEnemy(e, Math.ceil(BLAST_ROBOT_HITS * blastStrength(blast, d)));
   }
 
+  finishDownedNear(x, y, blast.radius); // infected.js: burns the bodies, so they don't get up
+
   const d = Math.hypot(player.x - x, player.y - y);
   if (d < blast.radius && clearLine(x, y, player.x, player.y)) {
     damagePlayer(Math.round(blast.damage * blastStrength(blast, d)));

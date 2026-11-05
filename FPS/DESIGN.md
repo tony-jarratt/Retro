@@ -103,6 +103,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | `#` `H` `P` | Walls: steel, hazard bulkhead, pipes | |
 | `C` | Computer bank | Animated, green light |
 | `T` | Security terminal | Walk up to it: its zone's **cameras** shut down for good (not tripwires or turrets) |
+| `o`, `v` | HQ walls | Office wall; overgrown wall (the HQ's own pieces) |
 | `K` | Security core | The objective. Several `K` cells are one core, 18 hits (blasts count), or one **demolition charge**. Doesn't fight back |
 | `L` | Exit lift | Red lamp until the core is down, then green: reach it to finish |
 | `D` | Blast door | Opens on approach; may be locked (`LOCKED_DOORS`) |
@@ -164,8 +165,8 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 ## 7. Levels
 
 Levels live in `levels/` as data, one file each, in play order
-(`levels/industrial.js`, `levels/lab.js`). Reaching the lift shows LEVEL
-COMPLETE; Enter goes on to the next. Both are **test sandboxes** for now, not
+(`levels/industrial.js`, `levels/lab.js`, `levels/hq.js`). Reaching the lift shows LEVEL
+COMPLETE; Enter goes on to the next. All are **test sandboxes** for now, not
 designed levels. Play-testing: `index.html?playtest` opens a level chooser,
 and L in a game goes back to it; `index.html?level=lab` jumps straight in.
 
@@ -248,6 +249,38 @@ cameras, tripwires or terminals (owner, 2026-11-05).
   and the automatic module lies in the larvae's nest. They can't open doors
   and are never smart.
 
+### The HQ (third theme, stage 1 built)
+
+The company's headquarters, where a **plant/fungal virus** got out of the
+atrium garden and into the air conditioning (owner's idea: "zombies,
+corporate suits who have succumbed to a virus", "botanical atmosphere").
+Infected only: no robots (owner, 2026-11-05).
+
+- **Look** (`theme: 'hq'`): office walls `o` (paint over wood panelling,
+  ivy creeping up and down), overgrown walls `v` (the atrium's planters),
+  carpet tiles going to moss with roots through them, office ceiling tiles
+  with skylights where the lights are, warm green ambient and daylight,
+  leaf litter, brass signage (VERIDIAN GROUP; GROW WITH US). Desks with
+  green-screen terminals and potted plants (`desk`, `plant` sprites).
+- **The suit** (`infected.js`, art in `infected-art.js`): a creature (hears,
+  needs light, drops nothing). Speed 0.9, 3 hits. It **grabs**: in reach
+  (0.8) it takes hold and squeezes 4 every 0.5s, and while anything holds
+  you, you move at 40% speed. Shoot it and it lets go and staggers; or drag
+  yourself away until it loses its grip (about a second against one).
+  It **gets back up**: shot down it's only down, its pustules glowing, for
+  6s (twitching for the last 1.5s), then rises in 1.2s with full health.
+  **Finish it** on the floor: one shot into the body (the gun aims down at
+  it) or a blast.
+- **Objective: the mother plant** (`objective: 'motherplant'`): a wall of
+  woven roots round a great pulsing bloom, a red tie hanging under it and a
+  hand reaching out (the chief executive). Burning it sets the infected
+  loose, as the chamber does the lab's creatures.
+- **Still to build:** stage 2, **bloomers** (rooted infected that burst a
+  sight-blocking spore cloud when you get close, waking the suits) and the
+  **sprinklers** (a blast sets them off, and every bloomer they water
+  flowers at once); stage 3, the **pollinators** (a moth/wasp swarm, the
+  drones' role).
+
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of
 fire, on zero armour, is a real decision).
@@ -258,8 +291,8 @@ turrets and tripwires, so hitting it early makes the rest safer, but it
 sets the whole facility on you.
 
 Levels are stored as data and the game moves from one to the next. A level picks its
-**theme** (floor, ceiling, lighting; map.js) and its **objective** (core or
-chamber). Still to build: a per-level enemy roster and ambience (sound).
+**theme** (floor, ceiling, lighting; map.js: THEMES) and its **objective** (core,
+chamber or mother plant). Still to build: a per-level enemy roster and ambience (sound).
 
 ---
 

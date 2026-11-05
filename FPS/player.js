@@ -140,7 +140,7 @@ function updatePlayer(dt) {
 
   // Move one axis at a time. If x is blocked but y isn't, you still slide
   // along the wall instead of sticking to it.
-  const step = MOVE_SPEED * dt;
+  const step = MOVE_SPEED * dt * (playerHeld() ? GRAB_SLOW : 1); // infected.js: something has hold of you
   const newX = player.x + moveX * step;
   if (!blocked(newX, player.y)) player.x = newX;
   const newY = player.y + moveY * step;
