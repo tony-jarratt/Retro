@@ -112,7 +112,7 @@ LEVELS.push({
     { x: 29, y: 22, flicker: true },
   ],
 
-  // Robots (enemies.js): type (a key of ROBOT_TYPES: walker, scout, heavy,
+  // Robots (enemies.js): type (a key of ENEMY_TYPES: walker, scout, heavy,
   // turret), where each starts, and which way it faces.
   // angle uses the player's convention: 0 = east, PI/2 = south, -PI/2 = north.
   // smart: true gives a walking robot the better brain (strafing, calling for

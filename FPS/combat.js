@@ -5,7 +5,7 @@ const DRY_FIRE_GAP = 0.25;      // seconds between dry clicks while you pull an 
 const GUN_FLASH_TIME = 0.12;    // longest a muzzle flash and recoil show (each weapon's own cooldown is in weapons.js)
 const HURT_FLASH_TIME = 0.1;    // seconds a hit robot flashes white
 const ROBOT_FIRE_FLASH = 0.15;  // seconds a robot shows its own muzzle flash
-// (Each robot type's health, charge time, damage and odds are in ROBOT_TYPES, enemies.js.)
+// (Each robot type's health, charge time, damage and odds are in ENEMY_TYPES, enemies.js.)
 const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hit
 
 // The whole game's state:
@@ -118,7 +118,7 @@ function shotHits(target) {
   if (target.core) { damageCore(1); return; }          // core.js
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
-    const hits = isFacingAway(target.enemy) ? ROBOT_TYPES[target.enemy.type].backHits : 1;
+    const hits = isFacingAway(target.enemy) ? ENEMY_TYPES[target.enemy.type].backHits : 1;
     damageEnemy(target.enemy, hits);
   }
   if (target.camera) shootCamera(target.camera); // security.js
@@ -136,18 +136,18 @@ function shotHits(target) {
 function damageEnemy(enemy, hits = 1, byPlayer = true) {
   enemy.health -= hits;
   enemy.hurtTime = HURT_FLASH_TIME;
-  if (enemy.state === 'dormant' && ROBOT_TYPES[enemy.type].creature) wakeCreature(enemy); // shot in its tank (creatures.js)
+  if (enemy.state === 'dormant' && ENEMY_TYPES[enemy.type].creature) wakeCreature(enemy); // shot in its tank (creatures.js)
   if (enemy.health <= 0) {
     enemy.state = 'dead';
     enemy.moving = false;
-    if (!ROBOT_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
+    if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
     return;
   }
   if (!byPlayer) return;
   wakeTurret(enemy);
   turnTowardsPlayer(enemy);
   if (enemy.state === 'idle' || enemy.state === 'search') {
-    if (ROBOT_TYPES[enemy.type].mobile) enemy.state = 'chase';
+    if (ENEMY_TYPES[enemy.type].mobile) enemy.state = 'chase';
     enemy.lastSeenX = player.x;
     enemy.lastSeenY = player.y;
   }
@@ -166,7 +166,7 @@ function robotHitChance(type, dist) {
 // A robot can SEE you through a window (castRay looks through glass), so it
 // fires: the window takes every shot, hit or miss, until it gives way.
 function robotFires(enemy, dist) {
-  const type = ROBOT_TYPES[enemy.type];
+  const type = ENEMY_TYPES[enemy.type];
   enemy.firedTime = type.volley > 1 ? ROBOT_FIRE_FLASH / 2 : ROBOT_FIRE_FLASH; // a volley flickers
   if (type.weapon === 'rocket') { launchRocket(enemy); sfxRocketLaunch(enemy); return; } // explosions.js, sound.js
   if (type.weapon === 'lob') { lobAcid(enemy, player.x, player.y); return; }              // a spitter (acid.js)

@@ -394,8 +394,8 @@ function scatterDecals() {
   const isFloor = (x, y) => MAP[y]?.[x] === 0;
   const nearDrum = (x, y) => props.some((p) => p.type === 'drum' && Math.hypot(p.x - (x + 0.5), p.y - (y + 0.5)) < 1.6);
   const hasCeilingLight = (x, y) => CEILING_LIGHTS.some((c) => c.x === x && c.y === y);
-  // What gets spilt on the floor: oil in the industrial sector, slime in the lab.
-  const spill = THEME === 'lab' ? 'slime' : 'oil';
+  // What gets spilt on the floor: oil in the industrial sector, slime in the lab (map.js: THEMES).
+  const spill = THEME.spill;
 
   MAP.forEach((row, y) => row.forEach((cell, x) => {
     if (cell === 0) {

@@ -303,7 +303,7 @@ How much of the code is general engine, and how much is this game's look?
 |---|---|---|---|
 | **Pure engine** | ~28% | `raycaster.js` (walls, floor/ceiling, see-through panels, decal blending), `sprites.js`, `lighting.js`, `reflections.js`, `pathfinding.js`, `doors.js`, `panels.js`, `player.js`, `main.js`, `debug.js` | Unchanged. Torches are flickering lamps; a portcullis is a door that slides up instead of sideways (a small change to `hitDoor`); iron bars are grates. |
 | **Reusable systems, new content** | ~47% | `enemies.js`, `combat.js`, `explosions.js`, `steam.js`, `drones.js`, `security.js`, `decals.js`, `pickups.js`, `weapons.js`, `hud.js`, `filter.js`, `sound.js` | The mechanics carry over; the dressing changes. Robots → monsters (same chase/aim/turn behaviour); drones → a swarm of bats (same flocking); steam vents → flame jets; tripwires → pressure plates; cameras → magic wards; drum blasts → fireballs; decals → moss and cracked flagstones; sound keeps its engine, gets new recipes. |
-| **Pure look and data** | ~25% | `textures.js` (every picture), `levels/*.js` (the levels), `visor.js` | Replaced: new art and a new layout. Since the art is generated in code, it's the same kind of work as before. |
+| **Pure look and data** | ~25% | `textures.js`, `robot-art.js`, `creature-art.js` (every picture), `levels/*.js` (the levels), `visor.js` | Replaced: new art and a new layout. Since the art is generated in code, it's the same kind of work as before. |
 
 A *Dungeon Master*-style game would add: grid movement with 90° turns (simpler
 than free movement: snap to cell centres and slide between them), melee (a

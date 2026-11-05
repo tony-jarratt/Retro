@@ -624,11 +624,11 @@ function updateSound(dt) {
   for (const e of enemies) {
     const charging = e.state === 'aim' && e.charge > 0;
     let v = robotWhines.get(e);
-    const creature = ROBOT_TYPES[e.type].creature;
+    const creature = ENEMY_TYPES[e.type].creature;
     if (charging && !v) { v = makeVoice(creature ? 'sawtooth' : 'triangle'); robotWhines.set(e, v); }
     if (!charging && v) { stopVoice(v); robotWhines.delete(e); continue; }
     if (v) {
-      const f = e.charge / ROBOT_TYPES[e.type].charge;
+      const f = e.charge / ENEMY_TYPES[e.type].charge;
       // A spitter's sac swelling is a rising gurgle, lower and rougher than a robot's whine.
       if (creature) steerVoice(v, e.x, e.y, 0.1, 80 + 220 * f + 25 * Math.sin(animTime * 40));
       else steerVoice(v, e.x, e.y, 0.15, 300 + 900 * f);
@@ -709,7 +709,7 @@ function watchTheGame() {
   for (const e of enemies) {
     const was = last.enemies.get(e);
     const step = Math.floor(e.walkTime * WALK_FPS);
-    const creature = ROBOT_TYPES[e.type].creature;
+    const creature = ENEMY_TYPES[e.type].creature;
     if (e.health < was.health) {
       if (creature) e.state === 'dead' ? sfxCreatureDown(e) : sfxCreatureHit(e);
       else e.state === 'dead' ? sfxRobotDown(e) : sfxRobotHit(e);

@@ -51,7 +51,7 @@ function spriteThings(viewer) {
       { glowShade: spriteGlow(p), prop: p })),
     ...enemies.map((e) => thing(e.x, e.y, enemyTexture(e, viewer), {
       shade: e.hurtTime > 0 ? 3 : 1,
-      glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ROBOT_TYPES[e.type].charge : 1,
+      glowShade: e.state === 'aim' ? 1 + 1.5 * e.charge / ENEMY_TYPES[e.type].charge : 1,
       enemy: e,
     })),
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),

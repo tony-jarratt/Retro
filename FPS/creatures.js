@@ -1,6 +1,6 @@
 // THE LAB'S CREATURES: how they sense you and how they attack. They're in
 // the same `enemies` list as the robots and run the same walking state
-// machine (enemies.js); a type with `creature: true` in ROBOT_TYPES differs in:
+// machine (enemies.js); a type with `creature: true` in ENEMY_TYPES differs in:
 //
 //   HEARING. Robots answer to cameras and alarms; creatures answer to NOISE.
 //     Every round you fire is a noise where you stand, and the faster the gun
@@ -52,7 +52,7 @@ let looseTimer = 0;
 
 // A tank creature must have tank glass beside it, or nothing could ever wake it.
 enemies.forEach((e, n) => {
-  if (e.state !== 'dormant' || !ROBOT_TYPES[e.type].creature) return;
+  if (e.state !== 'dormant' || !ENEMY_TYPES[e.type].creature) return;
   const x = Math.floor(e.x), y = Math.floor(e.y);
   if (![[0, -1], [0, 1], [1, 0], [-1, 0]].some(([dx, dy]) => MAP[y + dy]?.[x + dx] === TANK_GLASS_CELL)) {
     throw new Error(`ENEMIES[${n}] (${e.type} at ${e.x}, ${e.y}) is in a tank (tank: true), but there's no tank glass ('g') beside its cell.`);
@@ -70,7 +70,7 @@ function wakeCreature(enemy) {
 // A pane of tank glass has gone (panels.js): whatever was in that tank is out.
 function tankBroken(panel) {
   for (const e of enemies) {
-    if (e.state !== 'dormant' || !ROBOT_TYPES[e.type].creature) continue;
+    if (e.state !== 'dormant' || !ENEMY_TYPES[e.type].creature) continue;
     if (Math.abs(Math.floor(e.x) - panel.x) + Math.abs(Math.floor(e.y) - panel.y) === 1) wakeCreature(e);
   }
 }
@@ -101,7 +101,7 @@ function retreatStep(enemy, dt) {
 // goes to look. One already after you carries on.
 function makeNoise(x, y, radius) {
   for (const e of enemies) {
-    if (e.state === 'dead' || !ROBOT_TYPES[e.type].creature) continue;
+    if (e.state === 'dead' || !ENEMY_TYPES[e.type].creature) continue;
     const reach = clearLine(x, y, e.x, e.y) ? radius : radius * WALL_MUFFLE;
     if (Math.hypot(e.x - x, e.y - y) <= reach) alertEnemy(e, x, y);
   }
@@ -155,7 +155,7 @@ function updateMeleeAttack(enemy, dt) {
     if (!blocked) { enemy.x = nx; enemy.y = ny; }
     enemy.lungeLeft -= step;
     if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < LURCHER_REACH) {
-      damagePlayer(ROBOT_TYPES[enemy.type].damage);
+      damagePlayer(ENEMY_TYPES[enemy.type].damage);
       enemy.state = 'recover';
       enemy.attackTime = 0;
     } else if (blocked || enemy.lungeLeft <= 0) {

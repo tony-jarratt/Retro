@@ -513,39 +513,11 @@ function makeCagedLamp() {
   });
 }
 
-// THE ROBOTS ------------------------------------------------------------------
-// Three walking types share one body plan, a chunky hull on two reverse-jointed
-// ("chicken") legs, drawn by the same shape functions with a different STYLE:
-//   walker  the standard sentry: olive hull, red visor, missile pods, twin chin gun
-//   scout   small and light: blue-grey hull, yellow visor, no pods
-//   heavy   bulky, rust-red armour plating, a rocket launcher on one shoulder, and
-//           glowing exhaust vents on its back: the weak spot you can see from behind
-// Plus the TURRET (further down): a gun head on a pedestal that never walks.
-// Each is drawn from four sides so it can face different ways (enemyTexture in
-// enemies.js). Poses: 'stand', 'walk1' and 'walk2' (one foot lifted), 'aim',
-// and 'fire' (aim plus muzzle flash). Aim and fire are front only: a robot
-// aiming at you is always facing you.
-//
-// A "shape" here is a function (x, y) -> colour or null, like the colourAt
-// that makeTexture takes. Keeping shapes separate from textures lets them be
+// SHAPES -----------------------------------------------------------------------
+// The robots and creatures (robot-art.js, creature-art.js) are drawn as
+// SHAPES: functions (x, y) -> colour or null, like the colourAt that
+// makeTexture takes. Keeping shapes separate from textures lets them be
 // mirrored or resized before they're baked into a texture.
-const HULL = [104, 110, 86];
-const HULL_DARK = [54, 58, 48];
-const LEG_STEEL = [118, 122, 112]; // lighter than the floor, so the legs read against it
-const VISOR = [255, 50, 30];
-
-const ROBOT_STYLES = {
-  walker: { hull: HULL, dark: HULL_DARK, visor: VISOR, visorHot: [255, 170, 120], scale: 1, bulk: 0, pods: true, launcher: false, plating: false, vents: false },
-  scout:  { hull: [86, 100, 118], dark: [44, 50, 60], visor: [255, 220, 60], visorHot: [255, 250, 200], scale: 0.75, bulk: 0, pods: false, launcher: false, plating: false, vents: false },
-  heavy:  { hull: [126, 70, 48], dark: [62, 36, 28], visor: VISOR, visorHot: [255, 170, 120], scale: 1, bulk: 3, pods: false, launcher: true, plating: true, vents: true },
-};
-
-// A thick line from a to b (points as [x, y]), shaded across its width.
-function robotLimb(dx, y, a, b, width, colour) {
-  const d = segmentDistance(dx, y, a[0], a[1], b[0], b[1]);
-  if (d >= width) return null;
-  return brighten(colour, 1.1 - 0.5 * d / width);
-}
 
 // A shape drawn at a different size, feet still on the floor: each texel asks
 // the full-size shape about the point it corresponds to, scaling around the
@@ -563,312 +535,6 @@ function scaledShape(shape, scale) {
 // A shape flipped left to right (reading x backwards), if `mirror` is true.
 function mirroredShape(shape, mirror) {
   return mirror ? (x, y) => shape(TEX_SIZE - 1 - x, y) : shape;
-}
-
-// A walking robot from the front (view 'front') or from behind (view 'back').
-// SMART ROBOTS (enemies.js) carry two marks; their shape is the same.
-//   A BEACON: a dome lamp on a short mast. It blinks; the robot shows its lit
-//     or unlit version each moment (`beacon` true or false in the style).
-//   CHEVRONS: two painted stripes on the hull, pointing up, like rank badges.
-const CHEVRON_PAINT = [228, 196, 92];
-const BEACON_ON = [255, 190, 70];
-const BEACON_OFF = [90, 60, 30];
-
-// Is this hull texel on a chevron? (cx, cy) is the chevron's tip; each stripe
-// is a "^" two texels thick, the second three rows below the first.
-function onChevron(dx, y, cx, cy, width) {
-  const ax = Math.abs(dx - cx);
-  if (ax >= width) return false;
-  const v = y - cy - ax * 0.7; // 0 along the upper edge of the top stripe
-  return (v >= 0 && v < 2) || (v >= 3 && v < 5);
-}
-
-// The beacon at (bx, top): a 3-wide dome over a mast down to the hull.
-function beaconTexel(style, dx, y, bx, top, hullTop) {
-  if (style.beacon === undefined) return null;
-  const ax = Math.abs(dx - bx);
-  if (y >= top && y < top + 3 && ax < (y === top ? 1 : 2)) {
-    return style.beacon ? glowing(y === top ? [255, 240, 200] : BEACON_ON) : BEACON_OFF;
-  }
-  if (y >= top + 3 && y < hullTop && ax < 0.8) return DARK_STEEL;
-  return null;
-}
-
-function walkerFrontBackShape(style, view, pose) {
-  return (x, y) => {
-    const dx = x + 0.5 - 32;
-    const adx = Math.abs(dx);
-
-    const beacon = beaconTexel(style, dx, y, 6, 6, 12);
-    if (beacon) return beacon;
-
-    // Antenna with a glowing tip: on the left pod, or on the hull if there are no pods.
-    const antennaX = style.pods ? -18 : -6;
-    if (Math.abs(dx - antennaX) < 1.5 && y >= 4 && y < 6) return glowing(AMBER);
-    if (Math.abs(dx - antennaX) < 1 && y >= 6 && y < 12) return DARK_STEEL;
-
-    // Shoulder pods (walker). From the front you see their missile tubes.
-    if (style.pods && adx >= 14 && adx < 22 && y >= 12 && y < 26) {
-      if (y >= 23) return hazard(x, y, dx < 0);
-      if (view === 'front' && y >= 15 && y < 22 && (adx - 15) % 3 < 2 && (y - 15) % 3 < 2) return [18, 18, 20];
-      if (y === 12 || adx < 15 || adx >= 21) return style.dark;
-      return brighten(style.hull, 0.95 + 0.1 * noise(x, y, 37));
-    }
-
-    // Rocket launcher (heavy): a box on its right shoulder. From the front
-    // you can see the warhead of the next rocket glowing in the tube.
-    const lx = view === 'front' ? 19 : -19; // its right shoulder is on YOUR left when you see its back
-    if (style.launcher && Math.abs(dx - lx) < 7 && y >= 6 && y < 22) {
-      if (view === 'front') {
-        const tip = Math.hypot(dx - lx, y + 0.5 - 13);
-        if (tip < 2.2) return glowing([255, 220, 150]);
-        if (tip < 3.5) return glowing([255, 120, 40]);
-        if (tip < 4.5) return [16, 16, 18];
-      }
-      if (y === 6 || y === 21) return style.dark;
-      return brighten(style.hull, 0.8 + 0.1 * noise(x, y, 58));
-    }
-
-    // Chin gun. Aiming, its two muzzles point straight at you.
-    if (pose === 'aim' || pose === 'fire') {
-      const m = (adx - 4) * (adx - 4) + (y + 0.5 - 37) * (y + 0.5 - 37);
-      if (pose === 'fire' && m <= 5) return glowing([255, 255, 230]);
-      if (pose === 'fire' && m <= 13) return glowing([255, 210, 100]);
-      if (m <= 3) return [12, 12, 12];
-      if (adx < 8 && y >= 33 && y < 41) return brighten(DARK_STEEL, 1.3 - 0.4 * adx / 8);
-    } else if (adx < 6 && y >= 33 && y < 37) {
-      return brighten(DARK_STEEL, 1.2);
-    }
-
-    // Hull: wide at the shoulders, narrowing to the hips, top corners cut off.
-    const halfW = 14 + style.bulk - (y - 12) * 0.15;
-    if (y >= 12 && y < 34 && adx < halfW && !(y < 15 && adx > halfW - (15 - y) * 2)) {
-      if (view === 'front' && y >= 19 && y < 22 && adx < 9) {
-        return glowing(adx < 3 ? style.visorHot : style.visor); // visor slit, hottest in the middle
-      }
-      if (view === 'back' && y >= 17 && y < 29 && adx < 8) {
-        if (y % 3 === 0) return [20, 20, 22];
-        // Engine grille: the heavy's glows hot, a visible weak spot.
-        return style.vents ? glowing([255, 120, 40]) : brighten(style.dark, 1.2);
-      }
-      if (style.beacon !== undefined && onChevron(dx, y, 0, 27, 9)) return CHEVRON_PAINT; // smart: chevrons
-      if (style.plating && (y === 16 || y === 23 || y === 30)) return style.dark; // armour plate seams
-      if (y === 27 || (y > 27 && Math.abs(dx) < 0.5)) return style.dark;          // panel lines
-      return brighten(style.hull, roundShade(dx / halfW) * (0.92 + 0.1 * noise(x, y, 38)));
-    }
-
-    if (y >= 34 && y < 38 && adx < 9 + style.bulk) return brighten(DARK_STEEL, 1.2); // hip joint
-
-    // Legs: hip -> knee -> ankle, then a broad foot. Walking lifts one foot.
-    for (const side of [-1, 1]) {
-      const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 4 : 0;
-      const hip = [side * 6, 37];
-      const knee = [side * 11, 47 - lift];
-      const ankle = [side * 8, 57 - lift];
-      if (Math.hypot(dx - knee[0], y - knee[1]) < 3.5) return style.dark;  // knee joint
-      const limb = robotLimb(dx, y, hip, knee, 4.5, LEG_STEEL) || robotLimb(dx, y, knee, ankle, 3.5, LEG_STEEL);
-      if (limb) return limb;
-      if (y >= 58 - lift && y < 63 - lift && Math.abs(dx - side * 8) < 6) {
-        return brighten(style.dark, y === 58 - lift ? 1.5 : 1.0);           // foot
-      }
-    }
-    return null;
-  };
-}
-
-// A walking robot side-on, facing right (towards +x in the texture). This is
-// the view that shows off the reverse-jointed legs: the knee bends FORWARD.
-function walkerSideShape(style, pose) {
-  return (x, y) => {
-    const dx = x + 0.5 - 32;
-
-    if (Math.abs(dx + 4) < 1.5 && y >= 2 && y < 4) return glowing(AMBER); // antenna tip
-    if (Math.abs(dx + 4) < 1 && y >= 4 && y < 10) return DARK_STEEL;
-    const beacon = beaconTexel(style, dx, y, 6, 5, 12);
-    if (beacon) return beacon;
-
-    // The near shoulder pod sits in front of the hull, so it's checked first.
-    if (style.pods && dx >= -10 && dx < 5 && y >= 10 && y < 25) {
-      if (y >= 22) return hazard(x, y, false);
-      if (dx >= 2 && (y - 12) % 3 < 2 && y < 21) return [18, 18, 20]; // tube mouths on its front face
-      if (y === 10 || dx < -9) return style.dark;
-      return brighten(style.hull, 0.85 + 0.1 * noise(x, y, 39));
-    }
-    // The heavy's launcher, a long box pointing forward with a warhead in its mouth.
-    if (style.launcher && dx >= -10 && dx < 12 && y >= 6 && y < 18) {
-      if (dx >= 10 && y >= 9 && y < 15) return glowing([255, 120, 40]);
-      if (y === 6 || y === 17 || dx < -9) return style.dark;
-      return brighten(style.hull, 0.8 + 0.1 * noise(x, y, 59));
-    }
-
-    // Chin gun pointing forward. The aim/fire poses never use the side view.
-    if (dx >= 6 && dx < 22 && y >= 33 && y < 36) return brighten(DARK_STEEL, y === 33 ? 1.5 : 1.0);
-    if (dx >= 4 && dx < 12 && y >= 31 && y < 38) return DARK_STEEL;
-
-    // Hull, with its lower front corner sloped back like a beak.
-    const back = -15 - style.bulk;
-    if (dx >= back && dx < 15 && y >= 12 && y < 34 && !(dx > 9 && y > 27 + (15 - dx))) {
-      if (dx >= 11 && y >= 18 && y < 21) return glowing(style.visor);
-      if (style.vents && dx < back + 3 && y >= 17 && y < 29 && y % 3 !== 0) return glowing([255, 120, 40]);
-      // Smart: chevrons on its lower flank, below the shoulder pod.
-      if (style.beacon !== undefined && onChevron(dx, y, -2, 28, 6)) return CHEVRON_PAINT;
-      if (y === 27 || (style.plating && (y === 16 || y === 23))) return style.dark;
-      return brighten(style.hull, roundShade(dx / 15) * (0.92 + 0.1 * noise(x, y, 40)));
-    }
-
-    // Legs. The near leg is drawn first (in front); the far leg is darker.
-    // Walking swings the knees and feet forward and back.
-    const swing = pose === 'walk1' ? 5 : pose === 'walk2' ? -5 : 0;
-    for (const [s, shade] of [[swing, 1], [-swing, 0.6]]) {
-      const hip = [0, 35];
-      const knee = [7 + s * 0.6, 45];
-      const ankle = [-3 + s, 56];
-      if (Math.hypot(dx - knee[0], y - knee[1]) < 3.5) return brighten(style.dark, shade);
-      const limb = robotLimb(dx, y, hip, knee, 4.5, LEG_STEEL) || robotLimb(dx, y, knee, ankle, 3.5, LEG_STEEL);
-      if (limb) return brighten(limb, shade);
-      if (y >= 57 && y < 62 && dx >= ankle[0] - 5 && dx < ankle[0] + 9) {
-        return brighten(style.dark, (y === 57 ? 1.5 : 1.0) * shade); // foot, toes forward
-      }
-    }
-    return null;
-  };
-}
-
-const robotPoses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2') });
-
-// All the frames for one walking type: frames[view][pose]. The view is which
-// side of the robot you can see; its left side is its right side mirrored.
-// Every picture of one walking type. `beacon` is undefined for an ordinary
-// robot, or true / false for a smart one with its beacon lit / unlit.
-function makeWalkerFrames(styleName, beacon) {
-  const style = { ...ROBOT_STYLES[styleName], beacon };
-  const bake = (shape) => makeTexture(style.hull, scaledShape(shape, style.scale));
-  const front = (pose) => bake(walkerFrontBackShape(style, 'front', pose));
-  return {
-    front: { ...robotPoses(front), aim: front('aim'), fire: front('fire') },
-    back:  robotPoses((pose) => bake(walkerFrontBackShape(style, 'back', pose))),
-    right: robotPoses((pose) => bake(walkerSideShape(style, pose))),                              // it faces your right
-    left:  robotPoses((pose) => bake(mirroredShape(walkerSideShape(style, pose), true))),         // it faces your left
-  };
-}
-
-// THE TURRET: a twin-barrelled gun head on a pedestal, painted hazard yellow.
-// Poses: 'dormant' (asleep: sensor eye dark, waiting for a tripwire),
-// 'stand' (awake, looking for you), 'aim' and 'fire'.
-function turretShape(view, pose) {
-  const awake = pose !== 'dormant';
-  const paint = [150, 124, 40];
-  return (x, y) => {
-    const dx = x + 0.5 - 32;
-    const adx = Math.abs(dx);
-    if (y >= 46) {                                            // pedestal, wider at the foot
-      const halfW = 6 + (y - 46) * 0.45;
-      if (adx > halfW) return null;
-      return y >= 58 ? hazard(x, y, false) : brighten(DARK_STEEL, roundShade(dx / halfW) * 1.3);
-    }
-    if (y >= 40 && adx < 5) return brighten(STEEL, roundShade(dx / 5));   // neck
-    if (view === 'side') {
-      // Facing right: barrels poke out of the front of the head.
-      if (dx >= 9 && dx < 24 && ((y >= 30 && y < 33) || (y >= 35 && y < 38))) return brighten(DARK_STEEL, y === 30 || y === 35 ? 1.6 : 1);
-      if (dx >= 7 && dx < 10 && y >= 25 && y < 29) return awake ? glowing(VISOR) : [40, 16, 12];
-      if (dx < -11 || dx >= 10 || y < 24 || y >= 40) return null;
-    } else {
-      if (adx >= 13 || y < 24 || y >= 40) return null;
-      if (view === 'front') {
-        for (const bx of [-6, 6]) {                           // twin barrels, end on
-          const m = (dx - bx) * (dx - bx) + (y + 0.5 - 34) * (y + 0.5 - 34);
-          if (pose === 'fire' && m <= 6) return glowing([255, 255, 220]);
-          if (pose === 'fire' && m <= 14) return glowing([255, 200, 90]);
-          if (m <= 4) return [12, 12, 12];
-          if (m <= 9) return DARK_STEEL;
-        }
-        const eye = dx * dx + (y + 0.5 - 28) * (y + 0.5 - 28);
-        if (eye <= 6) return awake ? glowing(VISOR) : [40, 16, 12];
-      }
-      if (view === 'back' && y >= 28 && y < 36 && adx < 7) return y % 2 ? DARK_STEEL : [24, 24, 26]; // vents
-    }
-    if (y === 24 || y === 39) return brighten(DARK_STEEL, 1.2);
-    return brighten(paint, roundShade(dx / 13) * (0.9 + 0.1 * noise(x, y, 57)));
-  };
-}
-
-function makeTurretFrames() {
-  const poses = (make) => ({ dormant: make('dormant'), stand: make('stand') });
-  const bake = (shape) => makeTexture([150, 124, 40], shape);
-  return {
-    front: { ...poses((p) => bake(turretShape('front', p))), aim: bake(turretShape('front', 'aim')), fire: bake(turretShape('front', 'fire')) },
-    back:  poses((p) => bake(turretShape('back', p))),
-    right: poses((p) => bake(turretShape('side', p))),
-    left:  poses((p) => bake(mirroredShape(turretShape('side', p), true))),
-  };
-}
-
-// ROBOT_FRAMES[type][view][pose].
-const ROBOT_FRAMES = {
-  walker: makeWalkerFrames('walker'),
-  scout:  makeWalkerFrames('scout'),
-  heavy:  makeWalkerFrames('heavy'),
-  turret: makeTurretFrames(),
-};
-// Smart versions of the walking types (turrets are never smart): beacon lit and unlit.
-const SMART_ROBOT_FRAMES = {};
-for (const type of ['walker', 'scout', 'heavy']) {
-  SMART_ROBOT_FRAMES[type] = { on: makeWalkerFrames(type, true), off: makeWalkerFrames(type, false) };
-}
-
-// A destroyed robot: its hull slumped on the floor, a leg sticking out, the
-// visor gone dark, and a few embers still glowing.
-function makeWreck() {
-  return makeTexture(HULL, (x, y) => {
-    const dx = x + 0.5 - 32;
-    const leg = robotLimb(dx, y, [10, 56], [24, 44], 2.5, LEG_STEEL); // broken leg, angled up
-    if (leg) return leg;
-    if (y >= 44) {
-      const halfW = 10 + (y - 44) * 0.9; // the heap widens towards the floor
-      if (Math.abs(dx) <= halfW) {
-        if (y >= 50 && y < 52 && dx > -12 && dx < -2) return [80, 18, 12]; // dead visor
-        if (noise(x, y, 41) > 0.97) return glowing(SODIUM);               // embers
-        const f = 0.5 + 0.35 * noise(x >> 2, Math.floor(y / 3), 42) + 0.1 * noise(x, y, 43);
-        return brighten(noise(x >> 3, y >> 2, 44) > 0.6 ? HULL_DARK : HULL, f);
-      }
-    }
-    return null;
-  });
-}
-
-// A heavy's rocket in flight: a glowing ball at chin-gun height.
-// A swarm drone (drones.js): a small round hull with a red eye, slung between
-// two rotor blurs. It's tiny next to a walker, and hovers at eye height, so
-// the hull covers texture row 32 where shots land (see shotTarget in combat.js)
-// even as it bobs a texel up and down. `frame` 0-3 turns the rotors and bobs it.
-function makeDrone(frame) {
-  const bob = [0, -1, 0, 1][frame];
-  return makeTexture([90, 96, 104], (x, y) => {
-    const px = x + 0.5 - 32, py = y + 0.5 - 32 - bob;
-    const r = Math.hypot(px, py * 1.25);                                   // a slightly squashed disc
-    if (r < 2.2) return glowing([255, 60, 40]);                          // the eye
-    if (r < 3) return [20, 10, 10];                                       // its socket
-    if (r < 6.5) return brighten([90, 96, 104], 1.25 - 0.08 * r + (py < 0 ? 0.15 : -0.1)); // hull, lit from above
-    if (Math.abs(py) < 1 && Math.abs(px) < 11) return DARK_STEEL;         // the arms
-    // Rotor blurs either side: a part see-through smear that shifts each frame.
-    for (const side of [-1, 1]) {
-      const rx = px - side * 11, ry = py + 1.5;
-      if (Math.abs(ry) < 1.2 && Math.abs(rx) < 5 && (Math.floor(rx + 5 + frame * 2) % 4) < 3) {
-        return seeThrough([160, 165, 175], 120);
-      }
-    }
-    return null;
-  });
-}
-
-function makeRocket() {
-  return makeTexture([255, 140, 40], (x, y) => {
-    const d = Math.hypot(x + 0.5 - 32, y + 0.5 - 34);
-    if (d < 2) return glowing([255, 250, 220]);
-    if (d < 3.5) return glowing([255, 190, 80]);
-    if (d < 5) return glowing([230, 90, 30]);
-    return null;
-  });
 }
 
 // SECURITY -------------------------------------------------------------------
@@ -1298,9 +964,6 @@ const AMMO_CRATE_TEXTURE = makeAmmoCrate();
 const CLIP_TEXTURE = makeClip();
 const REPAIR_KIT_TEXTURE = makeRepairKit();
 
-const WRECK_TEXTURE = makeWreck();
-const ROCKET_TEXTURE = makeRocket();
-const DRONE_FRAMES = [0, 1, 2, 3].map(makeDrone);
 const CAMERA_TEXTURES = { watching: makeCamera('watching'), offline: makeCamera('offline'), destroyed: makeCamera('destroyed') };
 const BEAM_TEXTURE = makeBeam();
 const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true) };
@@ -1325,8 +988,8 @@ const GLASS_BURST_FRAMES = [0, 1, 2, 3].map(makeGlassBurst);
 const STEAM_BURST_FRAMES = [];
 const STEAM_SPUTTER_FRAMES = [];
 for (let f = 0; f < STEAM_FRAMES; f++) {
-  STEAM_BURST_FRAMES.push(makeSteam(f, false, THEME === 'lab'));
-  STEAM_SPUTTER_FRAMES.push(makeSteam(f, true, THEME === 'lab'));
+  STEAM_BURST_FRAMES.push(makeSteam(f, false, THEME.ventGas));
+  STEAM_SPUTTER_FRAMES.push(makeSteam(f, true, THEME.ventGas));
 }
 
 const DRUM_TEXTURE = makeDrum();
@@ -1335,12 +998,12 @@ const FIREBALL_FRAMES = [0, 1, 2, 3, 4].map(makeFireball);
 const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
 
-// The floor and ceiling come with the level's theme (map.js).
-const LAB_THEME = THEME === 'lab';
-const FLOOR_TEXTURE = LAB_THEME ? makeLabFloor() : makeDiamondPlate();
-const CEILING_TEXTURE = LAB_THEME ? makeLabCeiling([215, 245, 255]) : makeGirders([255, 214, 150]); // the lab's fluorescents run cold
-const CEILING_DARK_TEXTURE = LAB_THEME ? makeLabCeiling(null) : makeGirders(null);
-const CEILING_ALARM_TEXTURE = LAB_THEME ? makeLabCeiling([255, 40, 30]) : makeGirders([255, 40, 30]);
+// The floor and ceiling come with the level's theme (map.js: THEMES): the
+// ceiling three times, with its lights on, off, and red for an alarm.
+const FLOOR_TEXTURE = THEME.floor();
+const CEILING_TEXTURE = THEME.ceiling(THEME.ceilingGlow);
+const CEILING_DARK_TEXTURE = THEME.ceiling(null);
+const CEILING_ALARM_TEXTURE = THEME.ceiling([255, 40, 30]);
 
 // ANIMATED WALLS. The computer bank exists as several frames; wallTexture
 // picks one from animTime, which the main loop advances every frame. The

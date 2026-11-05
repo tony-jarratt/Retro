@@ -15,8 +15,9 @@ const STRAFE_MIN = 0.6, STRAFE_MAX = 1.3;    // seconds it keeps sidestepping on
 const BEACON_IDLE_RATE = 1;                  // a smart robot's beacon: blinks a second while it hasn't seen you...
 const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's calling you in
 
-// THE ROBOT TYPES. The numbers are the whole difference between them; the
-// state machine below is shared. Each type changes how you fight it:
+// THE ENEMY TYPES, robots and creatures. The numbers are the whole
+// difference between them; the state machine below is shared. Each type
+// changes how you fight it:
 //   walker  the all-rounder
 //   scout   twice as fast, dies to two hits, and doesn't stop at range: it
 //           rushes in close, firing quick weak shots
@@ -36,39 +37,60 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   - CALL FOR HELP: seeing you raises their zone's alarm, exactly like a
 //     camera would: every robot in the zone hears, and drone hives open.
 //     Kill the smart one first. Turrets are never smart.
-// speed      cells per second (the player does 3)
-// health     hits to destroy
-// aimRange   how close it gets before it stops and aims
-// charge     seconds of charging (visor brightening) before each shot
-// damage, hitNear, hitFar   for 'gun' weapons: damage per hit, and the chance
-//            to hit at 1 cell, falling in a straight line to hitFar at aimRange
-// backHits   hits taken per shot that lands from behind
-// strafe     smart ones sidestep across your aim while charging
-// weave      smart ones also zig-zag at you as they rush in
-// volley, volleyGap   rounds per charge, and seconds between them (the turret's rapid fire)
-// creature   one of the lab's creatures: hears, needs light to see, drops
-//            nothing (creatures.js). Its weapon 'melee' uses aimRange as its
-//            reach to start an attack, and damage per lunge that connects.
-//
-// retreat    creatures that fight at range: closer than this, it backs away
-//            (and shows you its back) rather than fire, unless it's cornered
 //
 // THE LAB'S CREATURES (creatures.js):
 //   lurcher  slow and tough, melee only: rears up, then lunges. Back off or sidestep.
 //   spitter  frail, keeps its distance and lobs acid where you're standing
 //            (acid.js), leaving a burning pool. Its glands are on its back:
 //            hits there count double. Get close, and it backs off.
-const ROBOT_TYPES = {
-  walker: { speed: 1.5, health: 4, aimRange: 3,   charge: 1.0, weapon: 'gun',    damage: 15, hitNear: 0.8,  hitFar: 0.3,  backHits: 1, mobile: true,  strafe: true,  weave: false, volley: 1, volleyGap: 0 },
-  scout:  { speed: 3.0, health: 2, aimRange: 1.6, charge: 0.5, weapon: 'gun',    damage: 8,  hitNear: 0.7,  hitFar: 0.45, backHits: 1, mobile: true,  strafe: true,  weave: true,  volley: 1, volleyGap: 0 },
-  heavy:  { speed: 0.8, health: 6, aimRange: 6,   charge: 1.8, weapon: 'rocket', damage: 0,  hitNear: 0,    hitFar: 0,    backHits: 2, mobile: true,  strafe: false, weave: false, volley: 1, volleyGap: 0 },
-  turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 6,  hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false, strafe: false, weave: false, volley: 5, volleyGap: 0.12 },
-  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, charge: 0,   weapon: 'melee', damage: 30, hitNear: 0, hitFar: 0, backHits: 1, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true },
-  spitter: { speed: 1.0, health: 3, aimRange: 6,   charge: 1.3, weapon: 'lob',   damage: 15, hitNear: 0, hitFar: 0, backHits: 2, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true, retreat: 2.5 },
+//
+// Every type gives these:
+//   speed      cells per second (the player does 3)
+//   health     hits to destroy
+//   aimRange   how close it gets before it stops and aims (for 'melee', its
+//              reach to start an attack)
+//   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js, acid.js)
+// and these only if it differs from ENEMY_DEFAULTS:
+//   charge     seconds of charging (visor brightening) before each shot
+//   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
+//   hitNear, hitFar   for 'gun' weapons: the chance to hit at 1 cell, falling
+//              in a straight line to hitFar at aimRange
+//   backHits   hits taken per shot that lands from behind
+//   mobile     false for a turret: it never moves
+//   strafe     smart ones sidestep across your aim while charging
+//   weave      smart ones also zig-zag at you as they rush in
+//   volley, volleyGap   rounds per charge, and seconds between them (the turret's rapid fire)
+//   creature   one of the lab's creatures: hears, needs light to see, drops
+//              nothing (creatures.js)
+//   retreat    creatures that fight at range: closer than this, it backs away
+//              (and shows you its back) rather than fire, unless it's cornered
+const ENEMY_DEFAULTS = {
+  charge: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
+  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0,
 };
+const ENEMY_REQUIRED = ['speed', 'health', 'aimRange', 'weapon'];
+const ENEMY_TYPES = {
+  walker:  { speed: 1.5, health: 4, aimRange: 3,   weapon: 'gun',    charge: 1.0, damage: 15, hitNear: 0.8,  hitFar: 0.3,  strafe: true },
+  scout:   { speed: 3.0, health: 2, aimRange: 1.6, weapon: 'gun',    charge: 0.5, damage: 8,  hitNear: 0.7,  hitFar: 0.45, strafe: true, weave: true },
+  heavy:   { speed: 0.8, health: 6, aimRange: 6,   weapon: 'rocket', charge: 1.8, backHits: 2 },
+  turret:  { speed: 0,   health: 4, aimRange: 8,   weapon: 'gun',    charge: 1.2, damage: 6,  hitNear: 0.75, hitFar: 0.35, mobile: false, volley: 5, volleyGap: 0.12 },
+  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true },
+  spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
+};
+// Fill in the defaults, so the rest of the code can read any field of any type.
+// A misspelt field would otherwise be silently ignored, so it's an error.
+for (const [name, type] of Object.entries(ENEMY_TYPES)) {
+  for (const field of ENEMY_REQUIRED) {
+    if (!(field in type)) throw new Error(`ENEMY_TYPES.${name} has no ${field}.`);
+  }
+  for (const field of Object.keys(type)) {
+    if (!ENEMY_REQUIRED.includes(field) && !(field in ENEMY_DEFAULTS)) throw new Error(`ENEMY_TYPES.${name} has "${field}", which isn't a field enemies have.`);
+  }
+  ENEMY_TYPES[name] = { ...ENEMY_DEFAULTS, ...type };
+}
 
 // The live robots, built once from the starting positions in the level file:
-//   type                   a key of ROBOT_TYPES
+//   type                   a key of ENEMY_TYPES
 //   x, y, angle            position and facing (radians, same convention as the player)
 //   state                  walking robots: 'idle' -> 'chase' <-> 'aim' -> 'search' -> 'idle'
 //                          turrets: 'dormant' -> 'idle' <-> 'aim', or 'offline'
@@ -84,8 +106,9 @@ const ROBOT_TYPES = {
 //   strafeDir, strafeTimer which way it's sidestepping (+1 / -1), and for how much longer
 //   volleyLeft, volleyTimer rounds of the current volley still to fire, and when the next goes
 ENEMIES.forEach((e, n) => {
+  if (!ENEMY_TYPES[e.type]) throw new Error(`ENEMIES[${n}] has type "${e.type}". Types: ${Object.keys(ENEMY_TYPES).join(', ')}.`);
   if (e.smart && e.type === 'turret') throw new Error(`ENEMIES[${n}] is a smart turret: turrets are always dumb.`);
-  if (e.smart && ROBOT_TYPES[e.type]?.creature) throw new Error(`ENEMIES[${n}] is a smart ${e.type}: only robots can be smart.`);
+  if (e.smart && ENEMY_TYPES[e.type].creature) throw new Error(`ENEMIES[${n}] is a smart ${e.type}: only robots can be smart.`);
 });
 const enemies = ENEMIES.map((start) => ({
   type: start.type,
@@ -99,7 +122,7 @@ const enemies = ENEMIES.map((start) => ({
   lastSeenY: start.y,
   moving: false,
   walkTime: 0,
-  health: ROBOT_TYPES[start.type].health,
+  health: ENEMY_TYPES[start.type].health,
   charge: 0,
   hurtTime: 0,
   firedTime: 0,
@@ -137,7 +160,7 @@ function canSee(enemy) {
   const dy = player.y - enemy.y;
   const dist = Math.hypot(dx, dy);
   // Creatures need light to spot you (creatures.js); robots see in the dark.
-  const range = ROBOT_TYPES[enemy.type].creature ? creatureSightRange(enemy) : SIGHT_RANGE;
+  const range = ENEMY_TYPES[enemy.type].creature ? creatureSightRange(enemy) : SIGHT_RANGE;
   if (dist > range) return false;
 
   // An idle robot only notices you inside the cone in front of it. Once
@@ -165,7 +188,7 @@ function isFacingAway(enemy) {
 // player does. Returns false if it couldn't move at all.
 function stepTowards(enemy, targetX, targetY, dt) {
   enemy.angle = Math.atan2(targetY - enemy.y, targetX - enemy.x);
-  const step = ROBOT_TYPES[enemy.type].speed * dt;
+  const step = ENEMY_TYPES[enemy.type].speed * dt;
   const newX = enemy.x + Math.cos(enemy.angle) * step;
   const newY = enemy.y + Math.sin(enemy.angle) * step;
   let moved = false;
@@ -189,7 +212,7 @@ function moveAlongPath(enemy, targetX, targetY, dt) {
 // Tell a walking robot where you are (a camera alarm, or being shot): it
 // stops idling and goes to look, by path. One already hunting you is left be.
 function alertEnemy(enemy, x, y) {
-  if (!ROBOT_TYPES[enemy.type].mobile || enemy.state === 'dead') return;
+  if (!ENEMY_TYPES[enemy.type].mobile || enemy.state === 'dead') return;
   enemy.lastSeenX = x;
   enemy.lastSeenY = y;
   if (enemy.state === 'idle' || enemy.state === 'search') enemy.state = 'search';
@@ -234,9 +257,9 @@ function aimAndFire(enemy, dt) {
   enemy.angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
   if (enemy.volleyLeft > 0) return; // still firing the last one
   enemy.charge += dt;
-  if (enemy.charge >= ROBOT_TYPES[enemy.type].charge) {
+  if (enemy.charge >= ENEMY_TYPES[enemy.type].charge) {
     enemy.charge = 0;
-    enemy.volleyLeft = ROBOT_TYPES[enemy.type].volley;
+    enemy.volleyLeft = ENEMY_TYPES[enemy.type].volley;
     enemy.volleyTimer = 0; // the first round goes this frame
   }
 }
@@ -249,9 +272,9 @@ function updateVolley(enemy, dt) {
   enemy.volleyTimer -= dt;
   if (enemy.volleyTimer > 0) return;
   enemy.volleyLeft -= 1;
-  enemy.volleyTimer = ROBOT_TYPES[enemy.type].volleyGap;
+  enemy.volleyTimer = ENEMY_TYPES[enemy.type].volleyGap;
   if (canSee(enemy)) robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
-  else if (ROBOT_TYPES[enemy.type].weapon === 'lob') lobAcid(enemy, enemy.lastSeenX, enemy.lastSeenY); // a spitter lobs it where you were
+  else if (ENEMY_TYPES[enemy.type].weapon === 'lob') lobAcid(enemy, enemy.lastSeenX, enemy.lastSeenY); // a spitter lobs it where you were
   else { enemy.firedTime = ROBOT_FIRE_FLASH / 2; sfxRobotShot(enemy); } // still fires, at where you were
 }
 
@@ -267,7 +290,7 @@ function strafeStep(enemy, dt) {
     enemy.strafeTimer = STRAFE_MIN + Math.random() * (STRAFE_MAX - STRAFE_MIN);
   }
   const a = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-  const step = ROBOT_TYPES[enemy.type].speed * STRAFE_SPEED * dt * enemy.strafeDir;
+  const step = ENEMY_TYPES[enemy.type].speed * STRAFE_SPEED * dt * enemy.strafeDir;
   const nx = enemy.x - Math.sin(a) * step;
   const ny = enemy.y + Math.cos(a) * step;
   if (enemyBlocked(enemy, nx, ny)) {
@@ -306,7 +329,7 @@ function callForHelp(enemy) {
 //   search lost sight of you (or was alerted): follow the path to where you
 //          were last seen, round corners if need be, then go idle
 function updateWalker(enemy, dt) {
-  const type = ROBOT_TYPES[enemy.type];
+  const type = ENEMY_TYPES[enemy.type];
   if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
   const sees = canSee(enemy);
@@ -354,7 +377,7 @@ function updateWalker(enemy, dt) {
 //   offline  shut down at a security terminal; never wakes again
 function updateTurret(enemy, dt) {
   if (enemy.state === 'dormant' || enemy.state === 'offline') return;
-  const type = ROBOT_TYPES.turret;
+  const type = ENEMY_TYPES.turret;
   const sees = canSee(enemy) && Math.hypot(player.x - enemy.x, player.y - enemy.y) <= type.aimRange;
   enemy.state = sees ? 'aim' : 'idle';
   if (enemy.state === 'aim') aimAndFire(enemy, dt);
@@ -376,7 +399,7 @@ function updateEnemy(enemy, dt) {
     return;
   }
 
-  if (ROBOT_TYPES[enemy.type].mobile) updateWalker(enemy, dt);
+  if (ENEMY_TYPES[enemy.type].mobile) updateWalker(enemy, dt);
   else updateTurret(enemy, dt);
 
   // Charging only happens while aiming. Leaving 'aim' (you duck out of sight,

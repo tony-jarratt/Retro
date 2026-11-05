@@ -58,9 +58,6 @@ function checkMap() {
     }
   });
   enemies.forEach((enemy, n) => {
-    if (!ROBOT_TYPES[enemy.type]) {
-      throw new Error(`ENEMIES[${n}] has type "${enemy.type}", which is not in ROBOT_TYPES.`);
-    }
     if (MAP[Math.floor(enemy.y)]?.[Math.floor(enemy.x)] !== 0) {
       throw new Error(`ENEMIES[${n}] at (${enemy.x}, ${enemy.y}) is outside the map or not on a floor cell.`);
     }

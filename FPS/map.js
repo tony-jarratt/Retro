@@ -57,12 +57,43 @@ const DECALS         = CURRENT_LEVEL.decals        || [];
 const PLAYER_START   = CURRENT_LEVEL.playerStart;
 if (!PLAYER_START) throw new Error(`Level "${CURRENT_LEVEL.id}" has no playerStart.`);
 
-// THE LOOK: which set of floor, ceiling and lighting the level uses
-// (textures.js, lighting.js, decals.js). Wall looks are picked per cell in
-// the rows themselves, so a level can mix them.
-const THEMES = ['industrial', 'lab'];
-const THEME = CURRENT_LEVEL.theme || 'industrial';
-if (!THEMES.includes(THEME)) throw new Error(`Level "${CURRENT_LEVEL.id}" has theme "${THEME}". Themes: ${THEMES.join(', ')}.`);
+// THE LOOK: everything that changes with the level's theme, in one place.
+// (Wall looks aren't here: they're picked per cell in the rows themselves,
+// so a level can mix them.) A new theme is a new entry.
+//   ambient       light everywhere, even far from any lamp (lighting.js)
+//   ceilingLight  its ceiling lights' colour and reach (lighting.js)
+//   floor         makes its floor texture (textures.js)
+//   ceiling       makes its ceiling texture, with its light panels glowing
+//                 in the colour given, or switched off for null (textures.js)
+//   ceilingGlow   the colour its ceiling lights glow, lit
+//   ventGas       its vents blow toxic gas, not steam: drawn green, and thin
+//                 enough to see through (textures.js, steam.js)
+//   spill         the floor decal scattered about as spills (decals.js)
+// floor and ceiling are little arrow functions, not the makers themselves,
+// because the makers are in textures.js, which loads after this file.
+const THEMES = {
+  industrial: {
+    ambient: [0.3, 0.3, 0.34],                             // dim, a little cool
+    ceilingLight: { colour: [0.9, 0.95, 1.05], radius: 3.5 }, // strip lights: cool white
+    floor: () => makeDiamondPlate(),
+    ceiling: (glow) => makeGirders(glow),
+    ceilingGlow: [255, 214, 150],
+    ventGas: false,
+    spill: 'oil',
+  },
+  lab: {
+    ambient: [0.26, 0.31, 0.29],                              // colder, with a sickly green cast
+    ceilingLight: { colour: [0.85, 1.05, 1.15], radius: 3.8 }, // fluorescent panels: cold blue-white
+    floor: () => makeLabFloor(),
+    ceiling: (glow) => makeLabCeiling(glow),
+    ceilingGlow: [215, 245, 255],
+    ventGas: true,
+    spill: 'slime',
+  },
+};
+const THEME_NAME = CURRENT_LEVEL.theme || 'industrial';
+if (!(THEME_NAME in THEMES)) throw new Error(`Level "${CURRENT_LEVEL.id}" has theme "${THEME_NAME}". Themes: ${Object.keys(THEMES).join(', ')}.`);
+const THEME = THEMES[THEME_NAME];
 
 // THE OBJECTIVE: what the level's K cells are, and so what you're told to
 // destroy (core.js). The mechanics are the same either way.
