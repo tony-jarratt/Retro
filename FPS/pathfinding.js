@@ -37,6 +37,12 @@ function buildWalkableCells() {
 // the same cell, and null if there's no way through at all.
 function findPath(fromX, fromY, toX, toY) {
   const w = MAP[0].length;
+  // The walkable map must have been built this frame (updateEnemies does it).
+  // Without it, every lookup below reads "undefined" and the walk back along
+  // the path never ends: better to say so loudly.
+  if (walkableCells.length !== w * MAP.length) {
+    throw new Error(`findPath called before buildWalkableCells: walkableCells has ${walkableCells.length} cells, the map ${w * MAP.length}.`);
+  }
   const start = Math.floor(fromY) * w + Math.floor(fromX);
   const goal = Math.floor(toY) * w + Math.floor(toX);
   if (start === goal) return [];

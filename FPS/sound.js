@@ -30,7 +30,7 @@ const MASTER_VOLUME = 0.5;
 const HEARING_RANGE = 16;      // cells: further than this, you hear nothing
 const MUFFLED_CUTOFF = 700;    // Hz: what gets through a wall
 
-const audio = { ctx: null, master: null, noise: null, muted: false };
+const audio = { ctx: null, master: null, noise: null, gun: null, muted: false };
 
 function initAudio() {
   if (audio.ctx) return;
@@ -49,6 +49,37 @@ function initAudio() {
   audio.noise = audio.ctx.createBuffer(1, n, n);
   const data = audio.noise.getChannelData(0);
   for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+  audio.gun = makeGunBus();
+}
+
+// YOUR GUN'S OWN CHANNEL, so it can be made bigger than everything else:
+//   DISTORTION: a WaveShaperNode bends the waveform through a curve (here
+//     tanh, which squashes loud peaks smoothly), adding gritty harmonics.
+//   ECHO: a DelayNode feeds a copy back into itself a moment later, quieter
+//     and duller each time round: the shot bouncing off the hangar walls.
+// Everything the gun plays goes into the returned node.
+function makeGunBus() {
+  const ctx = audio.ctx;
+  const drive = ctx.createWaveShaper();
+  const curve = new Float32Array(1024);
+  for (let i = 0; i < curve.length; i++) {
+    const x = i / (curve.length - 1) * 2 - 1;
+    curve[i] = Math.tanh(2.5 * x) / Math.tanh(2.5);
+  }
+  drive.curve = curve;
+  const out = ctx.createGain();
+  out.gain.value = 0.9;
+  drive.connect(out).connect(audio.master);
+  const delay = ctx.createDelay();
+  delay.delayTime.value = 0.07;                // ~70ms: a big room's first bounce
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.12;                  // each echo 12% of the last: a slap, not a wash
+  const dull = ctx.createBiquadFilter();
+  dull.type = 'lowpass';
+  dull.frequency.value = 900;                  // walls soak up the highs
+  out.connect(delay).connect(dull).connect(feedback).connect(delay);
+  dull.connect(audio.master);
+  return drive;
 }
 window.addEventListener('pointerdown', initAudio);
 window.addEventListener('keydown', initAudio);
@@ -153,15 +184,78 @@ function stopVoice(v) {
   v.osc.stop(audio.ctx.currentTime + 0.1);
 }
 
+// A NOISE voice that keeps going (steam, the air in the hangar): the noise
+// buffer looping forever through a band-pass filter. It has the same parts as
+// an oscillator voice, so steerVoice can drive it too (its `freq` is then the
+// filter's centre, not a pitch).
+function makeNoiseVoice(centre) {
+  const ctx = audio.ctx;
+  const src = ctx.createBufferSource();
+  src.buffer = audio.noise;
+  src.loop = true;
+  const band = ctx.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = centre;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  const pan = ctx.createStereoPanner();
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  src.connect(band).connect(filter).connect(pan).connect(gain).connect(audio.master);
+  src.start();
+  return { osc: { frequency: band.frequency, stop: (t) => src.stop(t) }, filter, pan, gain };
+}
+
 // THE SOUNDS ----------------------------------------------------------------
 
-// Your gun: a synth "zap" that drops in pitch, with a click of noise. Each
-// fire mode is pitched a little differently, so you can hear what it's doing.
+// A DRUM-LIKE HIT: a tone whose pitch drops very fast and whose volume dies
+// quickly. Speed is everything: a kick drum is a sine falling from ~200Hz to
+// ~50Hz in a few tens of milliseconds. Slow the same fall down and you get a
+// "wooo" instead of a "dum".
+function drumHit(dest, type, f0, f1, drop, dur, vol, delay = 0) {
+  const ctx = audio.ctx, t = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(f0, t);
+  osc.frequency.exponentialRampToValueAtTime(f1, t + drop); // the fast pitch drop
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(g).connect(dest);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+// Your gun: built like a drum rather than a whoosh, through its gritty channel.
+//   KICK   a sine falling 220 -> 50Hz in 40ms: the punch in your chest
+//   BODY   a triangle "tom" underneath: the shell of the drum
+//   THUD   30ms of mid noise: the stick hitting, like a snare's attack
+//   ZAP    a quick sawtooth chirp on top, so it's still a pulse weapon
+//   CRACK  15ms of bright, high noise, with a 4ms click right at the front:
+//          the sharp edge of a gunshot. It goes straight to the speakers,
+//          skipping the gun channel's distortion, which would round it off.
+// Each mode is pitched a little differently, so you can hear what it's
+// doing; automatic is shorter still, so rapid fire stays a drum roll.
 function sfxPlayerShot(mode) {
   if (!audioReady()) return;
-  const pitch = { single: 1, burst: 0.9, auto: 0.8 }[mode];
-  tone(audio.master, 'square', 900 * pitch, 180 * pitch, 0.09, 0.22);
-  noiseBurst(audio.master, 'highpass', 4000, 2000, 0.04, 0.25);
+  const pitch = { single: 1, burst: 0.92, auto: 0.85 }[mode];
+  const len = mode === 'auto' ? 0.7 : 1;
+  drumHit(audio.gun, 'sine', 220 * pitch, 50, 0.04, 0.2 * len, 1.0);        // kick
+  drumHit(audio.gun, 'triangle', 140 * pitch, 90, 0.06, 0.12 * len, 0.45);  // body
+  noiseBurst(audio.gun, 'bandpass', 2600, 1800, 0.03, 0.7);                 // thud
+  tone(audio.gun, 'sawtooth', 700 * pitch, 260 * pitch, 0.05, 0.12);        // zap
+  noiseBurst(audio.master, 'highpass', 1500, 4000, 0.015, 0.65);            // crack...
+  tone(audio.master, 'square', 3000, 2200, 0.004, 0.3);                     // ...and its click
+}
+
+// Pulling the trigger on an empty gun: the firing pin snapping on nothing
+// (a tiny metal tick, then a duller clack as it resets), and the suit's
+// faint "nothing loaded" blip.
+function sfxDryFire() {
+  if (!audioReady()) return;
+  metalClack(2400, 0.18, 0);
+  metalClack(1300, 0.12, 0.035);
+  tone(audio.master, 'square', 300, 300, 0.05, 0.04, 0.06);
 }
 
 // A coil locking on as the gun spins up a stage: a bright click.
@@ -233,6 +327,125 @@ function sfxPowerDown() {
   noiseBurst(audio.master, 'lowpass', 6000, 100, 1.0, 0.2);
 }
 
+// SECOND PASS: the world, robots' bodies, pickups, security -------------------
+
+// A blast door: a hydraulic hiss as it moves; a heavy clunk as it hits home.
+function sfxDoorMove(door) {
+  const out = placeAt(door.x + 0.5, door.y + 0.5);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 900, 500, 0.9, 0.35);
+  tone(out, 'sawtooth', 70, 55, 0.9, 0.08);
+}
+function sfxDoorClunk(door) {
+  const out = placeAt(door.x + 0.5, door.y + 0.5);
+  if (!out) return;
+  drumHit(out, 'sine', 120, 45, 0.05, 0.25, 0.7);
+  noiseBurst(out, 'lowpass', 1200, 200, 0.12, 0.4);
+}
+// A locked door refusing you: a flat buzz from its panel.
+function sfxDenied(door) {
+  const out = placeAt(door.x + 0.5, door.y + 0.5);
+  if (!out) return;
+  tone(out, 'square', 130, 120, 0.22, 0.2);
+  tone(out, 'square', 98, 95, 0.22, 0.12);
+}
+
+// METAL: struck metal rings at several pitches that AREN'T simple multiples
+// of each other (inharmonic), which is what makes it a clang and not a note.
+function clang(dest, base, dur, vol) {
+  for (const [mult, v] of [[1, 1], [1.58, 0.6], [2.43, 0.4], [3.71, 0.25]]) {
+    tone(dest, 'sine', base * mult, base * mult * 0.98, dur, vol * v);
+  }
+}
+// A round hitting a robot: a bright clang. Bigger robots ring lower.
+function sfxRobotHit(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  const base = { walker: 520, scout: 760, heavy: 340, turret: 600 }[enemy.type];
+  clang(out, base, 0.18, 0.35);
+  noiseBurst(out, 'highpass', 3000, 2000, 0.03, 0.3);
+}
+// A robot destroyed: a crunch of breaking metal and a low clang.
+function sfxRobotDown(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 2500, 150, 0.6, 0.8);
+  clang(out, 160, 0.7, 0.4);
+  drumHit(out, 'sine', 100, 35, 0.08, 0.4, 0.8);
+}
+// Footsteps. A walker's foot is a heavy servo thud; a scout's a light tick;
+// a heavy's a deep stomp. Yours, in the suit, are a soft thud with a whirr.
+function sfxRobotStep(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  if (enemy.type === 'scout') {
+    noiseBurst(out, 'bandpass', 2200, 1500, 0.04, 0.25);
+  } else {
+    const heavy = enemy.type === 'heavy';
+    drumHit(out, 'sine', heavy ? 90 : 130, heavy ? 30 : 45, 0.04, heavy ? 0.25 : 0.15, heavy ? 0.7 : 0.45);
+    noiseBurst(out, 'lowpass', 600, 150, 0.08, 0.3);
+  }
+}
+function sfxPlayerStep() {
+  drumHit(audio.master, 'sine', 110, 40, 0.04, 0.12, 0.25);
+  tone(audio.master, 'sawtooth', 240, 320, 0.08, 0.03); // servo whirr
+}
+
+// Glass: the first hit cracks it (a sharp tick and a hiss); the second sends
+// it in a shower: dozens of tiny high tinkles at random times and pitches.
+function sfxGlassCrack(panel) {
+  const out = placeAt(panel.x + 0.5, panel.y + 0.5);
+  if (!out) return;
+  tone(out, 'square', 4200, 3000, 0.02, 0.25);
+  noiseBurst(out, 'highpass', 5000, 3000, 0.15, 0.3);
+}
+function sfxGlassShatter(panel) {
+  const out = placeAt(panel.x + 0.5, panel.y + 0.5);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 6000, 2500, 0.35, 0.6);
+  for (let i = 0; i < 24; i++) {
+    const f = 2500 + Math.random() * 5000;
+    tone(out, 'sine', f, f, 0.04 + Math.random() * 0.08, 0.12, Math.random() * 0.45);
+  }
+}
+
+// Ammo: metal, not synth. A magazine slapped home: a clack (a short clang
+// with a click of noise), then a second, lower and heavier as it seats.
+// A clip is a single, lighter clack.
+function metalClack(base, vol, delay) {
+  for (const [mult, v] of [[1, 1], [1.58, 0.6], [2.43, 0.4], [3.71, 0.25]]) {
+    tone(audio.master, 'sine', base * mult, base * mult * 0.97, 0.07, vol * v, delay);
+  }
+  noiseBurst(audio.master, 'bandpass', 3500, 2000, 0.025, vol * 1.2, delay);
+}
+
+// Pickups: synth chirps from the suit, a little tune for each kind (ammo clacks).
+function sfxPickup(type) {
+  if (type === 'ammo') { metalClack(1300, 0.3, 0); metalClack(820, 0.4, 0.09); return; }
+  if (type === 'clip') { metalClack(1500, 0.25, 0); return; }
+  const notes = {
+    repair: [440, 554, 660, 880],
+    redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
+    burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319],
+  }[type] || [880];
+  notes.forEach((f, i) => tone(audio.master, 'square', f, f, 0.08, 0.1, i * 0.06));
+}
+
+// Security. A tripwire waking turrets: a rising pair of tones. A terminal
+// shutting a zone down: a falling run, the system powering off. A hive
+// releasing a drone: a short mechanical rattle.
+function sfxTurretsOnline() {
+  [440, 660, 440, 660].forEach((f, i) => tone(audio.master, 'square', f, f, 0.1, 0.1, i * 0.12));
+}
+function sfxSecurityOffline() {
+  [1047, 784, 523, 392].forEach((f, i) => tone(audio.master, 'triangle', f, f * 0.98, 0.12, 0.18, i * 0.1));
+}
+function sfxHiveRelease(hive) {
+  const out = placeAt(hive.outX, hive.outY);
+  if (!out) return;
+  for (let i = 0; i < 4; i++) noiseBurst(out, 'bandpass', 1800, 900, 0.03, 0.4, i * 0.04);
+}
+
 // THE CONTINUOUS SOUNDS, adjusted every frame ---------------------------------
 
 const robotWhines = new Map();   // robot -> voice, while it's charging a shot
@@ -240,10 +453,35 @@ const droneBuzzes = new Map();   // drone -> voice, while it's out and about
 let spinWhine = null;            // your gun winding up
 let lastLit = 1;                 // coils lit last frame, to hear one lock on
 let breachTimer = 0;             // seconds to the next breach beep
-let wasDead = false;
+let gameOver = false;             // set once the game has ended and the loops have faded (R reloads the page)
+const ventHisses = new Map();    // vent -> noise voice, while it's sputtering or bursting
+let siren = null;                // the alarm, while any zone's is going
+let ambience = null;             // the hangar's hum and air, always there
+
+// WATCHING THE GAME. Most second-pass sounds aren't called from the game code:
+// each frame we compare things with how they were last frame, and a change
+// is a sound. A door's state flipping, a pickup gone from the list, a robot's
+// health dropping. It keeps the sound out of the game's logic.
+const last = {
+  doors: new Map(), panels: new Map(), enemies: new Map(), pickups: new Set(),
+  hives: new Map(), terminals: new Map(), lockedHint: null, playerStep: 0, messageTime: 0, ready: false,
+};
 
 function updateSound(dt) {
   if (!audioReady()) return;
+
+  // GAME OVER (dead or cleared): everything is frozen, so any whine or buzz
+  // would hang on as one flat, endless tone. Instead, fade every ongoing
+  // sound out over a couple of seconds, once, and play nothing new.
+  if (game.state !== 'playing') {
+    if (game.state === 'dead' && !gameOver) sfxPowerDown();
+    if (!gameOver) fadeOutLoops();
+    gameOver = true;
+    return;
+  }
+  if (!last.ready) rememberState(); // the first frame we can play: start from what's there now
+  watchTheGame();
+  updateWorldLoops();
 
   // YOUR GUN SPINNING UP: a whine that climbs while you hold the trigger, if
   // there's a mode to spin up to. Its pitch follows how far through the
@@ -289,6 +527,97 @@ function updateSound(dt) {
     breachTimer = 0;
   }
 
-  if (game.state === 'dead' && !wasDead) sfxPowerDown();
-  wasDead = game.state === 'dead';
+}
+
+// Fade out and stop every sound that keeps going. setTargetAtTime with a
+// time constant of 0.6s is an exponential fade: about two-thirds gone after
+// 0.6s, all but silent after 2s.
+const LOOP_FADE = 0.6;
+function fadeOutLoops() {
+  const t = audio.ctx.currentTime;
+  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...ventHisses.values(), spinWhine, siren, ...(ambience || [])];
+  for (const v of all) {
+    if (!v) continue;
+    v.gain.gain.cancelScheduledValues(t);
+    v.gain.gain.setTargetAtTime(0, t, LOOP_FADE);
+    v.osc.stop(t + LOOP_FADE * 5);
+  }
+  robotWhines.clear();
+  droneBuzzes.clear();
+  ventHisses.clear();
+  spinWhine = siren = ambience = null;
+}
+
+// Note how everything is now, to compare against next frame.
+function rememberState() {
+  for (const d of DOORS) last.doors.set(d, d.state);
+  for (const p of PANELS) last.panels.set(p, p.state);
+  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS) });
+  last.pickups = new Set(pickups);
+  for (const h of hives) last.hives.set(h, h.left);
+  for (const t of terminals) last.terminals.set(t, t.state);
+  last.lockedHint = lockedDoorHint;
+  last.messageTime = securityMessageTime;
+  last.playerStep = Math.floor(player.walkTime * 6 / Math.PI); // the gun bob's cycle: one step per half-turn of cos
+  last.ready = true;
+}
+
+function watchTheGame() {
+  for (const d of DOORS) {
+    const was = last.doors.get(d);
+    if (d.state !== was) {
+      if (d.state === 'opening' || d.state === 'closing') sfxDoorMove(d);
+      if (d.state === 'open' || d.state === 'closed') sfxDoorClunk(d);
+    }
+  }
+  if (lockedDoorHint && lockedDoorHint !== last.lockedHint) {
+    const door = DOORS.find((d) => d.lock === lockedDoorHint && playerNearDoor(d));
+    if (door) sfxDenied(door);
+  }
+  for (const p of PANELS) {
+    const was = last.panels.get(p);
+    if (p.state !== was) p.state === 'shattered' ? sfxGlassShatter(p) : sfxGlassCrack(p);
+  }
+  for (const e of enemies) {
+    const was = last.enemies.get(e);
+    const step = Math.floor(e.walkTime * WALK_FPS);
+    if (e.health < was.health) e.state === 'dead' ? sfxRobotDown(e) : sfxRobotHit(e);
+    if (e.state !== 'dead' && e.moving && step !== was.step) sfxRobotStep(e);
+  }
+  // A pickup that was in the list last frame and isn't now has been collected.
+  for (const p of last.pickups) if (!pickups.includes(p)) sfxPickup(p.type);
+  for (const h of hives) if (h.left < last.hives.get(h)) sfxHiveRelease(h);
+  for (const t of terminals) if (t.state === 'safe' && last.terminals.get(t) !== 'safe') sfxSecurityOffline();
+  // A security message that has just appeared (its timer jumped back up).
+  if (securityMessage === 'TURRETS ONLINE' && securityMessageTime > last.messageTime) sfxTurretsOnline();
+  const step = Math.floor(player.walkTime * 6 / Math.PI);
+  if (step !== last.playerStep && game.state === 'playing') sfxPlayerStep();
+  rememberState();
+}
+
+// Steam, the alarm and the hangar's ambience: sounds that last.
+function updateWorldLoops() {
+  const t = audio.ctx.currentTime;
+  // STEAM: each vent hisses while it's active, quietly while sputtering.
+  for (const v of vents) {
+    const active = v.state !== 'idle';
+    let voice = ventHisses.get(v);
+    if (active && !voice) { voice = makeNoiseVoice(3000); ventHisses.set(v, voice); }
+    if (!active && voice) { stopVoice(voice); ventHisses.delete(v); continue; }
+    if (voice) steerVoice(voice, v.x, v.y, v.state === 'burst' ? 0.5 : 0.15, v.state === 'burst' ? 3500 : 2000);
+  }
+  // THE ALARM: a two-tone wail while any zone's alarm is going.
+  const alarmOn = game.state === 'playing' && Object.values(alarms).some((a) => a > 0);
+  if (!siren) siren = makeVoice('square');
+  siren.gain.gain.setTargetAtTime(alarmOn ? 0.035 : 0, t, 0.1);
+  siren.osc.frequency.setTargetAtTime(Math.floor(animTime * 2) % 2 === 0 ? 660 : 520, t, 0.02);
+  siren.filter.frequency.value = 2000;
+  // AMBIENCE: two low saws a fraction of a hertz apart (they "beat", the hum
+  // slowly swelling and fading), plus a little air. Always on, very quiet.
+  if (!ambience) {
+    ambience = [makeVoice('sawtooth'), makeVoice('sawtooth'), makeNoiseVoice(400)];
+    ambience[0].osc.frequency.value = 55;
+    ambience[1].osc.frequency.value = 55.6;
+    for (const v of ambience) { v.filter.frequency.value = 220; v.gain.gain.setTargetAtTime(0.02, t, 1); }
+  }
 }

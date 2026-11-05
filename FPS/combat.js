@@ -1,6 +1,7 @@
 // Combat: your gun, what the crosshair hits, robots charging and firing back
 // with distance-based odds, your health, and winning or losing.
 
+const DRY_FIRE_GAP = 0.25;      // seconds between dry clicks while you pull an empty trigger
 const GUN_FLASH_TIME = 0.12;    // longest a muzzle flash and recoil show (each weapon's own cooldown is in weapons.js)
 const HURT_FLASH_TIME = 0.1;    // seconds a hit robot flashes white
 const ROBOT_FIRE_FLASH = 0.15;  // seconds a robot shows its own muzzle flash
@@ -73,7 +74,13 @@ function shotTarget(angle) {
 // updateCombat. Each round costs one ammo, so a burst can run dry part-way.
 function playerFire() {
   if (game.state !== 'playing' || gun.cooldown > 0 || gun.burstLeft > 0) return;
-  if (player.ammo === 0) return; // empty: nothing happens (the HUD shows the count in red)
+  if (player.ammo === 0) {
+    // Empty: a dry click (sound.js) on each pull, with a short pause after it
+    // so fast pulls don't pile the clicks on top of each other.
+    sfxDryFire();
+    gun.cooldown = DRY_FIRE_GAP;
+    return;
+  }
   gun.pullMode = activeModeId();
   const mode = FIRE_MODES[gun.pullMode];
   gun.cooldown = mode.cooldown + mode.gap * (mode.rounds - 1); // from the pull, so it includes the burst
@@ -87,7 +94,7 @@ function playerFire() {
 // shotTarget finds along that line.
 function fireRound() {
   const mode = FIRE_MODES[gun.pullMode];
-  if (player.ammo === 0) { gun.burstLeft = 0; return; }
+  if (player.ammo === 0) { gun.burstLeft = 0; sfxDryFire(); return; } // ran dry mid-burst: click
   player.ammo -= 1;
   sfxPlayerShot(gun.pullMode); // sound.js
   gun.burstLeft -= 1;
