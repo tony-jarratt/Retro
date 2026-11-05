@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>running</title>
+<pre id="out">running…</pre>
+<script src="../js/errors.js"></script><script src="../js/rng.js"></script><script src="../js/data.js"></script>
+<script src="../js/map.js"></script><script src="../js/scenarios.js"></script><script src="../js/objectives.js"></script><script src="../js/rules.js"></script><script src="../js/code.js"></script><script src="../js/bay.js"></script><script src="../js/intro.js"></script><script src="../js/menu.js"></script><script src="../js/campaign.js"></script>
+<script src="../js/ai.js"></script><script src="../js/fireplan.js"></script><script src="../js/volley.js"></script>
+<script src="../js/sprites.js"></script><script src="../js/effects.js"></script><script src="../js/view.js"></script><script src="../js/render.js"></script>
+<script src="planner.js"></script><script src="checks.js"></script><script src="checks-fire.js"></script><script src="checks-code.js"></script><script src="checks-play.js"></script><script src="checks-bay.js"></script><script src="checks-intro.js"></script><script src="checks-maps.js"></script><script src="checks-goals.js"></script><script src="checks-forces.js"></script><script src="checks-scroll.js"></script><script src="checks-campaign.js"></script>
+<script src="checks-view.js"></script>
+<script>
+  // Runs every check and puts the result in the page title ("DONE checks=N passed=N failures=N"), which
+  // run-checks.sh reads. Add ?nobalance to skip the balance report.
+  const out = document.getElementById('out');
+  const text = [];
+  try {
+    const result = runAllChecks(line => text.push(line), !location.search.includes('nobalance'));
+    out.textContent = text.join('\n');
+    document.title = result.lines[result.lines.length - 1];
+  } catch (e) {
+    out.textContent = text.join('\n') + '\nCHECK RUNNER CRASHED: ' + (e && e.stack ? e.stack : e);
+    document.title = 'DONE checks=0 passed=0 failures=1 (the runner crashed)';
+  }
+</script>
