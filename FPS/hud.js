@@ -8,7 +8,8 @@ const HUD_WARN = [255, 96, 64];
 
 // A BITMAP FONT. Each character is a 3x5 grid of pixels: '#' on, '.' off.
 // Drawing text is just stamping these grids side by side, 1 pixel apart.
-// Only the characters the HUD actually uses are defined.
+// Only the characters actually used are defined (the HUD's, and the
+// stencilled signs in decals.js).
 const FONT = {
   '0': ['###', '#.#', '#.#', '#.#', '###'],
   '1': ['.#.', '##.', '.#.', '.#.', '###'],
@@ -26,6 +27,7 @@ const FONT = {
   'D': ['##.', '#.#', '#.#', '#.#', '##.'],
   'E': ['###', '#..', '##.', '#..', '###'],
   'F': ['###', '#..', '##.', '#..', '#..'],
+  'G': ['.##', '#..', '#.#', '#.#', '.##'],
   'H': ['#.#', '#.#', '###', '#.#', '#.#'],
   'I': ['###', '.#.', '.#.', '.#.', '###'],
   'K': ['#.#', '#.#', '##.', '#.#', '#.#'],
@@ -39,6 +41,7 @@ const FONT = {
   'T': ['###', '.#.', '.#.', '.#.', '.#.'],
   'U': ['#.#', '#.#', '#.#', '#.#', '###'],
   'V': ['#.#', '#.#', '#.#', '#.#', '.#.'],
+  'X': ['#.#', '#.#', '.#.', '#.#', '#.#'],
   'Y': ['#.#', '#.#', '.#.', '.#.', '.#.'],
   ' ': ['...', '...', '...', '...', '...'],
 };

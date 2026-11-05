@@ -219,6 +219,52 @@ const PICKUPS = [
   { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
 ];
 
+// Hand-placed DECALS (decals.js): the signs and scenes that tell a story. The
+// background wear (puddles under leaks, scorch by drums, rusty pipes) is
+// scattered by rules instead. type is a key of DECAL_TYPES.
+//   surface  'floor', 'ceiling' or 'wall'
+//   x, y     the CELL: a floor cell, or for 'wall' the wall cell itself
+//   face     walls only: which side of the wall cell, named by the way it
+//            looks: 'W' is the side you see from the cell to its west
+//   rot      floor/ceiling: quarter turns clockwise. Unturned, a footprint
+//            points north and a floor sign reads to someone facing north.
+//   mirror   optional: flip left to right (alternate feet in a trail)
+const footprints = (cells, rot) => cells.map(([x, y], n) => ({ surface: 'floor', type: 'footprint', x, y, rot, mirror: n % 2 === 1 }));
+const DECALS = [
+  // Start bay: straight ahead as you start, and a mech's tracks to the door.
+  { surface: 'wall', type: 'mechBay', x: 8, y: 1, face: 'W' },
+  { surface: 'wall', type: 'maxLoad', x: 8, y: 2, face: 'W' },
+  { surface: 'wall', type: 'insignia', x: 4, y: 0, face: 'S' },
+  ...footprints([[2, 4], [3, 4], [4, 4], [5, 4], [6, 4]], 1),
+  // Fuel depot: a warning, and the pillar where it was ignored once.
+  { surface: 'wall', type: 'noFlame', x: 13, y: 0, face: 'S' },
+  { surface: 'wall', type: 'wallScorch', x: 13, y: 3, face: 'W' },
+  { surface: 'floor', type: 'scorch', x: 12, y: 3 },
+  // Pipe works
+  { surface: 'wall', type: 'coolant', x: 24, y: 2, face: 'E' },
+  { surface: 'wall', type: 'spares', x: 31, y: 5, face: 'W' },
+  { surface: 'ceiling', type: 'stain', x: 26, y: 6 },
+  { surface: 'floor', type: 'puddle', x: 26, y: 6 },
+  // Server room and corridor
+  { surface: 'wall', type: 'battleComp', x: 8, y: 8, face: 'S' },
+  { surface: 'wall', type: 'toHangar', x: 17, y: 10, face: 'W' },
+  // Workshop: a walker's tracks from the door down to the grille.
+  { surface: 'wall', type: 'rearm', x: 31, y: 11, face: 'W' },
+  ...footprints([[24, 9], [24, 10], [24, 11], [24, 12], [24, 13], [24, 14], [24, 15]], 2),
+  // A fight at the hangar's blue door: scorched both sides.
+  { surface: 'wall', type: 'wallScorch', x: 14, y: 16, face: 'N' },
+  { surface: 'wall', type: 'wallScorch', x: 14, y: 16, face: 'S' },
+  { surface: 'wall', type: 'wallScorch', x: 16, y: 16, face: 'S' },
+  { surface: 'floor', type: 'scorch', x: 15, y: 15 },
+  { surface: 'floor', type: 'scorch', x: 15, y: 17 },
+  { surface: 'ceiling', type: 'scorch', x: 15, y: 17 },
+  // Hangar: numbered bays, reading the right way as you come in heading south.
+  { surface: 'floor', type: 'bay1', x: 7,  y: 19, rot: 2 },
+  { surface: 'floor', type: 'bay2', x: 17, y: 19, rot: 2 },
+  { surface: 'floor', type: 'bay3', x: 27, y: 19, rot: 2 },
+  { surface: 'wall', type: 'insignia', x: 15, y: 23, face: 'N' },
+];
+
 // Where the player starts. angle is in radians: 0 faces +x (east), and
 // because y points down, increasing the angle turns clockwise (to the right).
 const PLAYER_START = { x: 2.5, y: 3.5, angle: 0 };

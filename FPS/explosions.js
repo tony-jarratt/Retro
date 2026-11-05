@@ -42,6 +42,7 @@ function blastStrength(blast, d) {
 function explodeAt(x, y, blast) {
   explosions.push({ x, y, time: 0 });
   shatterGlassNear(x, y, blast.radius); // panels.js
+  stampBlastScorch(x, y); // decals.js: the floor, ceiling and nearby walls are scorched
 
   // Robots take up to BLAST_ROBOT_HITS hits: point blank destroys most outright.
   // (A heavy's own rockets hurt robots too: lure one into firing past its friends.)

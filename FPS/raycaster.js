@@ -108,7 +108,11 @@ function castRay(px, py, rayX, rayY) {
       // Facing west, your right is -y, so wallX shrinks left to right; flip it.
       if ((side === 0 && rayX < 0) || (side === 1 && rayY > 0)) wallX = 1 - wallX;
 
-      return { dist, side, cell, hitX, hitY, wallX, cellX: mapX, cellY: mapY, panes };
+      // Which face of the wall cell we hit, named by the way it looks (for
+      // decals.js): heading east, we hit the side that looks west, and so on.
+      const face = side === 0 ? (rayX > 0 ? 'W' : 'E') : (rayY > 0 ? 'N' : 'S');
+
+      return { dist, side, cell, hitX, hitY, wallX, face, cellX: mapX, cellY: mapY, panes };
     }
   }
 }
@@ -255,6 +259,7 @@ function drawWallStrip(pixels, col, hit, player) {
   const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
   const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
   const light = lightAt(lx, ly).map((v) => v * shade);
+  const decal = wallDecalAt(hit); // rust, scorch, a sign... or null (decals.js)
 
   for (let row = top; row < bottom; row++) {
     // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
@@ -269,6 +274,7 @@ function drawWallStrip(pixels, col, hit, player) {
     } else {
       copyTexel(pixels, col, row, tex, texX, texY, light, fog);
     }
+    if (decal) blendDecal(pixels, col, row, decal, texX, texY, light, fog); // over the wall, lit the same
   }
 }
 
@@ -328,16 +334,22 @@ function renderFloorCeiling(pixels, player) {
       // on the ceiling gets the same light as the spot on the floor below it.
       const light = lightAt(floorX, floorY);
       copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, light, fog);
+      // A puddle, oil, scorch... laid over the floor in this cell (decals.js).
+      const cellX = Math.floor(floorX), cellY = Math.floor(floorY);
+      const floorDecal = floorDecalAt(cellX, cellY);
+      if (floorDecal) blendDecal(pixels, col, row, floorDecal, texX, texY, light, fog);
 
       // Only cells with a working strip light show one lit (red in an alarm);
       // the rest have a dark fixture.
-      const state = ceilingLightState[Math.floor(floorY)]?.[Math.floor(floorX)];
+      const state = ceilingLightState[cellY]?.[cellX];
       const ceiling = state === 'on' ? CEILING_TEXTURE : state === 'alarm' ? CEILING_ALARM_TEXTURE : CEILING_DARK_TEXTURE;
       if (glows(ceiling, texX, texY)) {
         copyTexel(pixels, col, ceilingRow, ceiling, texX, texY, FULL_LIGHT, 0);
       } else {
         copyTexel(pixels, col, ceilingRow, ceiling, texX, texY, light, fog);
       }
+      const ceilingDecal = ceilingDecalAt(cellX, cellY);
+      if (ceilingDecal) blendDecal(pixels, col, ceilingRow, ceilingDecal, texX, texY, light, fog);
     }
   }
 }
