@@ -37,9 +37,10 @@ function hitsSolidSprite(x, y, r) {
 //   enemy      the robot this is, or null
 //   prop       the prop (drum, strut, lamp) this is, or null
 //   camera     the security camera this is, or null
+//   valve      the steam valve this is (steam.js), or null
 //   effect     true for an explosion, rocket or laser beam: you can see it, but shots pass through
 function spriteThings(viewer) {
-  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, effect: false, ...extra });
+  const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, valve: null, effect: false, ...extra });
   return [
     ...props.map((p) => thing(p.x, p.y, p.state === 'exploded' ? DRUM_WRECK_TEXTURE : SPRITE_TYPES[p.type].texture,
       { glowShade: spriteGlow(p), prop: p })),
@@ -50,6 +51,7 @@ function spriteThings(viewer) {
     })),
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
     ...securityThings(thing), // cameras and tripwire beams (security.js)
+    ...steamThings(thing),    // plumes and valves (steam.js)
     ...rockets.map((r) => thing(r.x, r.y, ROCKET_TEXTURE, { effect: true })),
     ...glassBursts.map((g) => thing(g.x, g.y, glassBurstTexture(g), { effect: true })), // panels.js
     // Explosions come last: one drawn at the same spot as its drum's remains
@@ -141,6 +143,8 @@ function drawSprite(pixels, depth, { thing, forward, size, left, top, fog, light
       // fog dims them: a robot's visor shows in the dark before its body does.
       if (glows(tex, texX, texY)) {
         copyTexel(pixels, col, row, tex, texX, texY, glowLight, 0);
+      } else if (tex.pixels[(texY * TEX_SIZE + texX) * 4 + 3] < 255) {
+        blendTexel(pixels, col, row, tex, texX, texY, light, fog); // part see-through: steam
       } else {
         copyTexel(pixels, col, row, tex, texX, texY, light, fog);
       }

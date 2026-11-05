@@ -335,6 +335,62 @@ function makeGlassBurst(frame) {
   });
 }
 
+// STEAM (steam.js) -----------------------------------------------------------
+
+// Smooth noise: noise() on a coarse grid of `cell`-texel squares, blended
+// between grid points (bilinear, as in lightAt), so it gives soft blobs
+// instead of speckle. It repeats every `wrapY` texels vertically, so a steam
+// animation that scrolls upward by exactly wrapY loops without a seam.
+function smoothNoise(x, y, cell, wrapY, seed) {
+  const gx = x / cell, gy = y / cell;
+  const x0 = Math.floor(gx), y0 = Math.floor(gy);
+  const fx = gx - x0, fy = gy - y0;
+  const rows = wrapY / cell;
+  const at = (ix, iy) => noise(ix, ((iy % rows) + rows) % rows, seed);
+  const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx;
+  const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx;
+  return top + (bottom - top) * fy;
+}
+
+const STEAM_FRAMES = 6;
+const STEAM_LOOP = 48; // texels the billows rise over a whole cycle of frames
+
+// A plume of steam: a soft, wavering column, narrow where it leaves the vent
+// at the floor and spreading as it rises, made of billows that drift upwards
+// from frame to frame. Its alpha is how thick the steam is: you see the room
+// through it. `sputter` gives the weak, low puffs that warn of a burst.
+function makeSteam(frame, sputter) {
+  const rise = frame * STEAM_LOOP / STEAM_FRAMES;
+  return makeTexture([210, 214, 220], (x, y) => {
+    const up = (63 - y) / 63; // 0 at the floor, 1 at the ceiling
+    if (sputter && up > 0.4) return null;
+    const half = 5 + 22 * Math.sqrt(up);
+    const across = Math.abs(x + 0.5 - 32 - 3 * Math.sin(up * 6 + frame * 2 * Math.PI / STEAM_FRAMES)) / half;
+    if (across >= 1) return null;
+    const n = 0.6 * smoothNoise(x, y + rise, 8, STEAM_LOOP, 120) + 0.4 * smoothNoise(x, y + rise * 2, 4, STEAM_LOOP, 121);
+    // A sputter's puffs thin out to nothing by 40% of the way up, rather than stopping in a hard edge.
+    const density = (1 - across * across) * (0.3 + 0.7 * n) * (1 - 0.4 * up) * (sputter ? 0.7 * (1 - up / 0.4) : 1);
+    if (density < 0.12) return null;
+    return seeThrough(brighten([200, 205, 212], 0.85 + 0.3 * n), Math.min(210, 240 * density));
+  });
+}
+
+// A pressure valve on a standpipe: shoot the red wheel to vent steam. The
+// wheel is at eye height (texture row 32), because that's the only height
+// the crosshair ever points at (see thingUnderCrosshair in combat.js).
+function makeValve() {
+  const red = [200, 40, 30];
+  return makeTexture(red, (x, y) => {
+    const px = x + 0.5, py = y + 0.5;
+    const r = Math.hypot(px - 32, py - 32);
+    if (r > 6 && r < 9.5) return brighten(red, py < 32 ? 1.15 : 0.8);                       // the wheel's rim, lit from above
+    if (r <= 6 && (Math.abs(px - 32) < 1 || Math.abs(py - 32) < 1)) return brighten(red, 0.7); // spokes
+    if (y >= 60 && Math.abs(px - 32) < 6) return DARK_STEEL;                                  // floor flange
+    if (y >= 32 && Math.abs(px - 32) < 2.5) return brighten(STEEL, roundShade((px - 32) / 2.5)); // the standpipe
+    return null;
+  });
+}
+
 // FLOOR AND CEILING -----------------------------------------------------------
 
 // Diamond-plate steel: a lattice of small raised diamonds, with oil stains.
@@ -928,6 +984,14 @@ const GUN_FLASH_TEXTURE = makeGun(true);
 const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
 const GRATE_TEXTURE = makeGrate();
 const GLASS_BURST_FRAMES = [0, 1, 2, 3].map(makeGlassBurst);
+
+const STEAM_BURST_FRAMES = [];
+const STEAM_SPUTTER_FRAMES = [];
+for (let f = 0; f < STEAM_FRAMES; f++) {
+  STEAM_BURST_FRAMES.push(makeSteam(f, false));
+  STEAM_SPUTTER_FRAMES.push(makeSteam(f, true));
+}
+const VALVE_TEXTURE = makeValve();
 
 const DRUM_TEXTURE = makeDrum();
 const DRUM_WRECK_TEXTURE = makeDrumWreck();

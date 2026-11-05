@@ -110,9 +110,12 @@ function reflectInPuddle(pixels, col, row, d, floorX, floorY, screenX, hit, spri
     const texX = Math.min(TEX_SIZE - 1, Math.floor((col + 0.5 - p.left) / p.size * TEX_SIZE));
     const texY = rowAtHeight(hs);
     if (isTransparent(p.thing.tex, texX, texY)) continue;
-    colour = glows(p.thing.tex, texX, texY)
+    const seen = glows(p.thing.tex, texX, texY)
       ? litTexel(p.thing.tex, texX, texY, p.glowLight, 0) // a robot's visor glints in the water
       : litTexel(p.thing.tex, texX, texY, p.light, p.fog);
+    // Steam is part see-through: mix it in by its alpha (solid texels have 255).
+    const a = p.thing.tex.pixels[(texY * TEX_SIZE + texX) * 4 + 3] / 255;
+    colour = colour.map((c, n) => c + (seen[n] - c) * a);
   }
 
   // Mix it into the puddle that's already drawn there.

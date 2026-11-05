@@ -66,6 +66,7 @@ function playerFire() {
     damageEnemy(target.enemy, hits);
   }
   if (target.camera) shootCamera(target.camera); // security.js
+  if (target.valve) openValve(target.valve.vent); // steam.js
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);

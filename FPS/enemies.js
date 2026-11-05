@@ -97,7 +97,8 @@ function canSee(enemy) {
   // castRay the renderer uses. If it hits a wall (or a closed door) before it
   // has travelled as far as the player is, something is in the way.
   const hit = castRay(enemy.x, enemy.y, dx / dist, dy / dist);
-  return hit.dist > dist;
+  // A burst of steam in the way hides you too (steam.js).
+  return hit.dist > dist && !steamBlocksSight(enemy.x, enemy.y, player.x, player.y);
 }
 
 // Is this robot facing away from the player (so the player sees its back)?

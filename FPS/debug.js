@@ -87,6 +87,19 @@ function drawDebug(ctx, player, hits) {
     }
   }
 
+  // Steam vents: a ring, filled white while bursting; valves as red dots.
+  for (const v of vents) {
+    ctx.strokeStyle = ctx.fillStyle = v.state === 'burst' ? '#fff' : v.state === 'sputter' ? '#aaa' : '#666';
+    ctx.beginPath();
+    ctx.arc(v.x * s, v.y * s, STEAM_RADIUS * s, 0, Math.PI * 2);
+    if (v.state === 'burst') ctx.fill();
+    else ctx.stroke();
+    if (v.valve) {
+      ctx.fillStyle = '#e33';
+      ctx.fillRect((v.valve.x - 0.1) * s, (v.valve.y - 0.1) * s, 0.2 * s, 0.2 * s);
+    }
+  }
+
   // Lights: a small cross coloured by kind, dim while it's flickering off.
   const LIGHT_COLOURS = { lamp: '#fa4', ceiling: '#cdf', screen: '#4f8' };
   for (const light of LIGHTS) {

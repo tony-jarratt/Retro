@@ -92,7 +92,7 @@ function cameraSeesPlayer(cam) {
   const dy = player.y - cam.y;
   if (Math.hypot(dx, dy) > CAMERA_RANGE) return false;
   if (Math.abs(angleDiff(Math.atan2(dy, dx), cam.angle)) > CAMERA_CONE / 2) return false;
-  return clearLine(cam.x, cam.y, player.x, player.y);
+  return clearLine(cam.x, cam.y, player.x, player.y) && !steamBlocksSight(cam.x, cam.y, player.x, player.y);
 }
 
 // Is the player's collision box across a tripwire's beam?

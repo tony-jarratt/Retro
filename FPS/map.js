@@ -219,6 +219,18 @@ const PICKUPS = [
   { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
 ];
 
+// Steam vents (steam.js): floor cells that blow scalding, sight-blocking
+// steam on a cycle. delay = seconds before the first burst's warning, so they
+// don't all go off together. A valve is a red wheel you can shoot to make the
+// vent blow a long burst at once; x, y are positions like the player's.
+const VENTS = [
+  { x: 15, y: 4,  delay: 0.5 },                               // fuel depot, out in the open
+  { x: 15, y: 11, delay: 2.0, valve: { x: 16.7, y: 9.3 } },   // corridor: slip past at the sides
+  { x: 22, y: 11, delay: 1.0, valve: { x: 19.3, y: 13.6 } },  // workshop: blind the camera by the door
+  { x: 18, y: 19, delay: 2.5 },                               // hangar, in front of the turret
+  { x: 9,  y: 21, delay: 0.2, valve: { x: 7.3, y: 22.6 } },   // hangar, by the scout and the other turret
+];
+
 // Hand-placed DECALS (decals.js): the signs and scenes that tell a story. The
 // background wear (puddles under leaks, scorch by drums, rusty pipes) is
 // scattered by rules instead. type is a key of DECAL_TYPES.

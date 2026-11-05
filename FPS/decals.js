@@ -89,6 +89,18 @@ function makeScorch(v) {
   });
 }
 
+// A square steam vent grille: steel slats over a dark, rust-stained pit.
+function makeVent() {
+  return makeTexture(DARK_STEEL, (x, y) => {
+    const inX = Math.abs(x + 0.5 - 32), inY = Math.abs(y + 0.5 - 32);
+    const edge = Math.max(inX, inY);
+    if (edge >= 20) return edge < 22 ? seeThrough(RUST, 120) : null; // rust stain round it
+    if (edge >= 17) return brighten(STEEL, 0.9 + 0.2 * noise(x, y, 118)); // frame
+    if (x % 5 < 2) return brighten(STEEL, 0.75);                        // slats
+    return [10, 10, 12];
+  });
+}
+
 // A round floor drain: a steel rim and slotted cover.
 function makeDrain() {
   return makeTexture(DARK_STEEL, (x, y) => {
@@ -223,6 +235,7 @@ const DECAL_TYPES = {
   oil:        { surfaces: ['floor'],            frames: [0, 1].map(makeOil) },
   scorch:     { surfaces: ['floor', 'ceiling'], frames: [0, 1].map(makeScorch) },
   drain:      { surfaces: ['floor'],            frames: [makeDrain()] },
+  vent:       { surfaces: ['floor'],            frames: [makeVent()] },
   footprint:  { surfaces: ['floor'],            frames: [makeFootprint()] },
   stain:      { surfaces: ['ceiling'],          frames: [0, 1].map(makeCeilingStain) },
   wallScorch: { surfaces: ['wall'],             frames: [0, 1].map(makeWallScorch) },
@@ -345,6 +358,7 @@ function placeMapDecals() {
 
 scatterDecals();
 placeMapDecals();
+for (const v of VENTS) placeDecal('floor', v.x, v.y, null, 'vent', 0, 0); // every steam vent's grille (steam.js)
 
 // 3. EXPLOSIONS (explosions.js calls this). The floor and ceiling of the cell
 // the blast is in get scorched, and so does any plain wall face close enough.

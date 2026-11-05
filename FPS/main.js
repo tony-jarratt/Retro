@@ -105,6 +105,7 @@ function frame(now) {
   if (game.state === 'playing') { // once you've won or died, everyone stops
     updatePlayer(dt);
     updatePickups();
+    updateSteam(dt);    // before security and robots, so they see this frame's plumes
     updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
     updateEnemies(dt);
   }
