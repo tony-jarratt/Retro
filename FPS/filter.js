@@ -1,5 +1,7 @@
-// THE 80s SCREEN FILTER (toggle with C). Two period tricks, applied to the
-// finished frame, HUD and all, just before it goes on screen.
+// THE 80s SCREEN FILTER. Two period tricks, applied to the finished frame,
+// HUD and all, just before it goes on screen. Press C to have it on all the
+// time; otherwise it creeps in as your VISOR TAKES DAMAGE (applyDamageFilter,
+// at the bottom), along with tearing and a failing tube's colour split.
 //
 // 1. A FIXED PALETTE WITH ORDERED DITHERING. Machines of the era could only
 //    show a few dozen colours, and that limit is a big part of the look.
@@ -55,18 +57,90 @@ function nearestPaletteColour(r, g, b) {
   return best;
 }
 
-function applyCrtFilter(pixels) {
+// The full filter. `crush` (0..1) blends each pixel from its true colour
+// towards its dithered palette colour: 1 is the whole effect, 0.5 halfway,
+// 0 skips the palette search altogether. `scanShade` is how bright the
+// in-between rows are (SCANLINE_SHADE for the full look, 1 for none).
+function applyCrtFilter(pixels, crush = 1, scanShade = SCANLINE_SHADE) {
   for (let y = 0; y < SCREEN_H; y++) {
-    const scan = y % 2 === 1 ? SCANLINE_SHADE : 1;
+    const scan = y % 2 === 1 ? scanShade : 1;
     for (let x = 0; x < SCREEN_W; x++) {
       const i = (y * SCREEN_W + x) * 4;
-      // The nudge for this position: -0.47 to +0.47, times the strength.
-      // (x & 3 is x mod 4: which column of the repeating 4x4 tile we're in.)
-      const nudge = ((BAYER_4X4[y & 3][x & 3] + 0.5) / 16 - 0.5) * DITHER_STRENGTH;
-      const c = nearestPaletteColour(pixels[i] + nudge, pixels[i + 1] + nudge, pixels[i + 2] + nudge);
-      pixels[i] = c[0] * scan;
-      pixels[i + 1] = c[1] * scan;
-      pixels[i + 2] = c[2] * scan;
+      if (crush > 0) {
+        // The nudge for this position: -0.47 to +0.47, times the strength.
+        // (x & 3 is x mod 4: which column of the repeating 4x4 tile we're in.)
+        const nudge = ((BAYER_4X4[y & 3][x & 3] + 0.5) / 16 - 0.5) * DITHER_STRENGTH;
+        const c = nearestPaletteColour(pixels[i] + nudge, pixels[i + 1] + nudge, pixels[i + 2] + nudge);
+        for (let k = 0; k < 3; k++) pixels[i + k] += (c[k] - pixels[i + k]) * crush;
+      }
+      if (scan !== 1) for (let k = 0; k < 3; k++) pixels[i + k] *= scan;
     }
+  }
+}
+
+// VISOR DAMAGE. As your health falls, the helmet's display starts to fail:
+//   below 60   scanlines creep in, darker the more you're hurt
+//   below 40   the palette starts to crush, and the picture TEARS: for a
+//              frame, a band of rows jumps sideways
+//   below 20   the full crushed look, a COLOUR SPLIT (the red image slides
+//              off the green and blue, like a failing tube), and flicker
+// Healing cleans it back up. Each effect is a 0..1 amount worked out from
+// your health, so it all fades in smoothly rather than switching on.
+const DAMAGE_START = 60, CRUSH_START = 40, SPLIT_START = 20;
+const TEAR_RATE = 5;          // tears per second at 0 health (fewer when less hurt)
+const TEAR_TIME = 0.06;       // seconds a tear lasts: about four frames
+const tears = [];             // tears showing: { y, h, shift, time }
+
+// 0 at `from` health and above, rising in a straight line to 1 at `to`.
+function damageRamp(health, from, to) {
+  return Math.min(1, Math.max(0, (from - health) / (from - to)));
+}
+
+// Slide row y's pixels `shift` to the right (left if negative), filling the
+// gap from the edge. A copy of the row first, so pixels aren't read after
+// they've already been moved.
+function shiftRow(pixels, y, shift) {
+  const start = y * SCREEN_W * 4;
+  const row = pixels.slice(start, start + SCREEN_W * 4);
+  for (let x = 0; x < SCREEN_W; x++) {
+    const from = Math.min(SCREEN_W - 1, Math.max(0, x - shift));
+    for (let k = 0; k < 3; k++) pixels[start + x * 4 + k] = row[from * 4 + k];
+  }
+}
+
+function applyDamageFilter(pixels, health, dt) {
+  // Tears come and go even as you heal, so update them first.
+  for (let i = tears.length - 1; i >= 0; i--) {
+    tears[i].time -= dt;
+    if (tears[i].time <= 0) tears.splice(i, 1);
+  }
+  if (health >= DAMAGE_START) return;
+
+  const tearing = damageRamp(health, CRUSH_START, 0);
+  if (Math.random() < TEAR_RATE * tearing * dt) {
+    const h = 2 + Math.floor(Math.random() * 10);
+    const shift = (8 + Math.floor(Math.random() * 17)) * (Math.random() < 0.5 ? -1 : 1); // 8-24 pixels, either way
+    tears.push({ y: Math.floor(Math.random() * (SCREEN_H - h)), h, shift, time: TEAR_TIME });
+  }
+  for (const t of tears) for (let y = t.y; y < t.y + t.h; y++) shiftRow(pixels, y, t.shift);
+
+  // Colour split: the red channel alone, shifted right by 1-2 pixels. Walking
+  // each row right to left means every pixel reads its left neighbour's red
+  // before that neighbour has been changed.
+  const split = Math.round(2 * damageRamp(health, SPLIT_START, 0) + 0.49);
+  if (health < SPLIT_START && split > 0) {
+    for (let y = 0; y < SCREEN_H; y++) {
+      const row = y * SCREEN_W * 4;
+      for (let x = SCREEN_W - 1; x >= split; x--) pixels[row + x * 4] = pixels[row + (x - split) * 4];
+    }
+  }
+
+  // Scanlines and crush together, in one pass of the CRT filter.
+  const scanShade = 1 - (1 - SCANLINE_SHADE) * damageRamp(health, DAMAGE_START, SPLIT_START);
+  applyCrtFilter(pixels, damageRamp(health, CRUSH_START, SPLIT_START), scanShade);
+
+  // Flicker: now and then, the whole picture dips.
+  if (health < SPLIT_START && Math.random() < 0.08) {
+    for (let i = 0; i < pixels.length; i += 4) for (let k = 0; k < 3; k++) pixels[i + k] *= 0.82;
   }
 }

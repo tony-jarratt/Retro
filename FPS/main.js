@@ -118,7 +118,10 @@ function frame(now) {
   const hits = castRays(player);
   renderView(frameImage, hits, player);
   drawHud(frameImage.data); // flat on top of the 3D view, same buffer
-  if (crtFilterOn) applyCrtFilter(frameImage.data); // last of all, so it covers the HUD too
+  // Last of all, so it covers the HUD too: the full CRT look if you've asked
+  // for it (C), otherwise however much your visor's damage calls for.
+  if (crtFilterOn) applyCrtFilter(frameImage.data);
+  else applyDamageFilter(frameImage.data, player.health, dt);
   screenCtx.putImageData(frameImage, 0, 0);
   if (debugOn) drawDebug(debugCtx, player, hits);
 
