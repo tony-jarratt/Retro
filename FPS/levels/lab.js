@@ -1,7 +1,8 @@
 // LEVEL 2: THE LAB, 24 cells wide and 16 tall. A test sandbox. It has the
 // lab's own look (stained white tiles, bench cabinets, cold fluorescents,
-// slime) and its own objective, the BREEDING CHAMBER; its enemies are still
-// the industrial robots until the lab's creatures exist (see DESIGN.md). The
+// slime), its own objective, the BREEDING CHAMBER, and its own enemies: the
+// lab's CREATURES (creatures.js), which hear you rather than watch for you,
+// so there are no cameras, tripwires or terminals here. The
 // glass boxes are SPECIMEN TANKS: one floor cell walled in by glass, with
 // steel pillars at the corners. Empty for now; one day, something will be in them.
 //
@@ -58,28 +59,30 @@ LEVELS.push({
     { x: 20, y: 13, flicker: true },
   ],
 
-  // Stand-ins until the lab's creatures exist.
+  // LURCHERS. They hear every shot (further in burst and auto), and spot you
+  // much sooner under a light than in the dark.
   enemies: [
-    { type: 'walker', x: 20.5, y: 5.5, angle: Math.PI },
-    { type: 'scout',  x: 8.5,  y: 9.5, angle: -Math.PI / 2 },
-    { type: 'turret', x: 10.5, y: 13.5, angle: -Math.PI / 2 },
+    // The specimen hall: two, out of sight of the door in. A careless burst
+    // at one brings the other.
+    { type: 'lurcher', x: 21.5, y: 5.5,  angle: Math.PI },
+    { type: 'lurcher', x: 17.5, y: 1.5,  angle: Math.PI / 2 },
+    // The side room: one, in the dark at the far end.
+    { type: 'lurcher', x: 2.5,  y: 8.5,  angle: 0 },
+    // The lower lab: three, around the chamber. Shooting down here wakes them all.
+    { type: 'lurcher', x: 4.5,  y: 12.5, angle: 0 },
+    { type: 'lurcher', x: 10.5, y: 13.5, angle: -Math.PI / 2 },
+    { type: 'lurcher', x: 19.5, y: 13.5, angle: Math.PI },
   ],
 
-  zones: [
-    { id: 'lab', x: 1, y: 1, w: 22, h: 14 },
-  ],
-  cameras: [
-    { x: 22.5, y: 10.5, angle: -2.4, zone: 'lab' },
-  ],
-  tripwires: [
-    { x0: 12, x1: 22, y: 10, zone: 'lab' }, // across the hall, before the way down: it wakes the chamber's turret
-  ],
-
+  // Creatures drop no clips, so there's more ammo lying about than in the hangar.
   pickups: [
     { type: 'ammo',   x: 8.5,  y: 1.5 },
     { type: 'repair', x: 22.5, y: 1.5 },
     { type: 'ammo',   x: 1.5,  y: 10.5 },
     { type: 'burstmod', x: 12.5, y: 5.5 },
+    { type: 'ammo',   x: 22.5, y: 9.5 },  // specimen hall, far corner
+    { type: 'ammo',   x: 21.5, y: 12.5 }, // lower lab
+    { type: 'repair', x: 1.5,  y: 14.5 }, // lower lab
   ],
 
   vents: [
@@ -101,7 +104,7 @@ LEVELS.push({
     { surface: 'wall', type: 'biohazard', x: 8,  y: 15, face: 'N' },
     { surface: 'wall', type: 'biohazard', x: 12, y: 15, face: 'N' },
     // Something has been dragged from the tanks to the chamber.
-    { surface: 'floor', type: 'slime', x: 16, y: 8 },
+    { surface: 'floor', type: 'slime', x: 17, y: 8 },  // just outside the tank's glass
     { surface: 'floor', type: 'slime', x: 17, y: 10 },
     { surface: 'floor', type: 'slime', x: 16, y: 12 },
     { surface: 'floor', type: 'slime', x: 12, y: 13 },

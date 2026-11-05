@@ -386,6 +386,52 @@ function sfxRobotStep(enemy) {
     noiseBurst(out, 'lowpass', 600, 150, 0.08, 0.3);
   }
 }
+
+// THE LAB'S CREATURES: flesh, not metal. Hits are wet slaps, not clangs.
+function sfxCreatureHit(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 1100, 250, 0.12, 0.6);
+  drumHit(out, 'sine', 170, 70, 0.05, 0.12, 0.35);
+}
+// Dying: a long, sinking gurgle.
+function sfxCreatureDown(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 150, 45, 0.9, 0.12);
+  tone(out, 'sawtooth', 153, 47, 0.9, 0.08); // a fraction apart, so the two beat: a rattle
+  noiseBurst(out, 'lowpass', 700, 90, 0.8, 0.5);
+  drumHit(out, 'sine', 80, 30, 0.1, 0.4, 0.6, 0.35); // it hits the floor
+}
+// A heavy, dragging step: bare feet on vinyl.
+function sfxCreatureStep(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  drumHit(out, 'sine', 75, 35, 0.03, 0.12, 0.35);
+  noiseBurst(out, 'lowpass', 450, 120, 0.14, 0.25);
+}
+// Spotting you: a low growl, two saws beating against each other.
+function sfxLurcherSnarl(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 95, 70, 0.7, 0.14);
+  tone(out, 'sawtooth', 99, 73, 0.7, 0.1);
+  noiseBurst(out, 'bandpass', 500, 300, 0.6, 0.25);
+}
+// Rearing up to strike: a rising screech. The sound to back off at.
+function sfxLurcherRear(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 260, 820, LURCHER_WINDUP, 0.1);
+  noiseBurst(out, 'bandpass', 1400, 3200, LURCHER_WINDUP, 0.3);
+}
+// The lunge: a whoosh of claws.
+function sfxLurcherSwipe(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 600, 2800, 0.2, 0.6);
+}
+
 function sfxPlayerStep() {
   drumHit(audio.master, 'sine', 110, 40, 0.04, 0.12, 0.25);
   tone(audio.master, 'sawtooth', 240, 320, 0.08, 0.03); // servo whirr
@@ -598,8 +644,17 @@ function watchTheGame() {
   for (const e of enemies) {
     const was = last.enemies.get(e);
     const step = Math.floor(e.walkTime * WALK_FPS);
-    if (e.health < was.health) e.state === 'dead' ? sfxRobotDown(e) : sfxRobotHit(e);
-    if (e.state !== 'dead' && e.moving && step !== was.step) sfxRobotStep(e);
+    const creature = ROBOT_TYPES[e.type].creature;
+    if (e.health < was.health) {
+      if (creature) e.state === 'dead' ? sfxCreatureDown(e) : sfxCreatureHit(e);
+      else e.state === 'dead' ? sfxRobotDown(e) : sfxRobotHit(e);
+    }
+    if (e.state !== 'dead' && e.moving && step !== was.step) creature ? sfxCreatureStep(e) : sfxRobotStep(e);
+    if (creature && e.state !== was.state) {
+      if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) sfxLurcherSnarl(e);
+      if (e.state === 'windup') sfxLurcherRear(e);
+      if (e.state === 'lunge') sfxLurcherSwipe(e);
+    }
   }
   // A pickup that was in the list last frame and isn't now has been collected.
   for (const p of last.pickups) if (!pickups.includes(p)) sfxPickup(p.type);

@@ -203,8 +203,29 @@ cabinets `b`, vinyl floor, fluorescent ceiling panels, a colder green-tinged
 ambient, slime spills that reflect like puddles, biohazard and warning
 stencils) and its **objective**, the breeding chamber (`objective:
 'chamber'`: the K cells become a viewport packed with pulsing green eggs; it
-works exactly like the core underneath). The enemies are still industrial
-robots, the tanks are empty, and the vents are still steam.
+works exactly like the core underneath).
+
+**Stage 1 of the creatures is built** (`creatures.js`, art in
+`creature-art.js`): **hearing** and the **lurcher**. The lab has creatures
+only: no robots, cameras, tripwires or terminals (owner, 2026-11-05).
+
+- **Noise:** every round fired is a noise where you stand, carrying 4 cells
+  (single), 6 (burst) or 9 (auto); explosions 12. A wall or closed door in
+  the way halves it. A creature that hears goes to where the noise was.
+  No noise readout on the visor: you judge it by ear and by what comes.
+- **Sight needs light:** an unaware creature spots you at 5 cells if you're
+  under a light, under 2 in the dark (your own muzzle flash counts). Once
+  it's after you, it tracks you at 5 whatever the light.
+- **Lurcher:** speed 1.3 (you do 3), 5 hits, 30 damage. In reach (1.6) it
+  rears up for 0.6s (eyes flare, a rising screech), then lunges 1.4 cells
+  in a straight line at where you were, then stands for 0.7s. Back off
+  during the rear-up, or sidestep the lunge, and it misses.
+- **Creatures drop nothing** (so the lab has more ammo lying about), can't
+  open doors, and are never smart.
+
+Still to build: spitters and acid pools, larvae (they **bite** and come back,
+rather than exploding) and breeding pods, things in the tanks, gas vents, and
+the chamber's ending. The vents are still steam.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of

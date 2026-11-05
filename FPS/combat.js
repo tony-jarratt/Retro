@@ -99,6 +99,7 @@ function fireRound() {
   if (player.ammo === 0) { gun.burstLeft = 0; sfxDryFire(); return; } // ran dry mid-burst: click
   player.ammo -= 1;
   sfxPlayerShot(gun.pullMode); // sound.js
+  makeNoise(player.x, player.y, SHOT_NOISE[gun.pullMode]); // the lab's creatures hear it (creatures.js)
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
@@ -135,7 +136,7 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
   if (enemy.health <= 0) {
     enemy.state = 'dead';
     enemy.moving = false;
-    dropClip(enemy);
+    if (!ROBOT_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
     return;
   }
   if (!byPlayer) return;

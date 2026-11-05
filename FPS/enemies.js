@@ -46,11 +46,18 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 // strafe     smart ones sidestep across your aim while charging
 // weave      smart ones also zig-zag at you as they rush in
 // volley, volleyGap   rounds per charge, and seconds between them (the turret's rapid fire)
+// creature   one of the lab's creatures: hears, needs light to see, drops
+//            nothing (creatures.js). Its weapon 'melee' uses aimRange as its
+//            reach to start an attack, and damage per lunge that connects.
+//
+// THE LAB'S CREATURES (creatures.js):
+//   lurcher  slow and tough, melee only: rears up, then lunges. Back off or sidestep.
 const ROBOT_TYPES = {
   walker: { speed: 1.5, health: 4, aimRange: 3,   charge: 1.0, weapon: 'gun',    damage: 15, hitNear: 0.8,  hitFar: 0.3,  backHits: 1, mobile: true,  strafe: true,  weave: false, volley: 1, volleyGap: 0 },
   scout:  { speed: 3.0, health: 2, aimRange: 1.6, charge: 0.5, weapon: 'gun',    damage: 8,  hitNear: 0.7,  hitFar: 0.45, backHits: 1, mobile: true,  strafe: true,  weave: true,  volley: 1, volleyGap: 0 },
   heavy:  { speed: 0.8, health: 6, aimRange: 6,   charge: 1.8, weapon: 'rocket', damage: 0,  hitNear: 0,    hitFar: 0,    backHits: 2, mobile: true,  strafe: false, weave: false, volley: 1, volleyGap: 0 },
   turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 6,  hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false, strafe: false, weave: false, volley: 5, volleyGap: 0.12 },
+  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, charge: 0, weapon: 'melee', damage: 30, hitNear: 0, hitFar: 0, backHits: 1, mobile: true, strafe: false, weave: false, volley: 1, volleyGap: 0, creature: true },
 };
 
 // The live robots, built once from the starting positions in the level file:
@@ -71,6 +78,7 @@ const ROBOT_TYPES = {
 //   volleyLeft, volleyTimer rounds of the current volley still to fire, and when the next goes
 ENEMIES.forEach((e, n) => {
   if (e.smart && e.type === 'turret') throw new Error(`ENEMIES[${n}] is a smart turret: turrets are always dumb.`);
+  if (e.smart && ROBOT_TYPES[e.type]?.creature) throw new Error(`ENEMIES[${n}] is a smart ${e.type}: only robots can be smart.`);
 });
 const enemies = ENEMIES.map((start) => ({
   type: start.type,
@@ -93,6 +101,8 @@ const enemies = ENEMIES.map((start) => ({
   strafeTimer: 0,
   volleyLeft: 0,
   volleyTimer: 0,
+  attackTime: 0, // creatures: seconds into the current stage of a melee attack (creatures.js)
+  lungeLeft: 0,  // creatures: cells of lunge still to go
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -117,7 +127,9 @@ function canSee(enemy) {
   const dx = player.x - enemy.x;
   const dy = player.y - enemy.y;
   const dist = Math.hypot(dx, dy);
-  if (dist > SIGHT_RANGE) return false;
+  // Creatures need light to spot you (creatures.js); robots see in the dark.
+  const range = ROBOT_TYPES[enemy.type].creature ? creatureSightRange(enemy) : SIGHT_RANGE;
+  if (dist > range) return false;
 
   // An idle robot only notices you inside the cone in front of it. Once
   // alerted, it keeps track of you whichever way it happens to be facing.
@@ -180,6 +192,7 @@ function alertEnemy(enemy, x, y) {
 // (updateEnemy). An offline turret has been shut down and doesn't react.
 function turnTowardsPlayer(enemy) {
   if (enemy.state === 'dead' || enemy.state === 'offline') return;
+  if (ATTACK_STATES.includes(enemy.state)) return; // a creature mid-attack is already facing you, and won't be put off
   // Already facing you (say, a robot aiming at you): nothing to turn, and
   // pausing it would let rapid fire freeze it in place.
   const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -284,6 +297,7 @@ function callForHelp(enemy) {
 //          were last seen, round corners if need be, then go idle
 function updateWalker(enemy, dt) {
   const type = ROBOT_TYPES[enemy.type];
+  if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
   const sees = canSee(enemy);
   if (sees) {
     if (enemy.smart) callForHelp(enemy);
@@ -295,7 +309,9 @@ function updateWalker(enemy, dt) {
     enemy.state = 'search';
   }
 
-  if (enemy.state === 'aim') {
+  if (enemy.state === 'aim' && type.weapon === 'melee') {
+    startMeleeAttack(enemy); // creatures.js: it rears up
+  } else if (enemy.state === 'aim') {
     aimAndFire(enemy, dt);
     if (enemy.smart && type.strafe) enemy.moving = strafeStep(enemy, dt);
   } else if (enemy.state === 'chase') {
@@ -368,8 +384,11 @@ function beaconLit(enemy) {
 }
 
 function enemyTexture(enemy, viewer) {
-  if (enemy.state === 'dead') return WRECK_TEXTURE; // a heap looks the same from every side
+  if (enemy.state === 'dead') return CORPSE_TEXTURES[enemy.type] || WRECK_TEXTURE; // a heap looks the same from every side
   const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off'] : ROBOT_FRAMES[enemy.type];
+  // A creature's attack faces you throughout, so it's only ever seen from the front.
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand' }[enemy.state];
+  if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.
     return enemy.firedTime > 0 ? frames.front.fire : frames.front.aim;

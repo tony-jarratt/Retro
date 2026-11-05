@@ -42,6 +42,7 @@ function blastStrength(blast, d) {
 function explodeAt(x, y, blast) {
   explosions.push({ x, y, time: 0 });
   sfxExplosion(x, y, blast.radius); // sound.js
+  makeNoise(x, y, BLAST_NOISE);      // creatures.js: everything nearby comes to look
   shatterGlassNear(x, y, blast.radius); // panels.js
   stampBlastScorch(x, y); // decals.js: the floor, ceiling and nearby walls are scorched
   if (!blast.spareDrones) blastDrones(x, y, blast.radius); // drones.js
