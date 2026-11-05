@@ -18,6 +18,8 @@ const GLASS_CELL = 6;
 const GRATE_CELL = 7;
 const CORE_CELL = 8;
 const LIFT_CELL = 10;
+const LAB_TILE_CELL = 11;
+const LAB_CABINET_CELL = 12;
 
 const LEGEND = {
   '.': 0,         // floor
@@ -29,8 +31,11 @@ const LEGEND = {
   'D': DOOR_CELL, // sliding blast door: must sit in a gap in a straight wall
   'W': GLASS_CELL, // window of wired glass: see through, stops bullets, shatters (panels.js)
   '=': GRATE_CELL, // steel bar grille: see and shoot through, can't walk through
-  'K': CORE_CELL,  // the security core: destroy it (core.js). Several K cells are one core.
-  'L': LIFT_CELL,  // the exit lift: reach it once the core is down, and the level is done
+  'K': CORE_CELL,  // the objective: the security core or the lab's breeding chamber, as the level says (core.js). Several K cells are one.
+  'L': LIFT_CELL,  // the exit lift: reach it once the objective is destroyed, and the level is done
+  // The lab's walls (lower case: the lab's own pieces).
+  't': LAB_TILE_CELL,    // stained white tiles
+  'b': LAB_CABINET_CELL, // steel bench cabinets under tiles, with a biohazard placard
 };
 
 // Every level, in the order you play them. Each levels/*.js file pushes one.

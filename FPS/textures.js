@@ -976,6 +976,162 @@ function makeLift(open) {
   });
 }
 
+// THE LAB ------------------------------------------------------------------------
+// Deeper in the complex: stained white tiles, steel benches, green biohazard
+// markings, cold fluorescent panels. Levels with theme 'lab' use the lab's
+// floor and ceiling (below); its walls are their own cells ('t', 'b').
+
+const TILE_WHITE = [200, 204, 194];
+const GROUT = [104, 108, 98];
+const GRIME = [118, 100, 60];
+const BIO_GREEN = [120, 220, 60];
+
+// One texel of the lab's wall tiles, 16x16 each: glazed, chipped and
+// cracked here and there, with grime running down from the grout and
+// collecting towards the floor.
+function labTileTexel(x, y) {
+  const tx = x % 16, ty = y % 16; // position within this tile
+  const tile = Math.floor(x / 16) + 4 * Math.floor(y / 16);
+  if (tx === 0 || ty === 0) return brighten(GROUT, 0.85 + 0.25 * noise(x, y, 200));
+  let c = brighten(TILE_WHITE, 0.9 + 0.08 * noise(tile, 0, 201) + 0.05 * noise(x, y, 202));
+  if (tx === 1 || ty === 1) c = brighten(c, 1.08);   // glaze catching the light on the top/left edge
+  if (tx === 15 || ty === 15) c = brighten(c, 0.84);
+  // A crack across some tiles: a thin dark line corner to corner.
+  if (noise(tile, 1, 205) < 0.18) {
+    const flip = noise(tile, 2, 205) < 0.5;
+    if (segmentDistance(tx + 0.5, ty + 0.5, flip ? 13 : 3, 2, flip ? 4 : 12, 14) < 0.6) return brighten(GROUT, 0.6);
+  }
+  // A chipped corner: the grey render behind shows through.
+  if (noise(tile, 3, 206) < 0.12 && tx + ty < 6) return brighten(GROUT, 1.1 + 0.2 * noise(x, y, 207));
+  const streak = noise(x, 0, 203) > 0.8 ? (y / 64) * noise(x, y >> 3, 204) : 0;
+  return mix(c, GRIME, streak * 0.6 + 0.3 * (y / 64) * (y / 64));
+}
+
+function makeLabTiles() {
+  return makeTexture(TILE_WHITE, labTileTexel);
+}
+
+// Is (x, y) on a biohazard symbol centred at (cx, cy)? Three round lobes,
+// each with a hole bitten out of its outer side, round a small clear hub,
+// and a ring through them. `s` scales it (1 = about 22 texels across).
+function onBiohazard(x, y, cx, cy, s) {
+  const px = (x + 0.5 - cx) / s, py = (y + 0.5 - cy) / s;
+  const r = Math.hypot(px, py);
+  if (r < 1.6) return false;                           // the hub's clear ring
+  if (r < 2.6) return true;                            // the hub
+  let onLobe = false;
+  for (let k = 0; k < 3; k++) {
+    const a = -Math.PI / 2 + k * 2 * Math.PI / 3;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    if (Math.hypot(px - ca * 7, py - sa * 7) < 2.9) return false; // the bite out of a lobe (it breaks the ring too)
+    if (Math.hypot(px - ca * 5.2, py - sa * 5.2) < 4.8) onLobe = true;
+  }
+  return onLobe || (r > 6.3 && r < 7.6);               // a lobe, or the ring through them
+}
+
+// Steel bench cabinets along the foot of a tiled wall, with a biohazard
+// placard above the worktop.
+function makeLabCabinet() {
+  const top = [150, 156, 160], door = [92, 100, 104];
+  return makeTexture(door, (x, y) => {
+    if (y < 33) {
+      if (x >= 22 && x < 42 && y >= 6 && y < 26) {     // the placard
+        if (x === 22 || x === 41 || y === 6 || y === 25) return [30, 34, 30];
+        if (onBiohazard(x, y, 32, 16, 0.85)) return [24, 30, 20];
+        return brighten(BIO_GREEN, 0.9 + 0.12 * noise(x, y, 208));
+      }
+      return labTileTexel(x, y);
+    }
+    if (y < 36) return brighten(top, y === 33 ? 1.3 : 0.95 - 0.1 * (y - 34)); // the worktop's steel lip
+    if (y === 36 || y >= 62) return [26, 28, 30];                              // shadow under the lip; kick plate
+    const dx = x % 21;                                                          // three cabinet doors
+    if (dx === 0) return [30, 32, 34];
+    if (dx === 1) return brighten(door, 1.25);
+    if (dx >= 15 && dx < 18 && y >= 42 && y < 50) return brighten(top, 1.2);    // handle
+    return mix(brighten(door, 0.9 + 0.1 * noise(x, y, 209)), GRIME, 0.25 * ((y - 36) / 26));
+  });
+}
+
+// The lab floor: big vinyl tiles, two to a cell each way, pale and grey in a
+// chequer, scuffed, with grime in the seams.
+function makeLabFloor() {
+  const pale = [168, 174, 164], grey = [120, 126, 120];
+  return makeTexture(pale, (x, y) => {
+    if (x % 32 === 0 || y % 32 === 0) return brighten(GROUT, 0.7);
+    const base = ((x >> 5) + (y >> 5)) % 2 === 0 ? pale : grey;
+    let f = 0.9 + 0.08 * noise(x, y, 210) + 0.04 * noise(x >> 2, y >> 2, 211);
+    if (noise(x >> 1, y >> 3, 212) < 0.04) f *= 0.8; // scuffs from trolley wheels
+    return mix(brighten(base, f), GRIME, noise(x >> 3, y >> 3, 213) < 0.1 ? 0.3 : 0);
+  });
+}
+
+// The lab ceiling: white panels on a T-bar grid, perforated, with a
+// fluorescent fitting behind a diffuser grid in the middle of every cell.
+// `tube` is its colour, or null when it's dead (as makeGirders).
+function makeLabCeiling(tube) {
+  const panel = [176, 180, 176], bar = [120, 124, 122];
+  return makeTexture(panel, (x, y) => {
+    if (x >= 12 && x < 52 && y >= 26 && y < 38) {
+      if (x === 12 || x === 51 || y === 26 || y === 37) return [70, 74, 76];   // the fitting's frame
+      if (!tube) return (x % 4 === 0 || y % 4 === 0) ? [58, 60, 62] : [96, 98, 100];
+      return glowing((x % 4 === 0 || y % 4 === 0) ? brighten(tube, 0.75) : tube); // lit through the diffuser grid
+    }
+    if (x % 32 < 2 || y % 32 < 2) return brighten(bar, x % 32 === 0 || y % 32 === 0 ? 0.7 : 1); // T-bars
+    if (x % 4 === 2 && y % 4 === 2) return brighten(panel, 0.6);                               // perforations
+    return mix(brighten(panel, 0.9 + 0.1 * noise(x, y, 214)), GRIME, noise(x >> 4, y >> 4, 215) < 0.2 ? 0.25 : 0);
+  });
+}
+
+// THE BREEDING CHAMBER (core.js, levels whose objective is 'chamber'): a
+// steel bulkhead with a round viewport, packed behind it with something that
+// grew: a red membrane threaded with veins, studded with glowing green eggs
+// that pulse. Growth has crept out over the steel round the viewport.
+// `damage` 0-2 cracks the glass and lets ooze run down; `pulse` 0-3 is how
+// bright the eggs are this moment; `dead` is the burnt-out wreck.
+const CHAMBER_EGGS = [[24, 22, 5], [38, 19, 6], [30, 34, 7], [43, 33, 5], [19, 36, 4.5], [34, 46, 4], [47, 23, 3.5], [22, 47, 3.5]];
+const MEMBRANE = [110, 34, 50];
+const EGG_GLOW = [150, 255, 90];
+
+function makeChamber(damage, pulse, dead) {
+  const cx = 32, cy = 30, port = 24;
+  return makeTexture(MEMBRANE, (x, y) => {
+    const r = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+    const a = Math.atan2(y + 0.5 - cy, x + 0.5 - cx);
+    if (r < port) {
+      // Cracks in the glass, from the centre outwards: more with damage.
+      for (let k = 0; k < damage * 3; k++) {
+        const spoke = k * 2.4 + 0.6 * noise(k, 0, 220);
+        const off = Math.abs(Math.atan2(Math.sin(a - spoke), Math.cos(a - spoke))) * r;
+        if (off < 0.6 && r > 3 && r < port * (0.5 + 0.5 * noise(k, 1, 220))) return [210, 240, 200];
+      }
+      for (const [ex, ey, er] of CHAMBER_EGGS) {
+        const d = Math.hypot(x + 0.5 - ex, y + 0.5 - ey) / er;
+        if (d >= 1) continue;
+        if (dead) return d < 0.7 ? [16, 14, 10] : [60, 44, 30];                  // burst and charred
+        if (d < 0.65) return glowing(brighten(EGG_GLOW, 0.4 + 0.15 * pulse + 0.35 * (1 - d))); // the yolk shining through
+        return brighten([60, 130, 40], 1.1 - 0.4 * d);                          // the shell
+      }
+      // The membrane, with veins: thin dark ridges where a wavy pattern crosses zero.
+      const vein = Math.abs(Math.sin(x * 0.45 + 3 * Math.sin(y * 0.21)) + Math.sin(y * 0.38 + 2 * Math.sin(x * 0.17)));
+      if (dead) return brighten([50, 30, 26], 0.4 + 0.4 * noise(x, y, 221));
+      if (vein < 0.12) return [60, 10, 24];
+      return brighten(MEMBRANE, 0.75 + 0.35 * noise(x >> 1, y >> 1, 222) + 0.08 * pulse);
+    }
+    if (r < port + 3) return dead ? [30, 30, 32] : brighten(STEEL, r < port + 1 ? 0.5 : 1.25); // the viewport's rim
+    // Ooze running down out of the cracks, once it's damaged.
+    if (!dead && damage > 0 && y > cy && noise(x, 0, 223) < 0.12 * damage && y < cy + port + 10 * noise(x, 1, 223) + 4) {
+      return brighten(BIO_GREEN, 0.6 + 0.3 * noise(x, y, 224));
+    }
+    // Growth creeping out over the steel round the rim.
+    if (r < port + 3 + 7 * noise(Math.floor((a + Math.PI) * 6), 0, 225)) {
+      return dead ? [24, 20, 18] : brighten(MEMBRANE, 0.6 + 0.2 * noise(x, y, 226));
+    }
+    if (x < 2 || y < 2 || x >= 62 || y >= 62) return brighten(DARK_STEEL, 0.8);   // frame
+    const plate = brighten(STEEL, 0.75 + 0.12 * noise(x, y, 227));
+    return dead ? mix(plate, [10, 8, 8], 0.6) : plate;
+  });
+}
+
 // THE PLAYER'S GUN ----------------------------------------------------------------
 // A chunky pulse gun seen from behind, with three coils round the barrel.
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
@@ -1131,6 +1287,9 @@ const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true)
 // CORE_TEXTURES[damage][pulse], and the wreck.
 const CORE_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeCore(damage, pulse, false)));
 const CORE_DEAD_TEXTURE = makeCore(2, 0, true);
+// The lab's breeding chamber, the same way: CHAMBER_TEXTURES[damage][pulse], and the wreck.
+const CHAMBER_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeChamber(damage, pulse, false)));
+const CHAMBER_DEAD_TEXTURE = makeChamber(2, 0, true);
 const LIFT_TEXTURES = { locked: makeLift(false), open: makeLift(true) };
 // The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
 // GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
@@ -1156,10 +1315,12 @@ const FIREBALL_FRAMES = [0, 1, 2, 3, 4].map(makeFireball);
 const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
 
-const FLOOR_TEXTURE = makeDiamondPlate();
-const CEILING_TEXTURE = makeGirders([255, 214, 150]);
-const CEILING_DARK_TEXTURE = makeGirders(null);
-const CEILING_ALARM_TEXTURE = makeGirders([255, 40, 30]);
+// The floor and ceiling come with the level's theme (map.js).
+const LAB_THEME = THEME === 'lab';
+const FLOOR_TEXTURE = LAB_THEME ? makeLabFloor() : makeDiamondPlate();
+const CEILING_TEXTURE = LAB_THEME ? makeLabCeiling([215, 245, 255]) : makeGirders([255, 214, 150]); // the lab's fluorescents run cold
+const CEILING_DARK_TEXTURE = LAB_THEME ? makeLabCeiling(null) : makeGirders(null);
+const CEILING_ALARM_TEXTURE = LAB_THEME ? makeLabCeiling([255, 40, 30]) : makeGirders([255, 40, 30]);
 
 // ANIMATED WALLS. The computer bank exists as several frames; wallTexture
 // picks one from animTime, which the main loop advances every frame. The
@@ -1182,6 +1343,8 @@ const TEXTURES = {
   [CORE_CELL]: CORE_TEXTURES[0][0], // core.js shows its damage, pulse, or wreck
   [LIFT_CELL]: LIFT_TEXTURES.locked, // core.js shows locked or open
   [DOOR_CELL]: makeBlastDoor(null),
+  [LAB_TILE_CELL]: makeLabTiles(),
+  [LAB_CABINET_CELL]: makeLabCabinet(),
 };
 
 function wallTexture(cell) {

@@ -72,6 +72,36 @@ function makeOil(v) {
   });
 }
 
+// THE LAB'S SPILLS: a pool of green slime, something that leaked out of a
+// tank. Glossy, so like water it mirrors the room (reflections.js), with a
+// paler crust round its edge where it's drying.
+function makeSlime(v) {
+  const shape = (x, y) => blobT(x, y, 31 + v * 3, 32, 18 + v * 3, v * 2.3 + 0.7);
+  const water = new Uint8Array(TEX_SIZE * TEX_SIZE);
+  for (let y = 0; y < TEX_SIZE; y++) for (let x = 0; x < TEX_SIZE; x++) water[y * TEX_SIZE + x] = shape(x, y) < 0.85 ? 1 : 0;
+  const tex = makeTexture([60, 120, 40], (x, y) => {
+    const t = shape(x, y);
+    if (t < 0.85) {
+      if (noise(x, y, 84 + v) < 0.03) return seeThrough([200, 255, 160], 230); // a bubble catching the light
+      return seeThrough(brighten([50, 110, 30], 0.85 + 0.3 * noise(x >> 2, y >> 2, 86)), 215);
+    }
+    if (t < 1) return seeThrough([150, 170, 90], 200);                  // the drying crust
+    if (t < 1.2) return seeThrough([40, 60, 20], 80 * (1.2 - t) / 0.2); // a stain soaked into the floor round it
+    return null;
+  });
+  tex.water = water;
+  return tex;
+}
+
+// A biohazard symbol stencilled on a wall (onBiohazard, textures.js).
+function makeBiohazardSign() {
+  const paint = [120, 210, 60];
+  return makeTexture(paint, (x, y) => {
+    if (noise(x >> 1, y >> 1, 96) < 0.08) return null;
+    return onBiohazard(x, y, 32, 32, 2.2) ? seeThrough(brighten(paint, 0.85 + 0.25 * noise(x >> 2, y >> 2, 97)), 210) : null;
+  });
+}
+
 // Old blast scorch on the floor or ceiling: black in the middle, fading out
 // through brown, with soot thrown outwards in streaks.
 function makeScorch(v) {
@@ -244,6 +274,7 @@ function makeInsignia() {
 const STENCIL_WHITE = [205, 200, 185];
 const STENCIL_YELLOW = [215, 175, 40];
 const STENCIL_RED = [190, 50, 35];
+const STENCIL_GREEN = [90, 170, 50];
 
 // Every kind of decal: its variant pictures, and which surfaces it may go on.
 // Hand-placed decals in a level file name one of these as `type`.
@@ -273,6 +304,12 @@ const DECAL_TYPES = {
   battleComp: { surfaces: ['wall'], text: true, frames: [makeStencil([['BATTLE', 2, 20], ['COMPUTER', 2, 34]], STENCIL_WHITE)] },
   toHangar:   { surfaces: ['wall'], text: true, frames: [makeStencil([['TO', 2, 20], ['HANGAR', 2, 34]], STENCIL_YELLOW)] },
   rearm:      { surfaces: ['wall'], text: true, frames: [makeStencil([['REARM', 2, 20], ['REPAIR', 2, 34]], STENCIL_WHITE)] },
+  // The lab's.
+  slime:      { surfaces: ['floor'],            frames: [0, 1, 2].map(makeSlime) },
+  biohazard:  { surfaces: ['wall'], text: true, frames: [makeBiohazardSign()] },
+  genetics:   { surfaces: ['wall'], text: true, frames: [makeStencil([['GENETICS', 2, 20], ['LAB 2', 2, 34]], STENCIL_GREEN)] },
+  specimens:  { surfaces: ['wall'], text: true, frames: [makeStencil([['SPECIMEN', 2, 20], ['HALL', 2, 34]], STENCIL_GREEN)] },
+  keepOut:    { surfaces: ['wall'], text: true, frames: [makeStencil([['DANGER', 2, 20], ['KEEP OUT', 2, 34]], STENCIL_RED)] },
 };
 
 // WHERE THEY ARE -------------------------------------------------------------
@@ -290,9 +327,10 @@ for (const face in wallDecals) wallDecals[face] = new Array(DECAL_W * MAP.length
 // Which way each face looks, as a step to the cell it faces.
 const FACE_STEPS = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
 
-// Plain walls carry decals; computer banks, terminals, doors and panels don't.
+// Plain walls carry decals; computer banks, terminals, doors, panels and
+// the lab's cabinets (they have their own placard) don't.
 function takesWallDecals(cell) {
-  return cell === 1 || cell === 2 || cell === 4;
+  return cell === 1 || cell === 2 || cell === 4 || cell === LAB_TILE_CELL;
 }
 
 // Put decal `type` on a surface. `pick` (0..1) chooses the variant, and the
@@ -319,6 +357,8 @@ function scatterDecals() {
   const isFloor = (x, y) => MAP[y]?.[x] === 0;
   const nearDrum = (x, y) => props.some((p) => p.type === 'drum' && Math.hypot(p.x - (x + 0.5), p.y - (y + 0.5)) < 1.6);
   const hasCeilingLight = (x, y) => CEILING_LIGHTS.some((c) => c.x === x && c.y === y);
+  // What gets spilt on the floor: oil in the industrial sector, slime in the lab.
+  const spill = THEME === 'lab' ? 'slime' : 'oil';
 
   MAP.forEach((row, y) => row.forEach((cell, x) => {
     if (cell === 0) {
@@ -332,11 +372,11 @@ function scatterDecals() {
         placeDecal('floor', x, y, null, 'scorch', noise(x, y, 104));
         if (noise(x, y, 105) < 0.4) placeDecal('ceiling', x, y, null, 'scorch', noise(x, y, 106));
       } else if (nextToPipes && noise(x, y, 107) < 0.25) {
-        placeDecal('floor', x, y, null, 'oil', noise(x, y, 108)); // pipes leak
+        placeDecal('floor', x, y, null, spill, noise(x, y, 108)); // pipes leak
       } else if (noise(x, y, 109) < 0.03) {
         placeDecal('floor', x, y, null, 'drain', 0);
       } else if (noise(x, y, 110) < 0.04) {
-        placeDecal('floor', x, y, null, 'oil', noise(x, y, 111));
+        placeDecal('floor', x, y, null, spill, noise(x, y, 111));
       }
       return;
     }
@@ -349,6 +389,7 @@ function scatterDecals() {
       else if (cell === 4 && r < 0.3) placeDecal('wall', x, y, face, 'rust', noise(x, y, 114));
       else if (cell === 1 && r < 0.1) placeDecal('wall', x, y, face, 'rust', noise(x, y, 115));
       else if (cell === 1 && r < 0.17) placeDecal('wall', x, y, face, 'damp', noise(x, y, 116));
+      else if (cell === LAB_TILE_CELL && r < 0.12) placeDecal('wall', x, y, face, 'damp', noise(x, y, 118));
     }
   }));
 }

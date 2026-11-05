@@ -16,13 +16,17 @@
 const LIGHT_RES = 4;                  // samples per cell, in each direction
 const LIGHT_W = MAP[0].length * LIGHT_RES;
 const LIGHT_H = MAP.length * LIGHT_RES;
-const AMBIENT = [0.3, 0.3, 0.34];     // light everywhere, even far from any lamp: dim, a little cool
+// Light everywhere, even far from any lamp: dim, a little cool. The lab's is
+// colder still, with a sickly green cast.
+const AMBIENT = THEME === 'lab' ? [0.26, 0.31, 0.29] : [0.3, 0.3, 0.34];
 const FULL_LIGHT = [1, 1, 1];
 
 // Light colours are multipliers: [1, 1, 1] shows a texture as drawn, more
 // than 1 brightens it, and each channel can differ to tint it.
 const LAMP_LIGHT = { colour: [1.4, 0.85, 0.35], radius: 4.5 };    // caged sodium lamps
-const CEILING_LIGHT = { colour: [0.9, 0.95, 1.05], radius: 3.5 }; // strip lights: cool white
+const CEILING_LIGHT = THEME === 'lab'
+  ? { colour: [0.85, 1.05, 1.15], radius: 3.8 }  // the lab's fluorescent panels: cold blue-white
+  : { colour: [0.9, 0.95, 1.05], radius: 3.5 };  // strip lights: cool white
 const SCREEN_LIGHT = { colour: [0.15, 0.5, 0.25], radius: 2.5 };  // computer banks: a green spill
 const PLAYER_FLASH_RADIUS = 5;                                    // your gun (its colour: GUN_FLASH_LIGHT, weapons.js)
 const ROBOT_FLASH = { colour: [1.4, 1.0, 0.5], radius: 4.5 };     // a walker's chin gun

@@ -198,8 +198,13 @@ modified creatures — built on the same systems:
 - **Objective:** the same arc — destroy the specimen reactor (or burn the
   breeding chamber), and the lab comes loose as you run for the lift.
 
-The lab file currently uses the industrial pieces as placeholders (robots,
-steel walls), with empty specimen tanks.
+Built so far: the lab's **look** (`theme: 'lab'`: tiled walls `t`, bench
+cabinets `b`, vinyl floor, fluorescent ceiling panels, a colder green-tinged
+ambient, slime spills that reflect like puddles, biohazard and warning
+stencils) and its **objective**, the breeding chamber (`objective:
+'chamber'`: the K cells become a viewport packed with pulsing green eggs; it
+works exactly like the core underneath). The enemies are still industrial
+robots, the tanks are empty, and the vents are still steam.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of
@@ -210,9 +215,9 @@ strategic target as well as the goal: it's the only thing that stops the
 turrets and tripwires, so hitting it early makes the rest safer, but it
 sets the whole facility on you.
 
-Levels are stored as data and the game moves from one to the next. Still to
-build: a per-level **theme** (texture set, palette, ambience, enemy roster),
-which the lab needs.
+Levels are stored as data and the game moves from one to the next. A level picks its
+**theme** (floor, ceiling, lighting; map.js) and its **objective** (core or
+chamber). Still to build: a per-level enemy roster and ambience (sound).
 
 ---
 

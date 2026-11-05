@@ -1,5 +1,10 @@
 // THE OBJECTIVE: destroy the security core, then reach the exit lift.
 //
+// In the lab the objective is the BREEDING CHAMBER instead (a level's
+// objective: 'chamber', map.js). It looks, lights and reads differently
+// (OBJECTIVE_LOOKS below), but it's the same thing underneath: K cells
+// that take CORE_HEALTH hits, and everything below works the same.
+//
 // The CORE is a stretch of wall ('K' cells in a level's rows; several cells are one
 // core) running the facility's security network. Every turret is wired to
 // it: terminals can blind a zone's cameras, but only the core going down
@@ -14,7 +19,22 @@
 
 const CORE_HEALTH = 18;
 const LIFT_RANGE = 1.0;          // cells from the lift's face: walk up to it
-const CORE_LIGHT = { colour: [1.2, 0.15, 0.1], radius: 3 };
+
+// What each kind of objective looks like and what the HUD calls it.
+//   textures   [damage][pulse] live frames, and the wreck
+//   light      the colour its heart throws into the room
+//   goal       shown as the level starts; done, when it goes; liftHint, at a locked lift
+const OBJECTIVE_LOOKS = {
+  core: {
+    textures: CORE_TEXTURES, dead: CORE_DEAD_TEXTURE, light: { colour: [1.2, 0.15, 0.1], radius: 3 },
+    goal: 'DESTROY THE SECURITY CORE', done: 'CORE DESTROYED  GET TO THE LIFT', liftHint: 'LIFT LOCKED  DESTROY THE CORE',
+  },
+  chamber: {
+    textures: CHAMBER_TEXTURES, dead: CHAMBER_DEAD_TEXTURE, light: { colour: [0.25, 0.7, 0.15], radius: 3 },
+    goal: 'BURN THE BREEDING CHAMBER', done: 'CHAMBER BURNT  GET TO THE LIFT', liftHint: 'LIFT LOCKED  BURN THE CHAMBER',
+  },
+};
+const OBJECTIVE_LOOK = OBJECTIVE_LOOKS[OBJECTIVE];
 
 // The core's state:
 //   health   hits left
@@ -33,10 +53,10 @@ MAP.forEach((row, y) => row.forEach((cell, x) => {
   const entry = { x, y, front: { x: x + 0.5 + dx * 0.55, y: y + 0.5 + dy * 0.55 } };
   (cell === CORE_CELL ? core.cells : liftCells).push(entry);
 }));
-if (core.cells.length === 0) throw new Error('The level has no security core (K cells in its rows).');
+if (core.cells.length === 0) throw new Error(`The level has no ${OBJECTIVE} (K cells in its rows).`);
 if (liftCells.length === 0) throw new Error('The level has no exit lift (L cells in its rows).');
 
-showSecurityMessage('DESTROY THE SECURITY CORE'); // the objective, as the level starts
+showSecurityMessage(OBJECTIVE_LOOK.goal); // the objective, as the level starts
 
 // How damaged the core looks: 0 healthy, 1 hurt, 2 critical.
 function coreDamage() {
@@ -47,10 +67,10 @@ function coreDamage() {
 // The texture for a core cell this frame. The heart pulses (four brightness
 // frames, there and back), faster the more damaged it is.
 function coreTexture() {
-  if (core.state === 'destroyed') return CORE_DEAD_TEXTURE;
+  if (core.state === 'destroyed') return OBJECTIVE_LOOK.dead;
   const rate = [2, 4, 8][coreDamage()];
   const step = Math.floor(animTime * rate * 6) % 6;            // 0 1 2 3 2 1, round and round
-  return CORE_TEXTURES[coreDamage()][[0, 1, 2, 3, 2, 1][step]];
+  return OBJECTIVE_LOOK.textures[coreDamage()][[0, 1, 2, 3, 2, 1][step]];
 }
 
 function liftTexture() {
@@ -86,7 +106,7 @@ function destroyCore() {
     raiseAlarm(z.id);
     alarms[z.id] = Infinity;
   }
-  showSecurityMessage('CORE DESTROYED  GET TO THE LIFT');
+  showSecurityMessage(OBJECTIVE_LOOK.done);
 }
 
 // The lift's hint while you stand at it with the core still running.
@@ -100,9 +120,10 @@ function updateCore() {
   else liftHint = true;
 }
 
-// The core's heart throws a pulsing red light into the room (lighting.js).
+// The core's heart (or the chamber's eggs) throws a pulsing light into the room (lighting.js).
 function addCoreLights(grid) {
   if (core.state !== 'online') return;
   const level = 0.6 + 0.4 * Math.sin(animTime * [2, 4, 8][coreDamage()] * Math.PI);
-  for (const c of core.cells) addLight(grid, c.front.x, c.front.y, CORE_LIGHT.colour, CORE_LIGHT.radius, level);
+  const { colour, radius } = OBJECTIVE_LOOK.light;
+  for (const c of core.cells) addLight(grid, c.front.x, c.front.y, colour, radius, level);
 }

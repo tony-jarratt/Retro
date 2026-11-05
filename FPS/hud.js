@@ -265,13 +265,13 @@ function drawHud(pixels) {
   drawKeys(pixels);
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);
   if (game.state === 'playing') {
-    if (liftHint) drawTextCentred(pixels, 'LIFT LOCKED  DESTROY THE CORE', 40, HUD_WARN, 1); // core.js
+    if (liftHint) drawTextCentred(pixels, OBJECTIVE_LOOK.liftHint, 40, HUD_WARN, 1); // core.js
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
     if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
     if (securityMessageTime > 0) {
-      const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === 'DESTROY THE SECURITY CORE';
+      const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === OBJECTIVE_LOOK.goal;
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);
     }
     // While any alarm is going, a red ALARM blinks at the top of the screen.

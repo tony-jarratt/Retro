@@ -54,3 +54,16 @@ const HIVES          = CURRENT_LEVEL.hives         || [];
 const DECALS         = CURRENT_LEVEL.decals        || [];
 const PLAYER_START   = CURRENT_LEVEL.playerStart;
 if (!PLAYER_START) throw new Error(`Level "${CURRENT_LEVEL.id}" has no playerStart.`);
+
+// THE LOOK: which set of floor, ceiling and lighting the level uses
+// (textures.js, lighting.js, decals.js). Wall looks are picked per cell in
+// the rows themselves, so a level can mix them.
+const THEMES = ['industrial', 'lab'];
+const THEME = CURRENT_LEVEL.theme || 'industrial';
+if (!THEMES.includes(THEME)) throw new Error(`Level "${CURRENT_LEVEL.id}" has theme "${THEME}". Themes: ${THEMES.join(', ')}.`);
+
+// THE OBJECTIVE: what the level's K cells are, and so what you're told to
+// destroy (core.js). The mechanics are the same either way.
+const OBJECTIVE_KINDS = ['core', 'chamber'];
+const OBJECTIVE = CURRENT_LEVEL.objective || 'core';
+if (!OBJECTIVE_KINDS.includes(OBJECTIVE)) throw new Error(`Level "${CURRENT_LEVEL.id}" has objective "${OBJECTIVE}". Objectives: ${OBJECTIVE_KINDS.join(', ')}.`);
