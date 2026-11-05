@@ -16,6 +16,8 @@
 
 const DOOR_CELL = 9;
 const TERMINAL_CELL = 5;
+const GLASS_CELL = 6;
+const GRATE_CELL = 7;
 
 const LEGEND = {
   '.': 0,         // floor
@@ -25,6 +27,8 @@ const LEGEND = {
   'P': 4,         // pipes
   'T': TERMINAL_CELL, // security terminal set into the wall (see TERMINALS below)
   'D': DOOR_CELL, // sliding blast door: must sit in a gap in a straight wall
+  'W': GLASS_CELL, // window of wired glass: see through, stops bullets, shatters (panels.js)
+  '=': GRATE_CELL, // steel bar grille: see and shoot through, can't walk through
 };
 
 const LEVEL = [
@@ -40,13 +44,13 @@ const LEVEL = [
   '#.......#..........#.......P...#', //  7
   '####D##########D#########D######', //  8  red door (x4), to corridor (x15), to workshop (x25)
   '#............P...P.............#', //  9  server room | corridor | workshop
-  '#............P...P.............#', // 10
-  '#..C..C..C...P...P.......PP....#', // 11
+  '#............W...P.............#', // 10  window: corridor looks into the server room
+  '#..C..C..C...W...P.......PP....#', // 11
   '#............P...D.......PP....#', // 12
   '#..C..C..C...P...P.......PP....#', // 13
   '#............T...P.............#', // 14  terminal: server room (x13), reached from the corridor
   '#............P...P.............#', // 15
-  '#HHHHHDHHHHHHHHDHHHHHHHHHHHHHHH#', // 16  blue doors (x6, x15) into the hangar
+  '#HHHHHDHHHHHHHHDHHHHHH===HHHHHH#', // 16  blue doors (x6, x15) into the hangar; grille (x22-24) from the workshop
   '#..............................#', // 17  hangar hall
   '#..............................#', // 18
   '#.........H.........H..........#', // 19

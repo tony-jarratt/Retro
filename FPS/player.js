@@ -61,7 +61,7 @@ function isWall(x, y) {
   // A door cell blocks until its door is fully open. (Simpler than colliding
   // with the moving slab itself, and it means you can't get clipped by it.)
   if (cell === DOOR_CELL) return doorAt(Math.floor(x), Math.floor(y)).open < 1;
-  return cell !== 0;
+  return cell !== 0; // walls, and panels: you can't climb through even a broken window
 }
 
 // Does a square of half-width r centred on (x, y) overlap a wall (or a door

@@ -27,7 +27,11 @@ function fogAmount(dist) {
 const PROJ_DIST = (SCREEN_W / 2) / Math.tan(FOV / 2);
 
 // Cast one ray from (px, py) in direction (rayX, rayY), which must be unit
-// length. Returns where it hit and how far along the ray that was.
+// length. Returns where it hit the first SOLID thing (a wall or a closed
+// door) and how far along the ray that was. Glass and grates don't stop it:
+// each one it passes is noted in hit.panes, nearest first, and it carries on.
+// So one cast answers both "what's the wall behind?" (sight, light, blasts)
+// and "what's in front of it?" (drawing, and bullets, which glass stops).
 //
 // DDA ("digital differential analyser"): instead of creeping along the ray in
 // small steps (slow, and can skip corners), jump straight from one grid line
@@ -55,6 +59,8 @@ function castRay(px, py, rayX, rayY) {
   if (rayY < 0) { stepY = -1; sideY = (py - mapY) * deltaY; }
   else          { stepY = 1;  sideY = (mapY + 1 - py) * deltaY; }
 
+  const panes = []; // see-through panels passed on the way, nearest first
+
   // The DDA walk. Each pass crosses exactly one grid line: the nearer one.
   // side records which kind we crossed last: 0 = a vertical line (so we hit
   // an east/west-facing wall face), 1 = a horizontal line (north/south face).
@@ -79,8 +85,13 @@ function castRay(px, py, rayX, rayY) {
     }
     if (cell === DOOR_CELL) {
       const doorHit = hitDoor(doorAt(mapX, mapY), px, py, rayX, rayY);
-      if (doorHit) return doorHit;
+      if (doorHit) return { ...doorHit, panes };
       continue; // passed through the open part: carry on walking the grid
+    }
+    if (isPanelCell(cell)) {
+      const paneHit = hitPanel(panelAt(mapX, mapY), px, py, rayX, rayY);
+      if (paneHit) panes.push(paneHit);
+      continue; // note it, and look on through it
     }
     if (cell !== 0) {
       const hitX = px + rayX * dist;
@@ -97,7 +108,7 @@ function castRay(px, py, rayX, rayY) {
       // Facing west, your right is -y, so wallX shrinks left to right; flip it.
       if ((side === 0 && rayX < 0) || (side === 1 && rayY > 0)) wallX = 1 - wallX;
 
-      return { dist, side, cell, hitX, hitY, wallX, cellX: mapX, cellY: mapY };
+      return { dist, side, cell, hitX, hitY, wallX, cellX: mapX, cellY: mapY, panes };
     }
   }
 }
@@ -111,27 +122,44 @@ function castRay(px, py, rayX, rayY) {
 // The door slides towards +x (or +y) into the wall beside it, so the solid
 // part covers `along` from door.open to 1, and the gap is 0 to door.open.
 function hitDoor(door, px, py, rayX, rayY) {
-  // A horizontal door lies along y = door.y + 0.5; a vertical one along
-  // x = door.x + 0.5. Distance along the (unit) ray to reach that line:
-  const dist = door.horizontal ? (door.y + 0.5 - py) / rayY : (door.x + 0.5 - px) / rayX;
-  const hitX = px + rayX * dist;
-  const hitY = py + rayY * dist;
-
-  // How far across the cell the crossing is, 0 to 1. Outside that range the
-  // ray reaches the centre line only after leaving the cell (it clips the
-  // corner of the doorway and goes on to hit the wall beside it). If the ray
-  // runs parallel to the door, dist is Infinity and `along` is NaN; the
-  // comparison is false for NaN too, so that also counts as a miss.
-  const along = door.horizontal ? hitX - door.x : hitY - door.y;
-  if (!(along >= 0 && along < 1)) return null;
-  if (along < door.open) return null; // went through the gap
+  const cross = crossCentreLine(door, px, py, rayX, rayY);
+  if (!cross) return null;
+  if (cross.along < door.open) return null; // went through the gap
 
   // Texture column: measured from the door's leading edge, so the picture
   // slides along with the door instead of the door sliding over the picture.
   // No mirror flip here (unlike walls): seen from either side, the handle
   // drawn at the leading edge stays at the edge that moves, as a real one would.
-  const wallX = along - door.open;
-  return { dist, side: door.horizontal ? 1 : 0, cell: DOOR_CELL, hitX, hitY, wallX, door };
+  const wallX = cross.along - door.open;
+  return { dist: cross.dist, side: door.horizontal ? 1 : 0, cell: DOOR_CELL, hitX: cross.hitX, hitY: cross.hitY, wallX, door };
+}
+
+// Where does the ray cross the centre line of a door's or panel's cell?
+// `slab` has x, y (its cell) and horizontal. Returns null if it doesn't
+// cross inside this cell, else the distance, the point, and `along`: how far
+// across the cell the crossing is, 0 to 1.
+function crossCentreLine(slab, px, py, rayX, rayY) {
+  // A horizontal slab lies along y = slab.y + 0.5; a vertical one along
+  // x = slab.x + 0.5. Distance along the (unit) ray to reach that line:
+  const dist = slab.horizontal ? (slab.y + 0.5 - py) / rayY : (slab.x + 0.5 - px) / rayX;
+  const hitX = px + rayX * dist;
+  const hitY = py + rayY * dist;
+
+  // Outside 0..1 the ray reaches the centre line only after leaving the cell
+  // (it clips the corner and goes on to hit whatever is beside it). If the
+  // ray runs parallel to the slab, dist is Infinity and `along` is NaN; the
+  // comparison is false for NaN too, so that also counts as a miss.
+  const along = slab.horizontal ? hitX - slab.x : hitY - slab.y;
+  if (!(along >= 0 && along < 1)) return null;
+  return { dist, hitX, hitY, along };
+}
+
+// PANELS (panels.js): the same thin slab as a door, but it never slides, and
+// a hit on one doesn't end the ray (see castRay).
+function hitPanel(panel, px, py, rayX, rayY) {
+  const cross = crossCentreLine(panel, px, py, rayX, rayY);
+  if (!cross) return null;
+  return { dist: cross.dist, side: panel.horizontal ? 1 : 0, hitX: cross.hitX, hitY: cross.hitY, wallX: cross.along, panel };
 }
 
 // Cast one ray per screen column and return the hits (also used by the
@@ -159,6 +187,7 @@ function castRays(player) {
     // perpendicular to the screen. That is the ray's length projected onto the
     // view direction: dist * cos(angle between ray and view direction).
     hit.perpDist = hit.dist * Math.cos(relAngle);
+    for (const pane of hit.panes) pane.perpDist = pane.dist * Math.cos(relAngle); // same fix for each panel
 
     hits[col] = hit;
   }
@@ -174,56 +203,83 @@ function textureForHit(hit) {
   return wallTexture(hit.cell);
 }
 
+// THE PIXEL DEPTH BUFFER. How far away the sprite drawn at each screen pixel
+// is, or Infinity where there's no sprite. Walls only ever needed one depth per
+// column (a wall strip fills its column top to bottom), but a sprite covers
+// only some of a column's rows, so to draw a window in front of some sprites
+// and behind others we need to know, pixel by pixel, what's already there.
+const pixelDepth = new Float32Array(SCREEN_W * SCREEN_H);
+
 // Draw the whole 3D view into the ImageData: floor and ceiling first, then
-// a textured wall strip for every column on top of them, then sprites.
+// a textured wall strip for every column on top of them, then sprites, and
+// last the glass and grates, see-through, over whatever is behind them.
 function renderView(image, hits, player) {
   const pixels = image.data; // flat RGBA bytes: 4 per pixel, row after row
 
   renderFloorCeiling(pixels, player);
 
-  for (let col = 0; col < SCREEN_W; col++) {
-    const hit = hits[col];
-    const wallHeight = PROJ_DIST / hit.perpDist;
-
-    // The wall's true top edge on screen. When you stand close it is taller
-    // than the screen and wallTop goes negative; the texture maths below
-    // still uses the true edge, so the visible slice comes from the middle.
-    const wallTop = (SCREEN_H - wallHeight) / 2;
-
-    // Draw the rows whose pixel centre (row + 0.5) lies on the wall.
-    const top = Math.max(0, Math.ceil(wallTop - 0.5));
-    const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
-
-    const tex = textureForHit(hit);
-    // The Math.min guards against wallX rounding to exactly 1.0, which would
-    // index one column past the edge of the texture.
-    const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
-    const shade = hit.side === 1 ? SIDE_SHADE : 1;
-    const fog = fogAmount(hit.perpDist); // the whole strip is at one distance
-
-    // The light on this strip of wall. The light map lives in the open space
-    // in front of walls, so look it up a little way out from the face, on the
-    // viewer's side. (The light map is flat, so one lookup does the whole strip.)
-    const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
-    const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
-    const light = lightAt(lx, ly).map((v) => v * shade);
-
-    for (let row = top; row < bottom; row++) {
-      // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
-      // scaled to a texture row. This one division stretches or squashes the
-      // 64-texel column to fit however tall the strip is on screen.
-      const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
-      if (glows(tex, texX, texY)) {
-        copyTexel(pixels, col, row, tex, texX, texY, FULL_LIGHT, 0); // a screen or lamp: unlit, no fog
-      } else {
-        copyTexel(pixels, col, row, tex, texX, texY, light, fog);
-      }
-    }
-  }
+  for (let col = 0; col < SCREEN_W; col++) drawWallStrip(pixels, col, hits[col], player);
 
   // Each column's wall distance is the depth buffer that lets walls hide sprites.
   const depth = hits.map((hit) => hit.perpDist);
+  pixelDepth.fill(Infinity);
   renderSprites(pixels, depth, player);
+  renderPanes(pixels, hits, player);
+}
+
+// One column's strip of wall, door or panel. For a panel (hit.panel set), each
+// texel is mixed with what's already on screen by its alpha (fully clear
+// texels change nothing), and only where no nearer sprite has been drawn.
+function drawWallStrip(pixels, col, hit, player) {
+  const wallHeight = PROJ_DIST / hit.perpDist;
+
+  // The wall's true top edge on screen. When you stand close it is taller
+  // than the screen and wallTop goes negative; the texture maths below
+  // still uses the true edge, so the visible slice comes from the middle.
+  const wallTop = (SCREEN_H - wallHeight) / 2;
+
+  // Draw the rows whose pixel centre (row + 0.5) lies on the wall.
+  const top = Math.max(0, Math.ceil(wallTop - 0.5));
+  const bottom = Math.min(SCREEN_H, Math.ceil(wallTop + wallHeight - 0.5));
+
+  const tex = hit.panel ? panelTexture(hit.panel) : textureForHit(hit);
+  // The Math.min guards against wallX rounding to exactly 1.0, which would
+  // index one column past the edge of the texture.
+  const texX = Math.min(TEX_SIZE - 1, Math.floor(hit.wallX * TEX_SIZE));
+  const shade = hit.side === 1 ? SIDE_SHADE : 1;
+  const fog = fogAmount(hit.perpDist); // the whole strip is at one distance
+
+  // The light on this strip of wall. The light map lives in the open space
+  // in front of walls, so look it up a little way out from the face, on the
+  // viewer's side. (The light map is flat, so one lookup does the whole strip.)
+  const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
+  const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
+  const light = lightAt(lx, ly).map((v) => v * shade);
+
+  for (let row = top; row < bottom; row++) {
+    // How far down the wall this pixel is (0 = top edge, 1 = bottom edge),
+    // scaled to a texture row. This one division stretches or squashes the
+    // 64-texel column to fit however tall the strip is on screen.
+    const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - wallTop) / wallHeight * TEX_SIZE));
+    if (hit.panel) {
+      if (pixelDepth[row * SCREEN_W + col] < hit.perpDist) continue; // a sprite in front of the panel here
+      blendTexel(pixels, col, row, tex, texX, texY, light, fog);
+    } else if (glows(tex, texX, texY)) {
+      copyTexel(pixels, col, row, tex, texX, texY, FULL_LIGHT, 0); // a screen or lamp: unlit, no fog
+    } else {
+      copyTexel(pixels, col, row, tex, texX, texY, light, fog);
+    }
+  }
+}
+
+// GLASS AND GRATES. Each column's panels are drawn FARTHEST FIRST (the
+// painter's algorithm again), each one over what's behind it: so through a
+// window you see a grate, and through the grate the wall.
+function renderPanes(pixels, hits, player) {
+  for (let col = 0; col < SCREEN_W; col++) {
+    const panes = hits[col].panes;
+    for (let i = panes.length - 1; i >= 0; i--) drawWallStrip(pixels, col, panes[i], player);
+  }
 }
 
 // FLOOR AND CEILING CASTING
@@ -291,6 +347,22 @@ function renderFloorCeiling(pixels, player) {
 // lights still show in the haze after everything around them has faded.
 function glows(tex, texX, texY) {
   return tex.glow[texY * TEX_SIZE + texX] === 1;
+}
+
+// Like copyTexel, but for see-through texels: the lit, fogged texel colour is
+// blended with what's already on screen, by the texel's alpha (0..255):
+//     screen = screen + (texel - screen) * alpha / 255
+// The same lerp as fog, just with alpha as the amount. Alpha 0 changes nothing.
+function blendTexel(pixels, x, y, tex, texX, texY, light, fog) {
+  const t = (texY * TEX_SIZE + texX) * 4;
+  const a = tex.pixels[t + 3] / 255;
+  if (a === 0) return;
+  const i = (y * SCREEN_W + x) * 4;
+  for (let c = 0; c < 3; c++) {
+    const lit = tex.pixels[t + c] * light[c];
+    const fogged = lit + (FOG_COLOUR[c] - lit) * fog;
+    pixels[i + c] += (fogged - pixels[i + c]) * a;
+  }
 }
 
 // Copy one texel of `tex` to screen pixel (x, y): multiplied by `light` (an

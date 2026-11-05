@@ -51,6 +51,7 @@ function spriteThings(viewer) {
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
     ...securityThings(thing), // cameras and tripwire beams (security.js)
     ...rockets.map((r) => thing(r.x, r.y, ROCKET_TEXTURE, { effect: true })),
+    ...glassBursts.map((g) => thing(g.x, g.y, glassBurstTexture(g), { effect: true })), // panels.js
     // Explosions come last: one drawn at the same spot as its drum's remains
     // ties on distance, and ties keep list order, so the fireball goes on top.
     ...explosions.map((b) => thing(b.x, b.y, explosionTexture(b), { effect: true })),
@@ -123,6 +124,9 @@ function drawSprite(pixels, depth, { thing, forward, size, left, top }) {
     for (let row = rowStart; row < rowEnd; row++) {
       const texY = Math.min(TEX_SIZE - 1, Math.floor((row + 0.5 - top) / size * TEX_SIZE));
       if (isTransparent(tex, texX, texY)) continue; // see-through: keep what's behind
+      // Note how far away this pixel's sprite is, so glass and grates drawn
+      // afterwards know whether they're in front of it (raycaster.js, renderPanes).
+      pixelDepth[row * SCREEN_W + col] = forward;
       // Glowing texels make their own light, so neither the light map nor the
       // fog dims them: a robot's visor shows in the dark before its body does.
       if (glows(tex, texX, texY)) {

@@ -19,7 +19,9 @@ const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0 };
 const gun = { cooldown: 0, flash: 0 };
 
 // What's under the crosshair, the exact centre of the screen? The shot is one
-// ray straight ahead. castRay gives the nearest wall along it; then each
+// ray straight ahead. castRay gives the nearest wall along it, and the panels
+// on the way: the first unbroken window is where the bullet stops instead.
+// (Grates and broken windows let it straight through.) Then each
 // sprite is placed on screen exactly as for drawing (placeOnScreen), and we
 // ask which texel of its current picture sits under the centre pixel. If that
 // texel is see-through the shot passes it by; otherwise it's a candidate, and
@@ -31,19 +33,22 @@ const gun = { cooldown: 0, flash: 0 };
 // height. The walker's hull is a long box, so it's a slightly wider target
 // side-on than face-on.
 function thingUnderCrosshair() {
-  const wall = castRay(player.x, player.y, Math.cos(player.angle), Math.sin(player.angle));
+  const ray = castRay(player.x, player.y, Math.cos(player.angle), Math.sin(player.angle));
+  const glass = firstBulletStop(ray.panes, ray.dist); // panels.js
+  const stopDist = glass ? glass.dist : ray.dist;
   let best = null;
   for (const thing of spriteThings(player)) {
     if (thing.effect) continue; // a fireball is just light and smoke: shots go straight through
     const spot = placeOnScreen(thing, player);
-    if (!spot || spot.forward > wall.dist) continue; // behind us, or behind the wall
+    if (!spot || spot.forward > stopDist) continue; // behind us, or behind the wall or window
     const texX = Math.floor((SCREEN_W / 2 - spot.left) / spot.size * TEX_SIZE);
     const texY = Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
     if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // crosshair is outside its square
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
     if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward };
   }
-  return best ? best.thing : null;
+  if (best) return best.thing;
+  return glass ? { panel: glass.panel } : null; // nothing nearer: the window takes it
 }
 
 function playerFire() {
@@ -54,6 +59,7 @@ function playerFire() {
   gun.flash = GUN_FLASH_TIME;
   const target = thingUnderCrosshair();
   if (!target) return;
+  if (target.panel) { hitGlass(target.panel); return; } // panels.js
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
     const hits = isFacingAway(target.enemy) ? ROBOT_TYPES[target.enemy.type].backHits : 1;
@@ -95,10 +101,14 @@ function robotHitChance(type, dist) {
 
 // Called by a robot when its charge completes (enemies.js). Guns are instant
 // with a chance to hit; the heavy's rocket is a real projectile you can dodge.
+// A robot can SEE you through a window (castRay looks through glass), so it
+// fires: the window takes every shot, hit or miss, until it gives way.
 function robotFires(enemy, dist) {
   const type = ROBOT_TYPES[enemy.type];
   enemy.firedTime = ROBOT_FIRE_FLASH;
-  if (type.weapon === 'rocket') launchRocket(enemy); // explosions.js
+  if (type.weapon === 'rocket') { launchRocket(enemy); return; } // explosions.js
+  const glass = glassInTheWay(enemy.x, enemy.y, player.x, player.y); // panels.js
+  if (glass) hitGlass(glass);
   else if (Math.random() < robotHitChance(type, dist)) damagePlayer(type.damage);
 }
 

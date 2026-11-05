@@ -32,10 +32,10 @@ function newLightGrid() {
   return new Float32Array(LIGHT_W * LIGHT_H * 3);
 }
 
-// Light passes through floor and door cells; wall cells block it.
+// Light passes through floor, door and panel (glass, grate) cells; wall cells block it.
 function isSolidCell(x, y) {
   const cell = MAP[Math.floor(y)][Math.floor(x)];
-  return cell !== 0 && cell !== DOOR_CELL;
+  return cell !== 0 && cell !== DOOR_CELL && !isPanelCell(cell);
 }
 
 // Add one light into a grid. Brightness falls off smoothly to nothing at the
@@ -223,6 +223,10 @@ function updateLighting() {
   }
   // Rockets light their way as they fly: you see one coming down a dark corridor.
   for (const r of rockets) addLight(lightGrid, r.x, r.y, ROCKET_LIGHT.colour, ROCKET_LIGHT.radius, 1);
+  // A window going: a brief cold glint off the falling glass.
+  for (const g of glassBursts) {
+    addLight(lightGrid, g.x, g.y, GLASS_BURST_LIGHT.colour, GLASS_BURST_LIGHT.radius, 1 - g.time / GLASS_BURST_TIME);
+  }
   addSecurityLights(lightGrid); // cameras' red spots (security.js)
 
   dilateIntoWalls(lightGrid);

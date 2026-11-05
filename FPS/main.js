@@ -109,6 +109,7 @@ function frame(now) {
     updateEnemies(dt);
   }
   updateCombat(dt);
+  updatePanels(dt); // falling glass
   updateExplosions(dt); // outside the "playing" check, so a fireball finishes even if it killed you
   updateLighting(); // after combat, so this frame's muzzle flashes light the scene
   const hits = castRays(player);

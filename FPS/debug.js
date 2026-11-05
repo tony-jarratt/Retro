@@ -15,7 +15,7 @@ function drawDebug(ctx, player, hits) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const cell = MAP[y][x];
-      const empty = cell === 0 || cell === DOOR_CELL;
+      const empty = cell === 0 || cell === DOOR_CELL || isPanelCell(cell);
       ctx.fillStyle = empty ? 'rgba(0, 0, 0, 0.85)' : `rgb(${TEXTURES[cell].colour.join(',')})`;
       ctx.fillRect(x * s, y * s, s, s);
     }
@@ -28,6 +28,15 @@ function drawDebug(ctx, player, hits) {
     ctx.strokeStyle = `rgb(${(door.lock ? KEY_COLOURS[door.lock] : TEXTURES[DOOR_CELL].colour).join(',')})`;
     if (door.horizontal) line(ctx, (door.x + door.open) * s, (door.y + 0.5) * s, (door.x + 1) * s, (door.y + 0.5) * s);
     else line(ctx, (door.x + 0.5) * s, (door.y + door.open) * s, (door.x + 0.5) * s, (door.y + 1) * s);
+  }
+  // Panels, as thinner lines: glass pale blue (dashed once it's shattered), grates grey.
+  ctx.lineWidth = 2;
+  for (const p of PANELS) {
+    ctx.strokeStyle = p.kind === 'grate' ? '#999' : p.state === 'cracked' ? '#cef' : '#7bd';
+    if (p.state === 'shattered') ctx.setLineDash([2, 2]);
+    if (p.horizontal) line(ctx, p.x * s, (p.y + 0.5) * s, (p.x + 1) * s, (p.y + 0.5) * s);
+    else line(ctx, (p.x + 0.5) * s, p.y * s, (p.x + 0.5) * s, (p.y + 1) * s);
+    ctx.setLineDash([]);
   }
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';

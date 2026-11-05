@@ -6,7 +6,8 @@
 // A texture is a TEX_SIZE x TEX_SIZE grid of colours stored exactly like the
 // screen buffer: one flat array, row after row, 4 bytes per texel (R, G, B, A).
 // A "texel" is just a pixel of a texture. Walls are fully opaque; sprites use
-// alpha 0 for the see-through parts around the object.
+// alpha 0 for the see-through parts around the object. Glass is the one
+// thing with alpha in between: 0 = clear, 255 = solid, and e.g. 60 = a faint tint.
 //
 // THE LOOK: an 1980s mech hangar. Riveted steel, hazard stripes, rust, pipes,
 // banks of green-screen computers, sodium-orange work lights. Anything that
@@ -17,7 +18,8 @@ const TEX_SIZE = 64;
 // Build a texture by asking colourAt(x, y) for the colour of every texel.
 // colourAt returns [r, g, b], or null for a transparent texel, or
 // [r, g, b, true] for a GLOWING texel: one that gives off its own light, so
-// the renderer skips the fog (and the wall side-shading) for it.
+// the renderer skips the fog (and the wall side-shading) for it, or
+// [r, g, b, alpha] (see seeThrough) for a partly see-through texel.
 // `colour` is the texture's main colour, used by the debug map.
 function makeTexture(colour, colourAt) {
   // Uint8ClampedArray clamps out-of-range values to 0..255, so brightening a
@@ -32,7 +34,7 @@ function makeTexture(colour, colourAt) {
       pixels[i] = rgb[0];
       pixels[i + 1] = rgb[1];
       pixels[i + 2] = rgb[2];
-      pixels[i + 3] = 255;
+      pixels[i + 3] = typeof rgb[3] === 'number' ? rgb[3] : 255;
       if (rgb[3] === true) glow[y * TEX_SIZE + x] = 1;
     }
   }
@@ -64,6 +66,11 @@ function mix(a, b, t) {
 
 function glowing(rgb) {
   return [rgb[0], rgb[1], rgb[2], true];
+}
+
+// A partly see-through texel: alpha 0 (invisible) to 255 (solid).
+function seeThrough(rgb, alpha) {
+  return [rgb[0], rgb[1], rgb[2], alpha];
 }
 
 // Fake roundness for anything cylindrical. u runs from -1 at the object's left
@@ -221,6 +228,110 @@ function makeBlastDoor(lock) {
     if (rib === 0) return brighten([84, 90, 98], 1.35);
     if (rib === 1) return brighten([84, 90, 98], 0.5);
     return brighten([84, 90, 98], 0.9 + 0.12 * noise(x, y, 31));
+  });
+}
+
+// SEE-THROUGH PANELS (panels.js) ----------------------------------------------
+// Both sit in a steel frame round the cell's edge, so a window several cells
+// long shows a mullion between each pane.
+
+function panelFrame(x, y) {
+  if (x < 2 || x >= 62 || y < 3 || y >= 61) {
+    const bolt = (y === 1 || y === 62) && x % 8 === 4;
+    return brighten(DARK_STEEL, bolt ? 2.2 : 1 + 0.25 * noise(x, y, 70));
+  }
+  return null; // inside the frame
+}
+
+// Wired safety glass, as fitted to factory windows: a faint blue-green tint,
+// a diamond mesh of wire set into it, two diagonal glints, and grime
+// gathering towards the bottom. Its alpha is how much it hides: 0 would be
+// perfectly clear glass, 255 a painted-over window.
+//   state 'intact'    as fitted
+//   state 'cracked'   one hit taken: cracks radiate from where it struck
+//   state 'shattered' only jagged teeth left round the frame; the hole is clear
+function makeGlass(state) {
+  const tint = [150, 200, 215];
+  const impactX = 38, impactY = 27; // where the first hit landed, for the cracks
+  return makeTexture(tint, (x, y) => {
+    const frame = panelFrame(x, y);
+    if (frame) return frame;
+
+    if (state === 'shattered') {
+      // Triangular teeth along each inside edge of the frame. For each edge:
+      // how far in from it this texel is, against how tall the tooth is at
+      // this point along it (a triangle wave, its height varied by noise).
+      const tooth = (along, seed) => {
+        const seg = Math.floor(along / 9);
+        const t = Math.abs((along % 9) - 4.5) / 4.5; // 0 at a tooth's tip, 1 between teeth
+        return (2 + 9 * noise(seg, seed, 71)) * (1 - t);
+      };
+      const inTooth = (x - 2) < tooth(y, 1) || (61 - x) < tooth(y, 2) ||
+                      (y - 3) < tooth(x, 3) || (60 - y) < tooth(x, 4);
+      if (!inTooth) return null; // the hole: nothing left in it at all
+      return seeThrough(brighten(tint, 1.3), 120); // broken edges catch the light
+    }
+
+    if (state === 'cracked') {
+      // Cracks: seven lines out from the impact point, each a random length.
+      // A texel is on spoke k if the angle between it and the spoke, times
+      // its distance out, is under 0.7 texels: i.e. it's within 0.7 texels
+      // of the spoke's line. A gentle sine wobble keeps them from looking ruled.
+      const dx = x - impactX, dy = y - impactY;
+      const r = Math.hypot(dx, dy);
+      for (let k = 0; k < 7; k++) {
+        const spoke = k * 2 * Math.PI / 7 + 0.6 * noise(k, 0, 72) + 0.08 * Math.sin(r * 0.5 + k);
+        const d = Math.atan2(dy, dx) - spoke;
+        const off = Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) * r; // wrapped into -PI..PI first
+        if (off < 0.7 && r < 10 + 26 * noise(k, 1, 72)) return seeThrough([235, 245, 250], 210);
+      }
+      if (r < 3 || Math.abs(r - 7) < 0.6) return seeThrough([235, 245, 250], 210); // the impact itself
+    }
+
+    // The wire mesh: diagonal lines every 12 texels, both ways.
+    if ((x + y) % 12 === 0 || (((x - y) % 12) + 12) % 12 === 0) return seeThrough([60, 66, 70], 190);
+    // Glints: two thin diagonal bands of reflected light.
+    const g = (x + y * 0.6) % 48;
+    if ((g > 6 && g < 9) || (g > 11 && g < 12.5)) return seeThrough([230, 245, 250], 110);
+    // Grime: more of it lower down, where hands and dirt reach.
+    const grime = Math.max(0, (y - 38) / 23) * (0.6 + 0.4 * noise(x >> 1, y >> 1, 73));
+    return seeThrough(mix(tint, [70, 60, 45], grime), 55 + 90 * grime);
+  });
+}
+
+// A steel bar grille: thick round bars with two flat cross-bars. Everything
+// between them has alpha 0, so you (and bullets, and robots' eyes) see and
+// shoot straight through the gaps.
+function makeGrate() {
+  const steel = [96, 98, 92];
+  return makeTexture(steel, (x, y) => {
+    const frame = panelFrame(x, y);
+    if (frame) return frame;
+    const rust = noise(x >> 1, y >> 2, 74) < 0.15 ? 0.75 : 1;
+    if (Math.abs(y - 22) < 2 || Math.abs(y - 42) < 2) {
+      return mix(brighten(steel, y % 2 === 0 ? 1.15 : 0.8), RUST, rust < 1 ? 0.5 : 0); // flat bar
+    }
+    const bx = (x - 2) % 8; // position across one bar plus gap, 0..7
+    if (bx >= 2 && bx < 5) {
+      return mix(brighten(steel, roundShade((bx - 3) / 1.5)), RUST, rust < 1 ? 0.4 : 0); // round bar
+    }
+    return null;
+  });
+}
+
+// Glass bursting: a cloud of glinting fragments, falling and spreading out
+// as `frame` goes from 0 to 3. Drawn as an effect sprite where the pane was.
+function makeGlassBurst(frame) {
+  return makeTexture([200, 230, 240], (x, y) => {
+    for (let n = 0; n < 40; n++) {
+      // Each fragment starts near the middle and falls, faster the later the frame.
+      const sx = 32 + (noise(n, 0, 75) - 0.5) * (20 + frame * 14);
+      const sy = 30 + (noise(n, 1, 75) - 0.5) * 28 + frame * frame * 4;
+      if (Math.abs(x - sx) < 1 && Math.abs(y - sy) < 1 + (n % 3 === 0 ? 1 : 0)) {
+        return noise(n, 2, 75) < 0.4 ? glowing([235, 250, 255]) : [150, 200, 215];
+      }
+    }
+    return null;
   });
 }
 
@@ -814,6 +925,10 @@ const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true)
 const GUN_TEXTURE = makeGun(false);
 const GUN_FLASH_TEXTURE = makeGun(true);
 
+const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
+const GRATE_TEXTURE = makeGrate();
+const GLASS_BURST_FRAMES = [0, 1, 2, 3].map(makeGlassBurst);
+
 const DRUM_TEXTURE = makeDrum();
 const DRUM_WRECK_TEXTURE = makeDrumWreck();
 const FIREBALL_FRAMES = [0, 1, 2, 3, 4].map(makeFireball);
@@ -841,6 +956,8 @@ const TEXTURES = {
   3: COMPUTER_FRAMES[0],
   4: makePipes(),
   5: TERMINAL_TEXTURES.armed, // security terminal (security.js shows armed or safe)
+  [GLASS_CELL]: GLASS_TEXTURES.intact, // panels.js shows intact, cracked or shattered
+  [GRATE_CELL]: GRATE_TEXTURE,
   [DOOR_CELL]: makeBlastDoor(null),
 };
 

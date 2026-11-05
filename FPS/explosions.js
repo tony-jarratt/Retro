@@ -23,7 +23,9 @@ const explosions = [];
 const rockets = [];
 
 // Is there a clear straight line from (x1, y1) to (x2, y2)? The same castRay
-// test the robots use to see you: walls and closed doors shield you from a blast.
+// test the robots use to see you: walls and closed doors shield you from a
+// blast. Glass and grates don't (castRay sees through them), and the blast
+// blows any windows in its radius in anyway (shatterGlassNear).
 function clearLine(x1, y1, x2, y2) {
   const d = Math.hypot(x2 - x1, y2 - y1);
   if (d < 0.01) return true;
@@ -39,6 +41,7 @@ function blastStrength(blast, d) {
 // A blast at (x, y): fireball, damage to robots and you, and drums set off.
 function explodeAt(x, y, blast) {
   explosions.push({ x, y, time: 0 });
+  shatterGlassNear(x, y, blast.radius); // panels.js
 
   // Robots take up to BLAST_ROBOT_HITS hits: point blank destroys most outright.
   // (A heavy's own rockets hurt robots too: lure one into firing past its friends.)
@@ -82,7 +85,8 @@ function launchRocket(enemy) {
   rockets.push({ x: enemy.x + dx / d * start, y: enemy.y + dy / d * start, dirX: dx / d, dirY: dy / d });
 }
 
-// What, if anything, would a rocket at (x, y) run into?
+// What, if anything, would a rocket at (x, y) run into? Panels block it like
+// walls do (isWall), so a rocket hitting a window blows it in.
 function rocketHitsSomething(x, y) {
   return boxHitsWall(x, y, ROCKET_RADIUS) ||
          hitsSolidSprite(x, y, ROCKET_RADIUS) ||
