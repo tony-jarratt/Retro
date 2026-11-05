@@ -13,7 +13,7 @@
 //   1. RULES (scatterDecals): a repeatable pseudo-random scatter, so it looks
 //      the same every load. Leaks drip puddles and stain the ceiling, old
 //      blasts scorch the ground near fuel drums, pipes rust and leak oil.
-//   2. HAND-PLACED, from DECALS in map.js: signs, footprint trails, a fight
+//   2. HAND-PLACED, from a level's decals (levels/*.js): signs, footprint trails, a fight
 //      that happened in a doorway. The things that tell a story.
 //   3. EXPLOSIONS during play stamp fresh scorch marks (stampBlastScorch).
 //
@@ -246,7 +246,7 @@ const STENCIL_YELLOW = [215, 175, 40];
 const STENCIL_RED = [190, 50, 35];
 
 // Every kind of decal: its variant pictures, and which surfaces it may go on.
-// Hand-placed decals in map.js name one of these as `type`.
+// Hand-placed decals in a level file name one of these as `type`.
 const DECAL_TYPES = {
   puddle:     { surfaces: ['floor'],            frames: [0, 1, 2].map(makePuddle) },
   oil:        { surfaces: ['floor'],            frames: [0, 1].map(makeOil) },
@@ -353,7 +353,7 @@ function scatterDecals() {
   }));
 }
 
-// 2. HAND-PLACED, from map.js. Checked first, with clear messages.
+// 2. HAND-PLACED, from the level file. Checked first, with clear messages.
 function placeMapDecals() {
   DECALS.forEach((d, n) => {
     const kind = DECAL_TYPES[d.type];

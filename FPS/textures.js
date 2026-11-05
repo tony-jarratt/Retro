@@ -105,7 +105,7 @@ const SODIUM = [255, 170, 60];
 const PHOSPHOR = [90, 240, 120];
 const AMBER = [255, 176, 40];
 
-// Keycard colours. A locked door (LOCKED_DOORS in map.js) names one of these.
+// Keycard colours. A locked door (a level's lockedDoors) names one of these.
 const KEY_COLOURS = { red: [220, 40, 40], blue: [60, 110, 255] };
 
 // WALLS ---------------------------------------------------------------------
@@ -924,6 +924,58 @@ function makeTerminal(safe) {
   });
 }
 
+// THE SECURITY CORE (core.js): a wall of server racks with a red "heart" in
+// the middle that pulses. `damage` 0, 1 or 2 adds sparking cracks and
+// scorch; `pulse` 0-3 is how bright the heart is this moment (the core
+// picks a frame from the time, faster as it weakens). `dead` draws the
+// wreck: dark racks, a blown-out heart.
+function makeCore(damage, pulse, dead) {
+  const heartColour = [255, 40, 30];
+  return makeTexture([70, 74, 80], (x, y) => {
+    if (x < 2 || y < 2 || x >= 62 || y >= 62) return brighten(DARK_STEEL, 0.8); // frame
+    const r = Math.hypot(x + 0.5 - 32, y + 0.5 - 30);
+    if (r < 10) {                                                              // the heart and its housing
+      if (dead) return r < 7 ? (noise(x, y, 121) < 0.5 ? [20, 16, 14] : [60, 30, 20]) : DARK_STEEL;
+      if (r < 7) return glowing(brighten(heartColour, 0.45 + 0.18 * pulse + 0.3 * (1 - r / 7)));
+      if (r < 8) return [20, 20, 24];
+      return brighten(STEEL, 1.2);
+    }
+    // Racks: rows of drive bays, each with a tiny status light.
+    const bay = (y - 2) % 6, col = Math.floor((x - 2) / 15);
+    if (bay === 0) return [24, 24, 28];
+    if (!dead && bay === 3 && (x - 2) % 15 === 12) {
+      return glowing(noise(col, Math.floor((y - 2) / 6), 120 + pulse) < 0.6 ? [90, 255, 120] : [255, 180, 40]);
+    }
+    // Damage: dark cracks radiating from the heart, scorch around them.
+    const a = Math.atan2(y + 0.5 - 30, x + 0.5 - 32);
+    for (let k = 0; k < damage * 3 + (dead ? 4 : 0); k++) {
+      const spoke = k * 2.4 + 0.5 * noise(k, 0, 122);
+      const off = Math.abs(Math.atan2(Math.sin(a - spoke), Math.cos(a - spoke))) * r;
+      if (off < 0.8 && r < 14 + 14 * noise(k, 1, 122)) return [14, 12, 12];
+      if (off < 2.5 && r < 18) return brighten([70, 74, 80], 0.45);
+    }
+    if (dead) return brighten([70, 74, 80], 0.35 + 0.15 * noise(x, y, 123));
+    return brighten([70, 74, 80], 0.85 + 0.15 * noise(x, y, 124));
+  });
+}
+
+// THE EXIT LIFT (core.js): heavy doors with hazard chevrons, and a status
+// lamp: red while the lift is locked, green once the core is down.
+function makeLift(open) {
+  const lamp = open ? [90, 255, 120] : [255, 50, 30];
+  return makeTexture([96, 100, 90], (x, y) => {
+    if (x < 3 || x >= 61 || y < 4 || y >= 62) return brighten(DARK_STEEL, 1.1);        // frame
+    if (y < 12) {                                                                         // header with the lamp
+      if (Math.hypot(x + 0.5 - 32, y + 0.5 - 8) < 3) return glowing(lamp);
+      return brighten(STEEL, 0.9);
+    }
+    if (Math.abs(x + 0.5 - 32) < 1) return [18, 18, 20];                                // the seam between the doors
+    if (y >= 50 && y < 58) return hazard(x, y, x < 32);                                   // chevrons at the foot
+    if ((y - 12) % 9 === 0) return brighten([96, 100, 90], 0.6);                         // panel ribs
+    return brighten([96, 100, 90], 0.9 + 0.1 * noise(x, y, 125));
+  });
+}
+
 // THE PLAYER'S GUN ----------------------------------------------------------------
 // A chunky pulse gun seen from behind, with three coils round the barrel.
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
@@ -1076,6 +1128,10 @@ const DRONE_FRAMES = [0, 1, 2, 3].map(makeDrone);
 const CAMERA_TEXTURES = { watching: makeCamera('watching'), offline: makeCamera('offline'), destroyed: makeCamera('destroyed') };
 const BEAM_TEXTURE = makeBeam();
 const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true) };
+// CORE_TEXTURES[damage][pulse], and the wreck.
+const CORE_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeCore(damage, pulse, false)));
+const CORE_DEAD_TEXTURE = makeCore(2, 0, true);
+const LIFT_TEXTURES = { locked: makeLift(false), open: makeLift(true) };
 // The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
 // GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
 const GUN_TEXTURES = [1, 2, 3].map((lit) => [makeGun(false, lit), makeGun(true, lit)]);
@@ -1123,6 +1179,8 @@ const TEXTURES = {
   5: TERMINAL_TEXTURES.armed, // security terminal (security.js shows armed or safe)
   [GLASS_CELL]: GLASS_TEXTURES.intact, // panels.js shows intact, cracked or shattered
   [GRATE_CELL]: GRATE_TEXTURE,
+  [CORE_CELL]: CORE_TEXTURES[0][0], // core.js shows its damage, pulse, or wreck
+  [LIFT_CELL]: LIFT_TEXTURES.locked, // core.js shows locked or open
   [DOOR_CELL]: makeBlastDoor(null),
 };
 

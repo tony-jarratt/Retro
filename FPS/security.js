@@ -1,13 +1,15 @@
 // SECURITY: cameras, tripwires, terminals and alarms. Everything belongs to a
-// ZONE, a rectangle of cells listed in map.js, and that's what links them up:
+// ZONE, a rectangle of cells listed in the level file (levels/*.js), and that's what links them up:
 //
 //   cameras    sweep back and forth. One that sees you raises its zone's
 //              alarm, and every walking robot in the zone comes for you,
 //              by path. Shoot one (one hit) to kill it, ideally before it spots you.
 //   tripwires  laser beams across narrow passages. Break one and the turrets
-//              in its zone wake up (enemies.js). Step over? There's no jumping.
-//   terminals  wall panels. Walk up to one and its zone's security shuts down:
-//              cameras off, beams off, turrets back to sleep for good.
+//              in its zone wake up (enemies.js) — quietly: no alarm, no red
+//              lights, nobody else told. Step over? There's no jumping.
+//   terminals  wall panels. Walk up to one and its zone's CAMERAS shut down for
+//              good. Tripwires and turrets stay live: they're wired to the
+//              security core (core.js), and only destroying it stops them.
 //   alarms     while a zone's alarm is going (ALARM_TIME), its strip lights
 //              pulse red (lighting.js) and the HUD says so.
 
@@ -17,7 +19,7 @@ const CAMERA_SWEEP = 0.8;                  // radians either side of its set dir
 const CAMERA_SWEEP_SPEED = 0.6;            // how fast it pans (radians of phase per second)
 const ALARM_TIME = 12;                     // seconds an alarm keeps going after the last trigger
 const TERMINAL_RANGE = 1.3;                // cells from a terminal's middle: standing right in front of it
-const SECURITY_MESSAGE_TIME = 2.5;         // seconds the HUD shows "SECURITY OFFLINE" etc.
+const SECURITY_MESSAGE_TIME = 2.5;         // seconds the HUD shows "CAMERAS OFFLINE" etc.
 const CAMERA_SPOT = { colour: [0.9, 0.08, 0.05], radius: 1.6 }; // the red patch a camera throws where it's looking
 
 function zoneById(id) {
@@ -60,7 +62,7 @@ const terminals = TERMINALS.map((t, n) => {
 });
 
 const alarms = {};              // zone id -> seconds of alarm left
-let securityMessage = null;     // e.g. 'SECURITY OFFLINE', shown on the HUD for a moment
+let securityMessage = null;     // e.g. 'CAMERAS OFFLINE', shown on the HUD for a moment
 let securityMessageTime = 0;
 
 function showSecurityMessage(text) {
@@ -73,18 +75,29 @@ function zoneAlarmedAt(x, y) {
   return ZONES.some((z) => alarms[z.id] > 0 && inZone(z, x, y));
 }
 
-// Something in a zone has spotted you. A camera alerts the walking robots in
-// it; a tripwire wakes its turrets. Both set the alarm (and the red lights).
-function raiseAlarm(zoneId, cause) {
-  if (!(alarms[zoneId] > 0)) showSecurityMessage(cause === 'tripwire' ? 'TURRETS ONLINE' : 'ALARM');
+// Something in a zone has spotted you (a camera, or a smart robot): the
+// alarm goes off, the red lights pulse, every walking robot in the zone comes
+// for you, and its drones wake (drones.js).
+function raiseAlarm(zoneId) {
+  if (!(alarms[zoneId] > 0)) showSecurityMessage('ALARM');
   alarms[zoneId] = ALARM_TIME;
   droneAlarm(zoneId); // drones.js: waiting packs wake, hives release
   const zone = zoneById(zoneId);
+  for (const e of enemies) if (inZone(zone, e.x, e.y)) alertEnemy(e, player.x, player.y);
+}
+
+// A tripwire broken: the turrets in its zone wake up. That's all. No alarm,
+// so the rest of the zone doesn't know you're there. The message only shows
+// when a turret actually wakes, not every frame you stand in the beam.
+function tripTurrets(zoneId) {
+  const zone = zoneById(zoneId);
+  let woke = false;
   for (const e of enemies) {
-    if (!inZone(zone, e.x, e.y)) continue;
-    if (cause === 'camera') alertEnemy(e, player.x, player.y);
-    if (cause === 'tripwire') wakeTurret(e);
+    if (e.type !== 'turret' || e.state !== 'dormant' || !inZone(zone, e.x, e.y)) continue;
+    wakeTurret(e);
+    woke = true;
   }
+  if (woke) showSecurityMessage('TURRETS ONLINE');
 }
 
 // Does a camera see you right now? In its cone, in range, nothing in the way.
@@ -104,15 +117,12 @@ function playerBreaksBeam(t) {
 }
 
 // Shut a zone down from its terminal.
+// Shut a zone's cameras down from its terminal, and quieten its alarm (but
+// not the facility-wide one after the core goes: that never stops).
 function disableZone(zoneId) {
-  const zone = zoneById(zoneId);
   for (const c of cameras) if (c.zone === zoneId && c.state === 'watching') c.state = 'offline';
-  for (const t of tripwires) if (t.zone === zoneId) t.state = 'offline';
-  for (const e of enemies) {
-    if (e.type === 'turret' && e.state !== 'dead' && inZone(zone, e.x, e.y)) e.state = 'offline';
-  }
-  alarms[zoneId] = 0;
-  showSecurityMessage('SECURITY OFFLINE');
+  if (alarms[zoneId] !== Infinity) alarms[zoneId] = 0;
+  showSecurityMessage('CAMERAS OFFLINE');
 }
 
 // Called from combat.js when a shot lands on a camera.
@@ -128,10 +138,10 @@ function updateSecurity(dt) {
     if (cam.state !== 'watching') continue;
     // Pan back and forth: a sine wave of the time, so it eases at each end.
     cam.angle = cam.base + Math.sin(animTime * CAMERA_SWEEP_SPEED + cam.phase) * CAMERA_SWEEP;
-    if (cameraSeesPlayer(cam)) raiseAlarm(cam.zone, 'camera');
+    if (cameraSeesPlayer(cam)) raiseAlarm(cam.zone);
   }
   for (const t of tripwires) {
-    if (t.state === 'armed' && playerBreaksBeam(t)) raiseAlarm(t.zone, 'tripwire');
+    if (t.state === 'armed' && playerBreaksBeam(t)) tripTurrets(t.zone);
   }
   for (const term of terminals) {
     if (term.state !== 'armed') continue;

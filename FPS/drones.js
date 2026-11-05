@@ -7,9 +7,9 @@
 // off drums, scorch walls and blow in windows).
 //
 // Where they come from:
-//   PACKS (DRONE_PACKS in map.js): a group hovering quietly in place until one
+//   PACKS (a level's dronePacks): a group hovering quietly in place until one
 //     of them sees you, or an alarm goes off in their zone. Then the whole pack comes.
-//   HIVES (HIVES in map.js): honeycomb panels in a wall, each holding a pack.
+//   HIVES (a level's hives): honeycomb panels in a wall, each holding a pack.
 //     An alarm in the hive's zone (a camera spotting you, a tripwire) releases
 //     them one after another. Then the hive is empty for good.
 //
@@ -43,7 +43,7 @@ const DRONE_BLAST = { radius: 0.9, damage: 12, spareDrones: true }; // its kamik
 //   phase    where in its weave it starts, so they don't all weave in step
 const drones = [];
 
-// The hives, from HIVES in map.js. A hive's drones are released from the
+// The hives, from the level's hives. A hive's drones are released from the
 // floor cell in front of it, one every DRONE_RELEASE_GAP seconds.
 //   state    'loaded' -> 'releasing' -> 'empty'
 //   left     drones still inside

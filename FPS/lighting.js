@@ -228,6 +228,7 @@ function updateLighting() {
     addLight(lightGrid, g.x, g.y, GLASS_BURST_LIGHT.colour, GLASS_BURST_LIGHT.radius, 1 - g.time / GLASS_BURST_TIME);
   }
   addSecurityLights(lightGrid); // cameras' red spots (security.js)
+  addCoreLights(lightGrid);     // the core's pulsing heart (core.js)
 
   dilateIntoWalls(lightGrid);
 }

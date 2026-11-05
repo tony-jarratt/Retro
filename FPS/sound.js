@@ -440,6 +440,20 @@ function sfxTurretsOnline() {
 function sfxSecurityOffline() {
   [1047, 784, 523, 392].forEach((f, i) => tone(audio.master, 'triangle', f, f * 0.98, 0.12, 0.18, i * 0.1));
 }
+// The core: a shot on it is a deep, heavy clang with a fizz of sparks. The
+// moment it dies, the lift's lamp turns green with a two-note chime.
+function sfxCoreHit() {
+  const c = core.cells.reduce((a, b) => Math.hypot(a.front.x - player.x, a.front.y - player.y) < Math.hypot(b.front.x - player.x, b.front.y - player.y) ? a : b);
+  const out = placeAt(c.front.x, c.front.y);
+  if (!out) return;
+  clang(out, 210, 0.35, 0.4);
+  noiseBurst(out, 'highpass', 6000, 3000, 0.15, 0.35);
+}
+function sfxLiftOpen() {
+  tone(audio.master, 'sine', 784, 784, 0.25, 0.2);
+  tone(audio.master, 'sine', 1175, 1175, 0.4, 0.2, 0.2);
+}
+
 function sfxHiveRelease(hive) {
   const out = placeAt(hive.outX, hive.outY);
   if (!out) return;
@@ -464,7 +478,8 @@ let ambience = null;             // the hangar's hum and air, always there
 // health dropping. It keeps the sound out of the game's logic.
 const last = {
   doors: new Map(), panels: new Map(), enemies: new Map(), pickups: new Set(),
-  hives: new Map(), terminals: new Map(), lockedHint: null, playerStep: 0, messageTime: 0, ready: false,
+  hives: new Map(), terminals: new Map(), lockedHint: null, playerStep: 0, messageTime: 0,
+  coreHealth: CORE_HEALTH, coreState: 'online', ready: false,
 };
 
 function updateSound(dt) {
@@ -558,6 +573,8 @@ function rememberState() {
   for (const t of terminals) last.terminals.set(t, t.state);
   last.lockedHint = lockedDoorHint;
   last.messageTime = securityMessageTime;
+  last.coreHealth = core.health;
+  last.coreState = core.state;
   last.playerStep = Math.floor(player.walkTime * 6 / Math.PI); // the gun bob's cycle: one step per half-turn of cos
   last.ready = true;
 }
@@ -588,6 +605,8 @@ function watchTheGame() {
   for (const p of last.pickups) if (!pickups.includes(p)) sfxPickup(p.type);
   for (const h of hives) if (h.left < last.hives.get(h)) sfxHiveRelease(h);
   for (const t of terminals) if (t.state === 'safe' && last.terminals.get(t) !== 'safe') sfxSecurityOffline();
+  if (core.health < last.coreHealth) sfxCoreHit();
+  if (core.state === 'destroyed' && last.coreState !== 'destroyed') { sfxSecurityOffline(); sfxLiftOpen(); }
   // A security message that has just appeared (its timer jumped back up).
   if (securityMessage === 'TURRETS ONLINE' && securityMessageTime > last.messageTime) sfxTurretsOnline();
   const step = Math.floor(player.walkTime * 6 / Math.PI);

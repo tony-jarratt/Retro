@@ -199,11 +199,13 @@ function castRays(player) {
 }
 
 // Which picture a wall hit shows. A door shows its own lock colour, a
-// security terminal whether it's armed or safe, and an animated wall this
-// frame's picture.
+// security terminal whether it's armed or safe, the core its damage, the lift
+// whether it's open, and an animated wall this frame's picture.
 function textureForHit(hit) {
   if (hit.door) return doorTexture(hit.door);
   if (hit.cell === TERMINAL_CELL) return terminalTexture(hit.cellX, hit.cellY);
+  if (hit.cell === CORE_CELL) return coreTexture();   // core.js
+  if (hit.cell === LIFT_CELL) return liftTexture();
   return wallTexture(hit.cell);
 }
 

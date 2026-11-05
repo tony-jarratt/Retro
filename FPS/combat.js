@@ -9,7 +9,7 @@ const ROBOT_FIRE_FLASH = 0.15;  // seconds a robot shows its own muzzle flash
 const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hit
 
 // The whole game's state:
-//   state        'playing', then 'dead' or 'clear'
+//   state        'playing', then 'dead', or 'clear' once you reach the lift (core.js)
 //   hurtFlash    seconds of red flash left
 //   pickupFlash  seconds of gold flash left (pickups.js)
 //   endTime      seconds since the game ended (for the slow fade)
@@ -47,7 +47,8 @@ const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0,
 // practice this asks "is the shot on its silhouette?" at hull height. The
 // walker's hull is a long box, so it's a slightly wider target side-on than face-on.
 //
-// Returns a sprite thing, { panel } for a window, or null for a wall.
+// Returns a sprite thing, { panel } for a window, { core: true } for the
+// security core (core.js), or null for any other wall.
 function shotTarget(angle) {
   const viewer = { x: player.x, y: player.y, angle };
   const ray = castRay(player.x, player.y, Math.cos(angle), Math.sin(angle));
@@ -66,6 +67,7 @@ function shotTarget(angle) {
   }
   if (best) return best.thing;
   if (glass) return { panel: glass.panel }; // nothing nearer: the window takes it
+  if (ray.cell === CORE_CELL) return { core: true };
   return null;
 }
 
@@ -110,6 +112,7 @@ function fireRound() {
 // One round arriving at what it hit.
 function shotHits(target) {
   if (target.panel) { hitGlass(target.panel); return; } // panels.js
+  if (target.core) { damageCore(1); return; }          // core.js
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
     const hits = isFacingAway(target.enemy) ? ROBOT_TYPES[target.enemy.type].backHits : 1;
@@ -205,10 +208,6 @@ function updateCombat(dt) {
   gun.flash = Math.max(0, gun.flash - dt);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
   game.pickupFlash = Math.max(0, game.pickupFlash - dt);
-  // Cleared: every robot down, and every drone that's out (hives never set off don't count).
-  if (game.state === 'playing' && enemies.every((e) => e.state === 'dead') && drones.every((d) => d.state === 'dead')) {
-    game.state = 'clear';
-  }
   if (game.state !== 'playing') game.endTime += dt;
 }
 

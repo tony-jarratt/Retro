@@ -33,7 +33,7 @@ function triggerHeld() {
 }
 
 // on: the functions to call for one-off actions:
-// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound }.
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, nextLevel, levelChooser }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -44,6 +44,8 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyC') on.toggleFilter();
       if (e.code === 'KeyV') on.toggleVisor();
       if (e.code === 'KeyN') on.toggleSound();
+      if (e.code === 'Enter') on.nextLevel();
+      if (e.code === 'KeyL') on.levelChooser();
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });

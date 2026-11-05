@@ -20,7 +20,7 @@ const SCALD_DAMAGE = 5;           // your health lost per scald tick...
 const SCALD_TICK = 0.4;           // ...every this many seconds in the plume (about 12 a second)
 const ROBOT_SCALD_TICK = 1.0;     // a robot in the plume takes 1 hit this often
 
-// The live vents, from VENTS in map.js:
+// The live vents, from the level's vents:
 //   x, y      the middle of its cell (where the plume stands)
 //   state     'idle', 'sputter' or 'burst'
 //   timer     seconds left in this state

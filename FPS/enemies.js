@@ -2,7 +2,7 @@
 // decides whether it can see the player using the renderer's own castRay, and
 // picks which picture of itself to show (front, back, a side, walking or
 // aiming). They are drawn by sprites.js along with the drums. Where they
-// start, and what type each is, is listed in map.js (ENEMIES).
+// start, and what type each is, is listed in the level file (levels/*.js, `enemies`).
 
 const ENEMY_RADIUS = 0.25;                   // half-width of a robot's collision box
 const ENEMY_VIEW_CONE = 120 * Math.PI / 180; // how wide an idle robot looks, in total
@@ -28,7 +28,7 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //           it fires, it fires a VOLLEY: five quick rounds, each a fresh chance
 //           to hit. Don't get caught in its line of fire.
 //
-// SMART robots (smart: true in map.js's ENEMIES) are any walking type with a
+// SMART robots (smart: true in a level's enemies) are any walking type with a
 // better brain, marked by a blinking beacon and chevrons on the hull. Same
 // health, same gun; on top of the usual state machine they:
 //   - STRAFE: sidestep across your aim while charging, so a careful single
@@ -53,7 +53,7 @@ const ROBOT_TYPES = {
   turret: { speed: 0,   health: 4, aimRange: 8,   charge: 1.2, weapon: 'gun',    damage: 6,  hitNear: 0.75, hitFar: 0.35, backHits: 1, mobile: false, strafe: false, weave: false, volley: 5, volleyGap: 0.12 },
 };
 
-// The live robots, built once from the starting positions in map.js:
+// The live robots, built once from the starting positions in the level file:
 //   type                   a key of ROBOT_TYPES
 //   x, y, angle            position and facing (radians, same convention as the player)
 //   state                  walking robots: 'idle' -> 'chase' <-> 'aim' -> 'search' -> 'idle'
@@ -273,7 +273,7 @@ function weaveStep(enemy, dt) {
 // SMART: seeing you raises the alarm in its zone, like a camera.
 function callForHelp(enemy) {
   const zone = ZONES.find((z) => inZone(z, enemy.x, enemy.y));
-  if (zone) raiseAlarm(zone.id, 'camera'); // security.js
+  if (zone) raiseAlarm(zone.id); // security.js
 }
 
 // THE WALKING ROBOTS' STATE MACHINE (walker, scout, heavy).

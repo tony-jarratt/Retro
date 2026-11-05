@@ -1,6 +1,6 @@
 // Pickups: ammo boxes, suit repair kits, keycards, gun modules, and clips dropped by destroyed robots.
 // They're drawn as sprites (sprites.js) and collected by walking over them.
-// Where the starting ones lie is listed in map.js (PICKUPS).
+// Where the starting ones lie is listed in the level file (levels/*.js, `pickups`).
 
 const PICKUP_RADIUS = 0.3;       // half-width of the box you have to touch to collect one
 const PICKUP_FLASH_TIME = 0.25;  // seconds the screen flashes gold when you collect one

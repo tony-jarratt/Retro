@@ -87,7 +87,30 @@ setupInput(screenCanvas, {
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
   toggleVisor: () => { visorOn = !visorOn; },
   toggleSound,
+  nextLevel: goToNextLevel,
+  levelChooser: () => { if (PLAYTEST) location.search = '?playtest'; },
 });
+
+// LEVEL COMPLETE -> Enter loads the next level (map.js), if there is one.
+function goToNextLevel() {
+  const next = nextLevel();
+  if (game.state === 'clear' && next) location.search = levelAddress(next.id);
+}
+
+// THE PLAY-TEST LEVEL CHOOSER: with ?playtest and no level picked yet, show a
+// button per level instead of starting the game. Picking one reloads the page
+// with that level (map.js).
+function showLevelChooser() {
+  const box = document.getElementById('chooser');
+  LEVELS.forEach((level, n) => {
+    const button = document.createElement('button');
+    button.textContent = `${n + 1}  ${level.name}`;
+    button.addEventListener('click', () => { location.search = levelAddress(level.id); });
+    box.appendChild(button);
+  });
+  box.style.display = 'flex';
+  box.querySelector('button').focus(); // so Enter or Space picks straight away
+}
 
 let lastTime = performance.now();
 
@@ -110,6 +133,7 @@ function frame(now) {
     updateSecurity(dt); // before the robots, so an alarm this frame sends them moving at once
     updateEnemies(dt);
     updateDrones(dt);
+    updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
   }
   updateCombat(dt);
   updateWeapons(dt);
@@ -131,4 +155,5 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+if (PLAYTEST && !PAGE_ARGS.has('level')) showLevelChooser();
+else requestAnimationFrame(frame);

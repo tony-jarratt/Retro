@@ -25,19 +25,37 @@
     cursor: crosshair;
   }
   #debug { position: absolute; left: 8px; top: 8px; display: none; }
+  /* The play-test level chooser (index.html?playtest), drawn over the screen
+     in the HUD's green phosphor. */
+  #chooser {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: #050805; color: #78ff96; font: 20px monospace; letter-spacing: 2px;
+  }
+  #chooser h1 { font-size: 26px; margin: 0 0 10px; font-weight: normal; }
+  #chooser button {
+    font: inherit; color: inherit; background: none; cursor: pointer;
+    border: 2px solid #2c6b3a; padding: 8px 28px; min-width: 60%;
+  }
+  #chooser button:hover, #chooser button:focus { border-color: #78ff96; background: #0d1f10; outline: none; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="screen"></canvas>
   <canvas id="debug"></canvas>
+  <div id="chooser"><h1>PLAY-TEST: CHOOSE A LEVEL</h1></div>
 </div>
-<p>Click to capture mouse (Esc frees) · WASD move · ←/→ turn · click/↑ fire (hold to spin up) · M map · V visor · C CRT · N sound · R restart</p>
+<p>Click to capture mouse (Esc frees) · WASD move · ←/→ turn · click/↑ fire (hold to spin up) · M map · V visor · C CRT · N sound · R restart · Enter next level · (?playtest: L level chooser)</p>
 
 <!-- Plain scripts, not ES modules: browsers refuse to load modules from
      file:// URLs, and we want "just open index.html" to work. Classic scripts
      share one global scope, so order matters: each file may only use names
      defined by the files above it (at load time). -->
+<script src="legend.js"></script>
+<!-- The levels, in the order you play them. Each adds itself to LEVELS. -->
+<script src="levels/industrial.js"></script>
+<script src="levels/lab.js"></script>
 <script src="map.js"></script>
 <script src="textures.js"></script>
 <script src="sprites.js"></script>
@@ -58,6 +76,7 @@
 <script src="decals.js"></script>
 <script src="reflections.js"></script>
 <script src="drones.js"></script>
+<script src="core.js"></script>
 <script src="visor.js"></script>
 <script src="filter.js"></script>
 <script src="debug.js"></script>

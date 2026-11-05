@@ -2,7 +2,7 @@
 // the robots from enemies.js). A sprite is a 1x1-unit picture that always
 // turns to face the camera (a "billboard"). Sprites are drawn after the walls,
 // column by column, and are hidden wherever a wall is nearer. Where the
-// static ones stand is listed in map.js.
+// static ones stand is listed in the level file (levels/*.js).
 
 // What each kind of sprite looks like, whether it blocks movement, and
 // whether shooting it sets it off (explosions.js).

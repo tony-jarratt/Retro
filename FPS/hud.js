@@ -265,12 +265,13 @@ function drawHud(pixels) {
   drawKeys(pixels);
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);
   if (game.state === 'playing') {
+    if (liftHint) drawTextCentred(pixels, 'LIFT LOCKED  DESTROY THE CORE', 40, HUD_WARN, 1); // core.js
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
     if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
     if (securityMessageTime > 0) {
-      const ok = securityMessage === 'SECURITY OFFLINE';
+      const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === 'DESTROY THE SECURITY CORE';
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);
     }
     // While any alarm is going, a red ALARM blinks at the top of the screen.
@@ -283,7 +284,9 @@ function drawHud(pixels) {
     drawTextCentred(pixels, 'TERMINATED', 70, HUD_WARN, 4);
     if (game.endTime > SHUTDOWN_TIME + 1) drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   } else if (game.state === 'clear') {
-    drawTextCentred(pixels, 'LEVEL CLEAR', 70, HUD_GREEN, 4);
-    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
+    drawTextCentred(pixels, 'LEVEL COMPLETE', 70, HUD_GREEN, 4);
+    // map.js knows whether there's another level after this one.
+    if (nextLevel()) drawTextCentred(pixels, 'PRESS ENTER FOR THE NEXT LEVEL', 110, HUD_GREEN, 2);
+    else drawTextCentred(pixels, 'PRESS R TO PLAY AGAIN', 110, HUD_GREEN, 2);
   }
 }
