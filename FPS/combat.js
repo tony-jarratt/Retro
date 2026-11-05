@@ -158,11 +158,18 @@ function robotFires(enemy, dist) {
   else if (Math.random() < robotHitChance(type, dist)) damagePlayer(type.damage);
 }
 
+// A hit on you. While the suit has armour, the armour takes it, however big
+// the hit: the one that empties it leaves you alive but BREACHED. A hit on a
+// breached suit is fatal.
 function damagePlayer(amount) {
   if (game.state !== 'playing') return;
-  player.health = Math.max(0, player.health - amount);
   game.hurtFlash = PLAYER_HURT_FLASH;
-  if (player.health === 0) game.state = 'dead';
+  if (player.armour === 0) {
+    game.state = 'dead';
+    return;
+  }
+  player.armour = Math.max(0, player.armour - amount);
+  if (player.armour === 0) showSecurityMessage('SUIT BREACH'); // security.js's red centre message
 }
 
 function updateCombat(dt) {

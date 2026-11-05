@@ -78,7 +78,8 @@ function applyCrtFilter(pixels, crush = 1, scanShade = SCANLINE_SHADE) {
   }
 }
 
-// VISOR DAMAGE. As your health falls, the helmet's display starts to fail:
+// VISOR DAMAGE. The visor is a camera feed on a screen inside your suit, so
+// as the suit's ARMOUR falls (passed in as `health`, 0-100), the display fails:
 //   below 60   scanlines creep in, darker the more you're hurt
 //   below 40   the palette starts to crush, and the picture TEARS: for a
 //              frame, a band of rows jumps sideways

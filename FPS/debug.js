@@ -106,8 +106,8 @@ function drawDebug(ctx, player, hits) {
     ctx.globalAlpha = 1;
   }
 
-  // Pickups: small squares, gold for ammo, white for health, keycards in their colour.
-  const PICKUP_COLOURS = { health: '#fff', redkey: '#f44', bluekey: '#48f' };
+  // Pickups: small squares, gold for ammo, white for repair kits, keycards in their colour.
+  const PICKUP_COLOURS = { repair: '#fff', redkey: '#f44', bluekey: '#48f' };
   for (const p of pickups) {
     ctx.fillStyle = PICKUP_COLOURS[p.type] || '#fc4';
     ctx.fillRect((p.x - 0.15) * s, (p.y - 0.15) * s, 0.3 * s, 0.3 * s);

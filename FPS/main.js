@@ -120,8 +120,9 @@ function frame(now) {
   drawHud(frameImage.data); // flat on top of the 3D view, same buffer
   // Last of all, so it covers the HUD too: the full CRT look if you've asked
   // for it (C), otherwise however much your visor's damage calls for.
+  // (Once you're dead the display has shut down: see drawHud.)
   if (crtFilterOn) applyCrtFilter(frameImage.data);
-  else applyDamageFilter(frameImage.data, player.health, dt);
+  else if (game.state !== 'dead') applyDamageFilter(frameImage.data, player.armour, dt);
   screenCtx.putImageData(frameImage, 0, 0);
   if (debugOn) drawDebug(debugCtx, player, hits);
 

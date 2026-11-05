@@ -152,20 +152,25 @@ function tintScreen(pixels, rgb, amount) {
 }
 
 // The readouts run along one line in the visor's bottom rim (visor.js):
-// HP and its bar on the left, keycards and ammo on the right.
+// your suit's ARMOUR and its bar on the left, keycards on the right.
 const READOUT_Y = SCREEN_H - 6;
 const READOUT_MARGIN = 10;
 
-function drawHealth(pixels) {
-  const label = 'HP ' + player.health;
-  const low = player.health <= 30;
+function drawArmour(pixels) {
+  const label = 'ARMOUR ' + player.armour;
+  const low = player.armour <= 30;
   drawText(pixels, label, READOUT_MARGIN, READOUT_Y, low ? HUD_WARN : HUD_GREEN, 1);
   const x = READOUT_MARGIN + textWidth(label, 1) + 4; // the bar sits just after the label
   const y = READOUT_Y;
+  // Breached: no bar, just a blinking warning where it was.
+  if (player.armour === 0) {
+    if (Math.floor(animTime * 4) % 2 === 0) drawText(pixels, 'SUIT BREACH', x, y, HUD_WARN, 1);
+    return;
+  }
   fillRect(pixels, x, y, 62, 6, [0, 0, 0]);             // bar border
   fillRect(pixels, x + 1, y + 1, 60, 4, [20, 60, 30]);  // empty part
   // The bar is cut into 5-pixel segments, like an old LED gauge.
-  const filled = Math.round(12 * player.health / PLAYER_MAX_HEALTH);
+  const filled = Math.ceil(12 * player.armour / PLAYER_MAX_ARMOUR); // any armour at all shows a segment
   for (let seg = 0; seg < filled; seg++) {
     fillRect(pixels, x + 1 + seg * 5, y + 1, 4, 4, low ? HUD_WARN : [60, 200, 90]);
   }
@@ -221,6 +226,27 @@ function drawKeys(pixels) {
   });
 }
 
+// DEAD: the suit's display shuts down, one raster line at a time. Each row
+// of pixels has its own moment to go (a repeatable random time from noise(),
+// within SHUTDOWN_TIME): it flares white for an instant, as a CRT line does,
+// then fades to black. Then TERMINATED comes up on the dead screen.
+const SHUTDOWN_TIME = 1.2;   // seconds until the last line is gone
+const LINE_FADE = 0.12;      // seconds each line takes to die
+function displayShutdown(pixels, t) {
+  for (let y = 0; y < SCREEN_H; y++) {
+    const offAt = noise(y, 0, 130) * (SHUTDOWN_TIME - LINE_FADE);
+    if (t < offAt) continue;
+    const since = t - offAt;
+    const row = y * SCREEN_W * 4;
+    if (since < 0.03) {
+      for (let i = row; i < row + SCREEN_W * 4; i += 4) { pixels[i] = 230; pixels[i + 1] = 255; pixels[i + 2] = 235; } // the flare
+      continue;
+    }
+    const keep = Math.max(0, 1 - since / LINE_FADE);
+    for (let i = row; i < row + SCREEN_W * 4; i += 4) for (let k = 0; k < 3; k++) pixels[i + k] *= keep;
+  }
+}
+
 function drawHud(pixels) {
   if (game.state !== 'dead') {
     drawGun(pixels);
@@ -231,15 +257,13 @@ function drawHud(pixels) {
   if (game.hurtFlash > 0) tintScreen(pixels, [200, 0, 0], 0.45 * game.hurtFlash / PLAYER_HURT_FLASH);
   // Gold flash for collecting something.
   if (game.pickupFlash > 0) tintScreen(pixels, [255, 210, 90], 0.3 * game.pickupFlash / PICKUP_FLASH_TIME);
-  // Dead: the view slowly fills with dark red.
-  if (game.state === 'dead') tintScreen(pixels, [90, 0, 0], Math.min(0.75, game.endTime * 0.6));
-
   // The helmet visor goes over the view but under the readouts, which sit on
   // its frame like displays built into the helmet (visor.js).
   if (visorOn) applyVisor(pixels);
 
-  drawHealth(pixels);
+  drawArmour(pixels);
   drawKeys(pixels);
+  if (game.state === 'dead') displayShutdown(pixels, game.endTime);
   if (game.state === 'playing') {
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
@@ -255,9 +279,9 @@ function drawHud(pixels) {
     }
   }
 
-  if (game.state === 'dead') {
-    drawTextCentred(pixels, 'SCRAPPED', 70, HUD_WARN, 4);
-    drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
+  if (game.state === 'dead' && game.endTime > SHUTDOWN_TIME) {
+    drawTextCentred(pixels, 'TERMINATED', 70, HUD_WARN, 4);
+    if (game.endTime > SHUTDOWN_TIME + 1) drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   } else if (game.state === 'clear') {
     drawTextCentred(pixels, 'LEVEL CLEAR', 70, HUD_GREEN, 4);
     drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);

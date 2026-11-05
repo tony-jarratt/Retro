@@ -1,4 +1,4 @@
-// Pickups: ammo boxes, health packs, keycards, and clips dropped by destroyed robots.
+// Pickups: ammo boxes, suit repair kits, keycards, gun modules, and clips dropped by destroyed robots.
 // They're drawn as sprites (sprites.js) and collected by walking over them.
 // Where the starting ones lie is listed in map.js (PICKUPS).
 
@@ -6,7 +6,7 @@ const PICKUP_RADIUS = 0.3;       // half-width of the box you have to touch to c
 const PICKUP_FLASH_TIME = 0.25;  // seconds the screen flashes gold when you collect one
 
 // What each kind looks like, and what collecting it does. collect() returns
-// false to refuse: a health pack is left where it is if you're at full health,
+// false to refuse: a repair kit is left where it is if your armour is full,
 // so it's still there when you need it.
 const PICKUP_TYPES = {
   ammo: {
@@ -17,11 +17,12 @@ const PICKUP_TYPES = {
     texture: CLIP_TEXTURE,
     collect: () => { player.ammo += 4; return true; },
   },
-  health: {
-    texture: MEDKIT_TEXTURE,
+  // Patches up your suit's armour, which also seals a breach.
+  repair: {
+    texture: REPAIR_KIT_TEXTURE,
     collect: () => {
-      if (player.health >= PLAYER_MAX_HEALTH) return false;
-      player.health = Math.min(PLAYER_MAX_HEALTH, player.health + 25);
+      if (player.armour >= PLAYER_MAX_ARMOUR) return false;
+      player.armour = Math.min(PLAYER_MAX_ARMOUR, player.armour + 25);
       return true;
     },
   },

@@ -1034,17 +1034,21 @@ function makeClip() {
   });
 }
 
-// A field medical kit: an off-white case with a red cross.
-function makeMedkit() {
-  const white = [200, 200, 192];
-  return makeTexture(white, (x, y) => {
+// A suit repair kit: a squat steel canister of repair paste with a nozzle,
+// a hazard band, and a green light that says it's charged. Small and on the
+// floor, so it's drawn in the bottom rows.
+function makeRepairKit() {
+  const steel = [150, 156, 164];
+  return makeTexture(steel, (x, y) => {
     const dx = x + 0.5 - 32;
-    const dy = y - 56; // the cross is centred on row 56
-    if (y < 48 || Math.abs(dx) > 11) return null;
-    if ((Math.abs(dx) < 2 && Math.abs(dy) < 5) || (Math.abs(dx) < 5 && Math.abs(dy) < 2)) return [200, 30, 30];
-    if (y < 50) return brighten(white, 1.1);               // lid
-    if (Math.abs(dx) > 10) return brighten(white, 0.55);   // edges
-    return brighten(white, 0.88 + 0.12 * noise(x, y, 19));
+    const ax = Math.abs(dx);
+    if (y >= 43 && y < 47 && ax < 2) return brighten(DARK_STEEL, y === 43 ? 1.6 : 1.1);   // nozzle
+    if (y < 47 || y >= 63 || ax >= 9) return null;
+    if (y < 49) return brighten(DARK_STEEL, 1.3);                                         // cap
+    if (y >= 50 && y < 52 && ax < 2) return glowing([90, 255, 120]);                      // charged light
+    if (y >= 54 && y < 57) return hazard(x, y, false);                                    // hazard band
+    if (y >= 61) return brighten(DARK_STEEL, 1.1);                                        // base ring
+    return brighten(steel, roundShade(dx / 9) * (0.9 + 0.1 * noise(x, y, 19)));
   });
 }
 
@@ -1064,7 +1068,7 @@ for (const colour in KEY_COLOURS) KEYCARD_TEXTURES[colour] = makeKeycard(KEY_COL
 
 const AMMO_BOX_TEXTURE = makeAmmoBox();
 const CLIP_TEXTURE = makeClip();
-const MEDKIT_TEXTURE = makeMedkit();
+const REPAIR_KIT_TEXTURE = makeRepairKit();
 
 const WRECK_TEXTURE = makeWreck();
 const ROCKET_TEXTURE = makeRocket();

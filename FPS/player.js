@@ -4,7 +4,10 @@ const MOVE_SPEED = 3.0;           // cells per second
 const TURN_SPEED = 2.5;           // radians per second (arrow keys)
 const MOUSE_SENSITIVITY = 0.0025; // radians per pixel of mouse movement
 const PLAYER_RADIUS = 0.2;        // half-width of the player's collision box, in cells
-const PLAYER_MAX_HEALTH = 100;
+// You're in an armoured biomechanical suit. ARMOUR is all that stands between
+// you and the robots: hits wear it down, and once it's gone the suit is
+// BREACHED and the next hit kills you. Repair kits patch it up; nothing heals you.
+const PLAYER_MAX_ARMOUR = 100;
 const PLAYER_START_AMMO = 12;     // enough for the first fight or two; robots drop clips
 
 // walkTime counts up while you're moving; the HUD uses it to bob the gun.
@@ -12,7 +15,7 @@ const player = {
   x: PLAYER_START.x,
   y: PLAYER_START.y,
   angle: PLAYER_START.angle,
-  health: PLAYER_MAX_HEALTH,
+  armour: PLAYER_MAX_ARMOUR, // 0 = breached: one more hit and it's over
   ammo: PLAYER_START_AMMO,
   keys: [],             // keycard colours collected, e.g. ['red']
   modes: ['single'],    // fire modes your gun can spin up to (weapons.js), in the order found

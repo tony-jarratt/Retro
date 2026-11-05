@@ -204,7 +204,7 @@ const TERMINALS = [
   { x: 0,  y: 20, zone: 'hangar' },    // deep in the hangar, far left
 ];
 
-// Things to collect (pickups.js): 'ammo' (+8), 'health' (+25), 'redkey', 'bluekey',
+// Things to collect (pickups.js): 'ammo' (+8), 'repair' (+25 armour), 'redkey', 'bluekey',
 // and fire-mode modules for your gun: 'burstmod' (and 'automod', though that
 // comes from heavies). Destroyed robots also drop a 'clip' (+4) where they
 // fall; the first heavy you bring down drops the automatic module.
@@ -212,15 +212,15 @@ const PICKUPS = [
   { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay
   { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
   { type: 'burstmod', x: 17.5, y: 1.5 }, // fuel depot, far corner, behind the walker watching the door
-  { type: 'health',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
+  { type: 'repair',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
   { type: 'redkey',  x: 29.5, y: 6.5 },  // pipe works, far corner
   { type: 'ammo',    x: 20.5, y: 1.5 },  // pipe works
   { type: 'bluekey', x: 11.5, y: 14.5 }, // server room, far corner
-  { type: 'health',  x: 1.5,  y: 14.5 }, // server room
+  { type: 'repair',  x: 1.5,  y: 14.5 }, // server room
   { type: 'ammo',    x: 16.5, y: 14.5 }, // corridor
   { type: 'ammo',    x: 29.5, y: 9.5 },  // workshop
-  { type: 'health',  x: 18.5, y: 15.5 }, // workshop
-  { type: 'health',  x: 1.5,  y: 22.5 }, // hangar
+  { type: 'repair',  x: 18.5, y: 15.5 }, // workshop
+  { type: 'repair',  x: 1.5,  y: 22.5 }, // hangar
   { type: 'ammo',    x: 30.5, y: 22.5 }, // hangar
   { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
 ];
