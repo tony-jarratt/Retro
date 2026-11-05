@@ -1,78 +1,92 @@
-// WEAPONS: what you carry, and how each one fires. The firing itself (rays,
-// what they hit) is in combat.js; this file is the table of differences.
+// YOUR GUN and its FIRE MODES. There's one gun, the pulse gun, and you never
+// switch it: it SPINS UP. Press the trigger and it fires a single accurate
+// shot. Keep holding, and after SPIN_UP.burst seconds it starts firing
+// bursts; hold on to SPIN_UP.auto and it goes fully automatic. Let go and it
+// drops straight back to single. Each step lights another coil on the barrel,
+// and the next coil flickers faster and faster as the gun winds up to it.
 //
-// Kept deliberately simple:
-//   - ONE ammo pool (player.ammo). Each weapon just spends it differently.
-//   - You keep everything you pick up. Q cycles; 1, 2, 3 pick one directly.
-//   - Picking up a new weapon puts it straight in your hands.
+// Upgrade modules you find decide how far it can spin up: without the burst
+// module, holding does nothing more than single shots. Every mode uses the
+// same ammo: what changes is how fast the rounds come out, and how
+// accurately. (The firing itself, the rays and what they hit, is in combat.js.)
 //
-// Each weapon:
-//   name       shown when you pick it up or switch to it
-//   short      shown by the ammo count
-//   key        the number key that selects it
-//   cost       ammo per shot
-//   cooldown   seconds between shots
-//   auto       true: keeps firing while the trigger is held
-//   pellets    rays per shot, fanned evenly across...
-//   spread     ...this total angle in radians (0 = dead straight)
-//   jitter     a random wobble added to each shot's aim, radians either way
-//   range      cells: a pellet that reaches further than this does nothing
-//   recoil     pixels the gun kicks down when it fires
-//   textures   [normal, firing] first-person pictures (textures.js)
-//   flash      the colour of its muzzle flash's light (lighting.js)
-const WEAPONS = {
-  pistol: {
-    name: 'PULSE PISTOL', short: 'PULSE', key: 'Digit1',
-    cost: 1, cooldown: 0.35, auto: false, pellets: 1, spread: 0, jitter: 0, range: Infinity, recoil: 6,
-    textures: PISTOL_TEXTURES, flash: [0.9, 1.2, 1.4],
-  },
-  // Up close, most of its five pellets land on the same robot: a walker in one
-  // shot. At range they've fanned out so far that one hits, if any.
-  scatter: {
-    name: 'SCATTER CANNON', short: 'SCATTER', key: 'Digit2',
-    cost: 3, cooldown: 0.8, auto: false, pellets: 5, spread: 0.2,  jitter: 0, range: 5, recoil: 12,
-    textures: SCATTER_TEXTURES, flash: [1.6, 1.0, 0.4],
-  },
-  // Hold the trigger: eight rounds a second, each wandering a little. It
-  // shreds anything in front of it, and your ammo with it.
-  autocannon: {
-    name: 'AUTOCANNON', short: 'AUTO', key: 'Digit3',
-    cost: 1, cooldown: 0.12, auto: true, pellets: 1, spread: 0, jitter: 0.04, range: Infinity, recoil: 3,
-    textures: AUTOCANNON_TEXTURES, flash: [1.5, 1.3, 0.6],
-  },
+// ACCURACY is a CONE. Each round leaves the barrel at a random angle up to
+// `cone` radians either side of where you're aiming. The robots are a fixed
+// width, so a fixed angle of error matters more the further away they are:
+// at 2 cells a little wobble still lands on the hull, at 8 the same wobble
+// misses. So hitting depends on the mode's accuracy, the distance, and luck,
+// all through one number, and what you see on screen is what happened.
+// Moving while you fire widens the cone (MOVING_CONE): stand still to snipe.
+//
+// LOW AMMO holds it back. Each mode needs `minAmmo` to run: below that the
+// gun won't spin up past the best mode your ammo covers (auto -> burst -> single).
+//
+// Each mode:
+//   name       shown when you pick up its module
+//   rounds     rounds fired per pull of the trigger (one ammo each)
+//   gap        seconds between the rounds of one pull (burst only)
+//   cooldown   seconds after a pull before the next
+//   cone       the most a round can stray, in radians, either side of the aim
+//   climb      extra cone per round within a pull: a burst's recoil climbs
+//   recoil     pixels the gun kicks down when it fires (hud.js)
+//   minAmmo    the least ammo this mode will run on
+const FIRE_MODES = {
+  single: { name: 'SINGLE SHOT', rounds: 1, gap: 0,    cooldown: 0.35, cone: 0.006, climb: 0,     recoil: 6, minAmmo: 1 },
+  burst:  { name: 'BURST',       rounds: 3, gap: 0.07, cooldown: 0.45, cone: 0.02,  climb: 0.015, recoil: 5, minAmmo: 3 },
+  auto:   { name: 'AUTOMATIC',   rounds: 1, gap: 0,    cooldown: 0.12, cone: 0.06,  climb: 0,     recoil: 3, minAmmo: 8 },
 };
-const WEAPON_ORDER = ['pistol', 'scatter', 'autocannon']; // the order Q cycles through
+const MODE_ORDER = ['single', 'burst', 'auto'];          // the spin-up steps, in order
+const SPIN_UP = { single: 0, burst: 0.5, auto: 1.5 };   // seconds of holding the trigger to reach each
+const MOVING_CONE = 0.04;   // extra cone, in radians, while you're walking
+const MODULE_AMMO = 8;      // an upgrade module comes with some ammo
+const GUN_FLASH_LIGHT = [0.9, 1.2, 1.4]; // the colour of your muzzle flash's light (lighting.js)
 
-const WEAPON_MESSAGE_TIME = 1.5; // seconds a weapon's name shows on screen
+const WEAPON_MESSAGE_TIME = 1.5; // seconds a module's name shows on screen
 let weaponMessage = null;
 let weaponMessageTime = 0;
 
-function currentWeapon() {
-  return WEAPONS[player.weapon];
+// Can the gun run in this mode right now: is its module fitted, and is there
+// the ammo for it?
+function modeAvailable(id) {
+  return player.modes.includes(id) && player.ammo >= FIRE_MODES[id].minAmmo;
 }
 
-function selectWeapon(id) {
-  if (!player.weapons.includes(id) || player.weapon === id) return;
-  player.weapon = id;
-  gun.cooldown = 0; // a fresh weapon is ready at once
-  weaponMessage = WEAPONS[id].name;
+// The mode the gun is firing in: the highest step that the time you've held
+// the trigger has reached, stepping back down past any you can't run.
+function activeModeId() {
+  for (let i = MODE_ORDER.length - 1; i > 0; i--) {
+    const id = MODE_ORDER[i];
+    if (gun.heldTime >= SPIN_UP[id] && modeAvailable(id)) return id;
+  }
+  return 'single';
+}
+
+function currentMode() {
+  return FIRE_MODES[activeModeId()];
+}
+
+// For the coils (hud.js): how many are lit, and how close the gun is to
+// lighting the next one (0 = just started winding, 1 = there; null if it
+// isn't winding up to anything).
+function spinUpState() {
+  const at = MODE_ORDER.indexOf(activeModeId());
+  const next = MODE_ORDER[at + 1];
+  if (!triggerHeld() || next === undefined || !modeAvailable(next)) return { lit: at + 1, progress: null };
+  const from = SPIN_UP[MODE_ORDER[at]];
+  return { lit: at + 1, progress: (gun.heldTime - from) / (SPIN_UP[next] - from) };
+}
+
+function showWeaponMessage(text) {
+  weaponMessage = text;
   weaponMessageTime = WEAPON_MESSAGE_TIME;
 }
 
-// Q: the next weapon you're carrying, in WEAPON_ORDER, wrapping round.
-function cycleWeapon() {
-  const owned = WEAPON_ORDER.filter((id) => player.weapons.includes(id));
-  selectWeapon(owned[(owned.indexOf(player.weapon) + 1) % owned.length]);
-}
-
-// Walking over a weapon: new ones join your kit and go straight into your
-// hands; one you already have is worth its ammo instead.
-const WEAPON_PICKUP_AMMO = 8;
-function collectWeapon(id) {
-  player.ammo += WEAPON_PICKUP_AMMO;
-  if (player.weapons.includes(id)) return;
-  player.weapons.push(id);
-  selectWeapon(id);
+// Walking over an upgrade module: it's fitted, and the gun can spin up further.
+function collectModule(id) {
+  player.ammo += MODULE_AMMO;
+  if (player.modes.includes(id)) return;
+  player.modes.push(id);
+  showWeaponMessage(FIRE_MODES[id].name + ' MODULE');
 }
 
 function updateWeapons(dt) {

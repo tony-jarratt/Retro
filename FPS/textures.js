@@ -858,10 +858,14 @@ function makeTerminal(safe) {
 }
 
 // THE PLAYER'S GUN ----------------------------------------------------------------
-// A boxy pulse pistol seen from behind, with glowing coils round the barrel.
+// A chunky pulse gun seen from behind, with three coils round the barrel.
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
-// at 2x size. GUN_FLASH is the same gun firing.
-function makeGun(flash) {
+// at 2x size. `flash` draws it firing. The coils show the FIRE MODE
+// (weapons.js): `lit` of them glow, counting from the body: one is single
+// shot, two burst, three automatic. Only the count means anything; the coil
+// colour is kept free to mean something else later (an ammo type, say).
+const COIL_COLOUR = [90, 230, 255];
+function makeGun(flash, lit) {
   return makeTexture(DARK_STEEL, (x, y) => {
     const dx = x + 0.5 - 32;
     if (flash && y >= 0 && y < 14) {
@@ -872,19 +876,41 @@ function makeGun(flash) {
       if (d <= r * 0.5) return [230, 255, 255];
       if (d <= r) return [90, 210, 255];
     }
-    if (y >= 12 && y < 15 && Math.abs(dx) < 3) return [16, 16, 18];        // muzzle
-    if (y >= 15 && y < 27 && Math.abs(dx) < 5) {                          // barrel shroud
-      if (y % 3 === 1) return [90, 230, 255];                             // glowing coils
-      return brighten(DARK_STEEL, roundShade(dx / 5) * 1.3);
+    // Still a chunky block of pixels, but shaped rather than stacked boxes:
+    // the barrel tapers to a flared muzzle, sloping shoulders join it to the
+    // body, and the body's corners are rounded off and it widens towards you.
+    const ax = Math.abs(dx);
+    if (y >= 10 && y < 13) {                                              // muzzle brake: a flared lip
+      if (ax >= 3.5) return null;
+      if (y === 10 && ax < 1.5) return [16, 16, 18];                      // the bore, seen from behind
+      if (y === 11 && ax >= 2.5) return [16, 16, 18];                     // brake ports either side
+      return brighten(DARK_STEEL, y === 10 ? 1.6 : 1.2);
+      return null;
     }
-    if (y >= 27 && y < 47) {                                              // body, wider nearer to you
-      const halfW = 8 + (y - 27) * 0.1;
-      if (Math.abs(dx) <= halfW) {
-        if (y < 29) return brighten(DARK_STEEL, 1.7);                      // top rail
-        if (Math.abs(dx) > halfW - 3 && y % 4 === 0) return [16, 16, 18];   // side vents
-        if (y >= 38 && y < 41 && Math.abs(dx) < 2) return glowing(PHOSPHOR); // charge readout
-        return brighten([64, 68, 78], roundShade(dx / halfW) * 1.1);
-      }
+    if (y >= 13 && y < 27) {                                              // barrel shroud, tapering to the front
+      const halfW = 3 + (y - 13) * 0.15;
+      if (ax >= halfW) return null;
+      const n = [24, 20, 16].indexOf(y);                                  // coil 0 nearest the body
+      if (n !== -1 && n < lit) return glowing(COIL_COLOUR);               // a lit coil
+      if (n !== -1) return [30, 34, 40];                                  // an unlit one
+      if (y < 15) return brighten(DARK_STEEL, roundShade(dx / halfW));    // bare barrel tip
+      return brighten(DARK_STEEL, roundShade(dx / halfW) * 1.3);
+    }
+    if (y >= 27 && y < 31) {                                              // shoulders: sloping out to the body
+      const halfW = 5.5 + (y - 27) * 1.2;
+      if (ax >= halfW) return null;
+      if (y === 27 && ax < 1) return brighten(DARK_STEEL, 2);             // front sight post
+      return brighten(DARK_STEEL, (1.9 - (y - 27) * 0.1) * roundShade(dx / halfW));
+    }
+    if (y >= 31 && y < 47) {                                              // body, widening towards you
+      const halfW = 10 + (y - 31) * 0.15;
+      if (ax > halfW) return null;
+      if (y < 33 && ax > halfW - 2) return null;                          // rounded top corners
+      if (y === 31 && ax >= 2 && ax < 3) return brighten(DARK_STEEL, 2);  // rear sight notch
+      if (ax > halfW - 3 && y % 4 === 0) return [16, 16, 18];             // side vents
+      if (y >= 37 && y < 43 && ax < 3.5) return [10, 8, 8];               // ammo counter window (hud.js draws the digits)
+      if (y >= 36 && y < 44 && ax < 4.5) return [24, 24, 28];             // its bezel
+      return brighten([64, 68, 78], roundShade(dx / halfW) * 1.1);
     }
     if (y >= 47) return gunHand(x, y, dx);
     return null;
@@ -900,85 +926,17 @@ function gunHand(x, y, dx) {
   return brighten([58, 54, 52], f);
 }
 
-// The scatter cannon: three stubby barrels side by side on a heavy body with
-// a hazard band. Its flash is a wide orange fan: the spread of the shot.
-function makeScatterCannon(flash) {
-  const body = [92, 78, 54];
-  return makeTexture(body, (x, y) => {
-    const dx = x + 0.5 - 32;
-    if (flash && y < 16) {
-      const spread = 6 + (16 - y) * 1.3; // wider further from the muzzles
-      if (Math.abs(dx) < spread * 0.5 && noise(x, y, 46) < 0.8) return glowing([255, 240, 190]);
-      if (Math.abs(dx) < spread && noise(x, y, 47) < 0.55) return glowing([255, 150, 50]);
+// A fire-mode upgrade module lying on the floor: a small steel cartridge with
+// `stripes` glowing stripes, matching the number of coils it lights on your gun.
+function makeUpgradeModule(stripes) {
+  return makeTexture(COIL_COLOUR, (x, y) => {
+    if (y < 50 || y >= 62 || x < 22 || x >= 42) return null;
+    if (y === 50 || y === 61 || x === 22 || x === 41) return DARK_STEEL;   // casing edge
+    const band = Math.floor((x - 25) / 5);                                 // three stripe slots
+    if (y >= 53 && y < 59 && (x - 25) % 5 < 3 && band >= 0 && band < 3) {
+      return band < stripes ? glowing(COIL_COLOUR) : [30, 34, 40];
     }
-    for (const bx of [-8, 0, 8]) {
-      if (y >= 14 && y < 31 && Math.abs(dx - bx) < 3) {                  // barrels
-        if (y < 16) return [14, 14, 16];                                  // muzzle
-        if (y === 22) return DARK_STEEL;                                  // clamp
-        return brighten(STEEL, roundShade((dx - bx) / 3));
-      }
-    }
-    if (y >= 29 && y < 47) {                                              // body
-      const halfW = 13 + (y - 29) * 0.12;
-      if (Math.abs(dx) <= halfW) {
-        if (y >= 34 && y < 38) return hazard(x, y, false);               // hazard band
-        if (y < 31) return brighten(body, 1.5);                           // top edge
-        return brighten(body, roundShade(dx / halfW) * (0.95 + 0.1 * noise(x, y, 48)));
-      }
-    }
-    if (y >= 47) return gunHand(x, y, dx);
-    return null;
-  });
-}
-
-// The autocannon: a cluster of three long barrels held by clamps, and a drum
-// magazine on the left. `spin` (0 or 1) shows the barrels a third of a turn
-// on: alternating the two frames while firing makes them seem to rotate.
-function makeAutocannon(flash, spin) {
-  const body = [70, 74, 64];
-  return makeTexture(body, (x, y) => {
-    const dx = x + 0.5 - 32;
-    if (flash && y < 9) {
-      const r = Math.hypot(dx, y + 0.5 - 4);
-      if (r < 2.5) return glowing([255, 255, 210]);
-      if (r < 4.5 + 2 * Math.abs(Math.cos(3 * Math.atan2(y + 0.5 - 4, dx)))) return glowing([255, 200, 60]);
-    }
-    if (y >= 3 && y < 30) {                                               // barrels
-      if (y === 9 || y === 19) { if (Math.abs(dx) < 6.5) return DARK_STEEL; } // clamps
-      for (let b = 0; b < 3; b++) {
-        const bx = (b - 1) * 4;
-        if (Math.abs(dx - bx) < 1.5) {
-          if (y < 5) return [14, 14, 16];
-          return brighten(STEEL, (b + spin) % 3 === 0 ? 1.4 : 0.8);       // the lit barrel moves round
-        }
-      }
-    }
-    // Drum magazine, left of the body.
-    const mr = Math.hypot(dx + 15, y + 0.5 - 38);
-    if (mr < 8) return mr > 6.5 ? DARK_STEEL : brighten(body, 0.9 + 0.25 * (y < 36 ? 1 : 0));
-    if (y >= 28 && y < 47) {                                              // body
-      const halfW = 8 + (y - 28) * 0.12;
-      if (Math.abs(dx) <= halfW) {
-        if (y < 30) return brighten(body, 1.6);
-        if (y >= 40 && y < 42 && Math.abs(dx) < 3) return glowing(AMBER);  // round counter
-        return brighten(body, roundShade(dx / halfW));
-      }
-    }
-    if (y >= 47) return gunHand(x, y, dx);
-    return null;
-  });
-}
-
-// A weapon lying on the floor, to pick up: a dark case with the weapon's
-// colour stencilled on it and an amber beacon, so you spot it from afar.
-function makeWeaponPickup(colour) {
-  return makeTexture(colour, (x, y) => {
-    if (y < 46 || y >= 62 || x < 14 || x >= 50) return null;
-    if (y < 48 && Math.abs(x + 0.5 - 32) < 2) return glowing(AMBER);       // beacon
-    if (y < 48) return null;
-    if (y === 48 || y === 61 || x === 14 || x === 49) return DARK_STEEL;   // case edge
-    if (y >= 52 && y < 57 && x > 18 && x < 46) return brighten(colour, 0.9 + 0.2 * noise(x, y, 49)); // stencilled gun shape
-    return brighten([46, 50, 44], 0.9 + 0.15 * noise(x, y, 50));
+    return brighten(STEEL, 0.8 + 0.2 * noise(x, y, 50));
   });
 }
 
@@ -1046,13 +1004,12 @@ const ROCKET_TEXTURE = makeRocket();
 const CAMERA_TEXTURES = { watching: makeCamera('watching'), offline: makeCamera('offline'), destroyed: makeCamera('destroyed') };
 const BEAM_TEXTURE = makeBeam();
 const TERMINAL_TEXTURES = { armed: makeTerminal(false), safe: makeTerminal(true) };
-// Each weapon's first-person picture: [normal, firing] (weapons.js).
-// The autocannon's second frame also turns its barrels.
-const PISTOL_TEXTURES = [makeGun(false), makeGun(true)];
-const SCATTER_TEXTURES = [makeScatterCannon(false), makeScatterCannon(true)];
-const AUTOCANNON_TEXTURES = [makeAutocannon(false, 0), makeAutocannon(true, 1)];
-const SCATTER_PICKUP_TEXTURE = makeWeaponPickup([210, 140, 50]);
-const AUTOCANNON_PICKUP_TEXTURE = makeWeaponPickup([150, 200, 90]);
+// The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
+// GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
+const GUN_TEXTURES = [1, 2, 3].map((lit) => [makeGun(false, lit), makeGun(true, lit)]);
+GUN_TEXTURES.unshift(null); // so GUN_TEXTURES[1] is one coil, not GUN_TEXTURES[0]
+const BURST_MODULE_TEXTURE = makeUpgradeModule(2);
+const AUTO_MODULE_TEXTURE = makeUpgradeModule(3);
 
 const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
 const GRATE_TEXTURE = makeGrate();

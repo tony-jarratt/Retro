@@ -1,6 +1,6 @@
 // The HUD (heads-up display): everything drawn flat on top of the 3D view,
-// straight into the same pixel buffer: the gun, the crosshair, the health
-// bar, a robot counter, the red damage flash, and end-of-game messages.
+// straight into the same pixel buffer: the gun and its ammo counter, the
+// crosshair, the health bar, keycards, the damage and pickup flashes, and messages.
 // Styled like a green-phosphor CRT readout.
 
 const HUD_GREEN = [120, 255, 150];
@@ -86,32 +86,49 @@ function drawTextCentred(pixels, text, y, rgb, scale) {
   drawText(pixels, text, Math.floor((SCREEN_W - textWidth(text, scale)) / 2), y, rgb, scale);
 }
 
-// Stamp a texture onto the screen at `scale` times its size, skipping
-// see-through texels. No perspective here: the HUD is flat.
-function drawTextureFlat(pixels, tex, x, y, scale) {
-  for (let ty = 0; ty < TEX_SIZE; ty++) {
-    for (let tx = 0; tx < TEX_SIZE; tx++) {
+// Stamp a texture onto the screen as a `size` x `size` square, skipping
+// see-through texels. No perspective here: the HUD is flat. It works screen
+// pixel by screen pixel, asking which texel lands there (the same "nearest
+// texel" lookup the walls use), so any size works, not just whole multiples
+// of 64: at 96, every other texel is drawn two pixels wide, the rest one.
+function drawTextureFlat(pixels, tex, x, y, size) {
+  for (let row = 0; row < size; row++) {
+    const ty = Math.floor(row * TEX_SIZE / size);
+    for (let col = 0; col < size; col++) {
+      const tx = Math.floor(col * TEX_SIZE / size);
       if (isTransparent(tex, tx, ty)) continue;
       const t = (ty * TEX_SIZE + tx) * 4;
-      const rgb = [tex.pixels[t], tex.pixels[t + 1], tex.pixels[t + 2]];
-      fillRect(pixels, x + tx * scale, y + ty * scale, scale, scale, rgb);
+      putPixel(pixels, x + col, y + row, [tex.pixels[t], tex.pixels[t + 1], tex.pixels[t + 2]]);
     }
   }
 }
 
-// The gun: 2x size at the bottom centre. It bobs in a figure-of-eight as you
-// walk (sideways at the step rate, up and down at twice it), and kicks down
-// while its muzzle flash shows.
+// The gun: 1.5x size (96 pixels square) at the bottom centre. It bobs in a
+// figure-of-eight as you walk (sideways at the step rate, up and down at
+// twice it), and kicks down while its muzzle flash shows.
+const GUN_SIZE = 96;
 function drawGun(pixels) {
-  const scale = 2;
   const bobX = Math.round(Math.sin(player.walkTime * 6) * 4);
   const bobY = Math.round(Math.abs(Math.cos(player.walkTime * 6)) * 4);
-  const recoil = gun.flash > 0 ? currentWeapon().recoil : 0;
-  const x = SCREEN_W / 2 - TEX_SIZE * scale / 2 + bobX;
-  // +26 sinks the gun so its muzzle sits well below the crosshair, with the
+  const recoil = gun.flash > 0 ? currentMode().recoil : 0;
+  const x = Math.round(SCREEN_W / 2 - GUN_SIZE / 2) + bobX;
+  // +18 sinks the gun so its muzzle sits well below the crosshair, with the
   // hand's bottom edge off screen.
-  const y = SCREEN_H - TEX_SIZE * scale + 26 + bobY + recoil;
-  drawTextureFlat(pixels, currentWeapon().textures[gun.flash > 0 ? 1 : 0], x, y, scale);
+  const y = SCREEN_H - GUN_SIZE + 18 + bobY + recoil;
+  drawTextureFlat(pixels, GUN_TEXTURES[litCoils()][gun.flash > 0 ? 1 : 0], x, y, GUN_SIZE);
+  drawAmmoCounter(pixels, x, y);
+}
+
+// THE COILS show the gun spinning up (weapons.js): one lit per mode reached.
+// While it winds up towards the next mode, the next coil flickers, on for a
+// growing share of each flicker and the flicker itself speeding up, until it
+// stays on. `progress` runs 0 -> 1 between one mode and the next.
+function litCoils() {
+  const { lit, progress } = spinUpState();
+  if (progress === null) return lit;
+  const rate = 6 + 24 * progress;                          // flickers per second: faster as it nears
+  const phase = (animTime * rate) % 1;                     // where we are in this flicker, 0..1
+  return phase < progress * progress ? lit + 1 : lit;      // on for a growing share of it
 }
 
 // A small gap-centred cross on the exact centre pixel the shot tests.
@@ -154,20 +171,48 @@ function drawHealth(pixels) {
   }
 }
 
-// Bottom right: the weapon in your hands and the ammo; red when there's not
-// enough for its next shot.
-function ammoText() {
-  return currentWeapon().short + ' ' + player.ammo;
+// THE AMMO COUNTER on the gun: two red seven-segment digits, like an LED
+// panel. Each digit is 3 pixels wide and 5 tall, and lights some of its
+// seven segments:
+//      aaa
+//      f b        a top, b top right, c bottom right, d bottom,
+//      ggg        e bottom left, f top left, g middle
+//      e c
+//      ddd
+// Unlit segments still glow faintly, as on a real panel. It's drawn straight
+// onto the screen each frame, over the gun's dark counter window, so it
+// moves with the gun and always shows the live count. Empty, it blinks 00.
+const SEGMENTS = {
+  a: [[0, 0], [1, 0], [2, 0]], b: [[2, 0], [2, 1], [2, 2]], c: [[2, 2], [2, 3], [2, 4]],
+  d: [[0, 4], [1, 4], [2, 4]], e: [[0, 2], [0, 3], [0, 4]], f: [[0, 0], [0, 1], [0, 2]],
+  g: [[0, 2], [1, 2], [2, 2]],
+};
+const DIGIT_SEGMENTS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
+const LED_ON = [255, 64, 40];
+const LED_OFF = [58, 14, 10];
+
+function drawSegmentDigit(pixels, digit, x, y, lit) {
+  // Unlit segments first, then the lit ones over them, so where two segments
+  // share a corner pixel, lit wins.
+  for (const name in SEGMENTS) for (const [sx, sy] of SEGMENTS[name]) putPixel(pixels, x + sx, y + sy, LED_OFF);
+  if (!lit) return;
+  for (const name of DIGIT_SEGMENTS[digit]) for (const [sx, sy] of SEGMENTS[name]) putPixel(pixels, x + sx, y + sy, LED_ON);
 }
 
-function drawAmmo(pixels) {
-  const colour = player.ammo < currentWeapon().cost ? HUD_WARN : HUD_GREEN;
-  drawText(pixels, ammoText(), SCREEN_W - READOUT_MARGIN - textWidth(ammoText(), 1), READOUT_Y, colour, 1);
+// gunX, gunY: where drawGun put the gun's top-left corner. The counter window
+// is texture rows 37-42, centred, so 38 * (GUN_SIZE / 64) down from the top.
+function drawAmmoCounter(pixels, gunX, gunY) {
+  const shown = Math.min(99, player.ammo);
+  const lit = shown > 0 || Math.floor(animTime * 3) % 2 === 0; // empty: blink
+  const cx = gunX + GUN_SIZE / 2;
+  const top = gunY + Math.round(38 * GUN_SIZE / TEX_SIZE);
+  drawSegmentDigit(pixels, Math.floor(shown / 10), cx - 4, top, lit);
+  drawSegmentDigit(pixels, shown % 10, cx, top, lit);
 }
 
 // The keycards you're carrying: a small card in each colour, just left of the ammo count.
 function drawKeys(pixels) {
-  const right = SCREEN_W - READOUT_MARGIN - textWidth(ammoText(), 1) - 6;
+  const right = SCREEN_W - READOUT_MARGIN; // bottom right of the visor rim
   player.keys.forEach((colour, n) => {
     const x = right - 9 - n * 11;
     fillRect(pixels, x, READOUT_Y, 9, 6, [0, 0, 0]);
@@ -194,7 +239,6 @@ function drawHud(pixels) {
   if (visorOn) applyVisor(pixels);
 
   drawHealth(pixels);
-  drawAmmo(pixels);
   drawKeys(pixels);
   if (game.state === 'playing') {
     if (lockedDoorHint) {

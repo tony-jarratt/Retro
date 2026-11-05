@@ -14,12 +14,21 @@ const PLAYER_HURT_FLASH = 0.3;  // seconds the screen flashes red when you're hi
 //   endTime      seconds since the game ended (for the slow fade)
 const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0 };
 
-// cooldown: seconds until you can fire again; flash: seconds of muzzle flash left.
-const gun = { cooldown: 0, flash: 0 };
+// The gun's moment-to-moment state (its fire modes are in weapons.js):
+//   cooldown    seconds until you can pull the trigger again
+//   flash       seconds of muzzle flash left
+//   burstLeft   rounds of this pull still to fire (a burst's 2nd and 3rd)
+//   burstTimer  seconds until the next of them
+//   burstRound  how many rounds of this pull have gone (for a burst's climb)
+//   pullMode    the mode this pull was fired in: it keeps it to the end, even
+//               if the ammo drops below that mode's minimum part-way
+//   heldTime    seconds the trigger has been held: how far the gun has spun up (weapons.js)
+//   lastMode    the mode last frame, to notice it stepping up
+const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0, pullMode: 'single', heldTime: 0, lastMode: 'single' };
 
-// What does a shot fired at `angle` hit? For the straight-ahead shot that's
-// whatever is under the crosshair; the scatter cannon's pellets and the
-// autocannon's wobble fire at angles a little to either side. Either way the
+// What does a shot fired at `angle` hit? For a dead-straight shot that's
+// whatever is under the crosshair; a round that strays (weapons.js: the
+// accuracy cone) flies at an angle a little to one side. Either way the
 // question is the same, asked as if we were looking along that angle: a
 // `viewer` standing where you are, facing it, so the shot runs through the
 // exact centre of ITS screen.
@@ -37,8 +46,7 @@ const gun = { cooldown: 0, flash: 0 };
 // practice this asks "is the shot on its silhouette?" at hull height. The
 // walker's hull is a long box, so it's a slightly wider target side-on than face-on.
 //
-// Returns { target, dist }: target is a sprite thing, { panel } for a window,
-// or null for a wall; dist is how far away it is (for the scatter's range).
+// Returns a sprite thing, { panel } for a window, or null for a wall.
 function shotTarget(angle) {
   const viewer = { x: player.x, y: player.y, angle };
   const ray = castRay(player.x, player.y, Math.cos(angle), Math.sin(angle));
@@ -55,32 +63,43 @@ function shotTarget(angle) {
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
     if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward };
   }
-  if (best) return { target: best.thing, dist: best.forward };
-  if (glass) return { target: { panel: glass.panel }, dist: glass.dist }; // nothing nearer: the window takes it
-  return { target: null, dist: ray.dist };
+  if (best) return best.thing;
+  if (glass) return { panel: glass.panel }; // nothing nearer: the window takes it
+  return null;
 }
 
-// Fire the weapon in your hands (weapons.js): pay its ammo, then send each of
-// its pellets out at its own angle. A scatter cannon's five pellets are
-// fanned evenly across its spread; the autocannon's one round wobbles by a
-// random amount up to its jitter. Each pellet hits whatever shotTarget finds,
-// if that's within the weapon's range.
+// A pull of the trigger, in the current fire mode (weapons.js). The first
+// round goes now; a burst's other rounds follow, `gap` seconds apart, from
+// updateCombat. Each round costs one ammo, so a burst can run dry part-way.
 function playerFire() {
-  if (game.state !== 'playing' || gun.cooldown > 0) return;
-  const weapon = currentWeapon();
-  if (player.ammo < weapon.cost) return; // not enough: nothing happens (the HUD shows the count in red)
-  player.ammo -= weapon.cost;
-  gun.cooldown = weapon.cooldown;
-  gun.flash = Math.min(GUN_FLASH_TIME, weapon.cooldown * 0.6); // a fast gun's flash has to end before its next shot
-  for (let n = 0; n < weapon.pellets; n++) {
-    const fan = weapon.pellets === 1 ? 0 : -weapon.spread / 2 + weapon.spread * n / (weapon.pellets - 1);
-    const wobble = (Math.random() * 2 - 1) * weapon.jitter;
-    const shot = shotTarget(player.angle + fan + wobble);
-    if (shot.target && shot.dist <= weapon.range) shotHits(shot.target);
-  }
+  if (game.state !== 'playing' || gun.cooldown > 0 || gun.burstLeft > 0) return;
+  if (player.ammo === 0) return; // empty: nothing happens (the HUD shows the count in red)
+  gun.pullMode = activeModeId();
+  const mode = FIRE_MODES[gun.pullMode];
+  gun.cooldown = mode.cooldown + mode.gap * (mode.rounds - 1); // from the pull, so it includes the burst
+  gun.burstLeft = mode.rounds;
+  gun.burstRound = 0;
+  fireRound();
 }
 
-// One bullet (or pellet) arriving at what it hit.
+// One round. It strays a random amount within the mode's cone (wider for
+// each round of a burst, and wider if you're walking), then hits whatever
+// shotTarget finds along that line.
+function fireRound() {
+  const mode = FIRE_MODES[gun.pullMode];
+  if (player.ammo === 0) { gun.burstLeft = 0; return; }
+  player.ammo -= 1;
+  gun.burstLeft -= 1;
+  gun.burstTimer = mode.gap;
+  // A fast gun's flash has to be over before its next round, or it'd never flicker.
+  gun.flash = Math.min(GUN_FLASH_TIME, mode.cooldown * 0.6, mode.rounds > 1 ? mode.gap * 0.8 : Infinity);
+  const cone = mode.cone + mode.climb * gun.burstRound + (player.moving ? MOVING_CONE : 0);
+  gun.burstRound += 1;
+  const target = shotTarget(player.angle + (Math.random() * 2 - 1) * cone);
+  if (target) shotHits(target);
+}
+
+// One round arriving at what it hit.
 function shotHits(target) {
   if (target.panel) { hitGlass(target.panel); return; } // panels.js
   if (target.enemy && target.enemy.state !== 'dead') {
@@ -95,9 +114,10 @@ function shotHits(target) {
   }
 }
 
-// Take `hits` off a robot (1 unless given). Shot from somewhere it wasn't
-// watching, it now knows where you are; a sleeping turret wakes up.
-function damageEnemy(enemy, hits = 1) {
+// Take `hits` off a robot (1 unless given). Unless `byPlayer` is false (it
+// walked into steam), it now knows where you are, and TURNS TO FACE YOU
+// whatever it was doing (turnTowardsPlayer, enemies.js); a sleeping turret wakes up.
+function damageEnemy(enemy, hits = 1, byPlayer = true) {
   enemy.health -= hits;
   enemy.hurtTime = HURT_FLASH_TIME;
   if (enemy.health <= 0) {
@@ -106,7 +126,9 @@ function damageEnemy(enemy, hits = 1) {
     dropClip(enemy);
     return;
   }
+  if (!byPlayer) return;
   wakeTurret(enemy);
+  turnTowardsPlayer(enemy);
   if (enemy.state === 'idle' || enemy.state === 'search') {
     if (ROBOT_TYPES[enemy.type].mobile) enemy.state = 'chase';
     enemy.lastSeenX = player.x;
@@ -144,9 +166,24 @@ function damagePlayer(amount) {
 
 function updateCombat(dt) {
   gun.cooldown = Math.max(0, gun.cooldown - dt);
-  // An automatic weapon keeps firing while the trigger is held; playerFire's
-  // cooldown check spaces the shots out.
-  if (currentWeapon().auto && triggerHeld()) playerFire();
+  // The rest of a burst, one round each time its gap runs out.
+  if (gun.burstLeft > 0 && game.state === 'playing') {
+    gun.burstTimer -= dt;
+    if (gun.burstTimer <= 0) fireRound();
+  }
+  // SPIN-UP (weapons.js): holding the trigger winds the gun up; letting go
+  // drops it back to single at once. Pressing fires a single shot by itself
+  // (setupInput calls playerFire); once it has spun up to burst or automatic,
+  // it keeps firing for as long as you hold, playerFire's cooldown check
+  // spacing the shots out.
+  if (triggerHeld() && game.state === 'playing') gun.heldTime += dt;
+  else gun.heldTime = 0;
+  // Stepping up mustn't mean waiting out the slower mode's cooldown: the
+  // new, faster mode takes over at once.
+  const mode = activeModeId();
+  if (mode !== gun.lastMode) gun.cooldown = Math.min(gun.cooldown, FIRE_MODES[mode].cooldown);
+  gun.lastMode = mode;
+  if (triggerHeld() && mode !== 'single') playerFire();
   gun.flash = Math.max(0, gun.flash - dt);
   game.hurtFlash = Math.max(0, game.hurtFlash - dt);
   game.pickupFlash = Math.max(0, game.pickupFlash - dt);

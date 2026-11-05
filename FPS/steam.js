@@ -72,7 +72,7 @@ function updateSteam(dt) {
     }
     const t = (robotScald.get(e) || 0) + dt;
     if (t >= ROBOT_SCALD_TICK) {
-      damageEnemy(e, 1);
+      damageEnemy(e, 1, false); // not your doing: it doesn't turn on you
       robotScald.set(e, t - ROBOT_SCALD_TICK);
     } else {
       robotScald.set(e, t);

@@ -24,7 +24,7 @@ const FULL_LIGHT = [1, 1, 1];
 const LAMP_LIGHT = { colour: [1.4, 0.85, 0.35], radius: 4.5 };    // caged sodium lamps
 const CEILING_LIGHT = { colour: [0.9, 0.95, 1.05], radius: 3.5 }; // strip lights: cool white
 const SCREEN_LIGHT = { colour: [0.15, 0.5, 0.25], radius: 2.5 };  // computer banks: a green spill
-const PLAYER_FLASH_RADIUS = 5;                                    // your gun (its colour is per weapon, weapons.js)
+const PLAYER_FLASH_RADIUS = 5;                                    // your gun (its colour: GUN_FLASH_LIGHT, weapons.js)
 const ROBOT_FLASH = { colour: [1.4, 1.0, 0.5], radius: 4.5 };     // a walker's chin gun
 
 // A light map: 3 floats (R, G, B) per sample, row after row like everything else.
@@ -212,7 +212,7 @@ function updateLighting() {
   // Muzzle flashes, fading as their flash timers run down. Worked out fresh
   // each frame (shadows and all), which is affordable for a light or two.
   if (gun.flash > 0) {
-    addLight(lightGrid, player.x, player.y, currentWeapon().flash, PLAYER_FLASH_RADIUS, gun.flash / GUN_FLASH_TIME);
+    addLight(lightGrid, player.x, player.y, GUN_FLASH_LIGHT, PLAYER_FLASH_RADIUS, gun.flash / GUN_FLASH_TIME);
   }
   for (const e of enemies) {
     if (e.firedTime > 0) addLight(lightGrid, e.x, e.y, ROBOT_FLASH.colour, ROBOT_FLASH.radius, e.firedTime / ROBOT_FIRE_FLASH);

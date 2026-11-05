@@ -25,14 +25,14 @@ const PICKUP_TYPES = {
       return true;
     },
   },
-  // Weapons (weapons.js): new ones go straight into your hands.
-  scatter: {
-    texture: SCATTER_PICKUP_TEXTURE,
-    collect: () => { collectWeapon('scatter'); return true; },
+  // Fire-mode upgrade modules for your gun (weapons.js): switched on at once.
+  burstmod: {
+    texture: BURST_MODULE_TEXTURE,
+    collect: () => { collectModule('burst'); return true; },
   },
-  autocannon: {
-    texture: AUTOCANNON_PICKUP_TEXTURE,
-    collect: () => { collectWeapon('autocannon'); return true; },
+  automod: {
+    texture: AUTO_MODULE_TEXTURE,
+    collect: () => { collectModule('auto'); return true; },
   },
   // Keycards: 'redkey', 'bluekey'. Collecting one lets you through doors of
   // that colour (playerCanOpen in doors.js).
@@ -65,10 +65,10 @@ function updatePickups() {
 // A destroyed robot drops a clip on its wreck. Both sprites then sit at the
 // same distance; the sort in placeSprites keeps ties in list order, and
 // pickups come after robots in that list, so the clip is drawn on top.
-// A heavy drops its AUTOCANNON instead, if you haven't got one yet (and
-// there isn't one already lying about): bring down a heavy and you're armed.
+// A heavy drops the AUTOMATIC fire module instead, if you haven't got it yet
+// (and there isn't one already lying about): bring down a heavy for it.
 function dropClip(enemy) {
-  const wantAutocannon = enemy.type === 'heavy' && !player.weapons.includes('autocannon') &&
-    !pickups.some((p) => p.type === 'autocannon');
-  pickups.push({ type: wantAutocannon ? 'autocannon' : 'clip', x: enemy.x, y: enemy.y });
+  const wantModule = enemy.type === 'heavy' && !player.modes.includes('auto') &&
+    !pickups.some((p) => p.type === 'automod');
+  pickups.push({ type: wantModule ? 'automod' : 'clip', x: enemy.x, y: enemy.y });
 }

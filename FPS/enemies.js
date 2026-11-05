@@ -9,6 +9,7 @@ const ENEMY_VIEW_CONE = 120 * Math.PI / 180; // how wide an idle robot looks, in
 const SIGHT_RANGE = 10;                      // cells; nothing sees further than this
 const WALK_FPS = 4;                          // walk animation frames per second
 const TURRET_SWEEP_SPEED = 0.7;              // radians per second an awake turret turns while looking
+const SHOT_TURN_SPEED = 12;                  // radians per second a shot robot spins round to face you: half a turn in 0.25s
 
 // THE ROBOT TYPES. The numbers are the whole difference between them; the
 // state machine below is shared. Each type changes how you fight it:
@@ -46,6 +47,7 @@ const ROBOT_TYPES = {
 //   charge                 seconds spent charging its shot while aiming
 //   hurtTime, firedTime    seconds left of its white hit flash / muzzle flash
 //   path                   the cells it's following this frame (pathfinding.js), or null
+//   turning                true while it's spinning round to face whoever shot it
 const enemies = ENEMIES.map((start) => ({
   type: start.type,
   x: start.x,
@@ -61,6 +63,7 @@ const enemies = ENEMIES.map((start) => ({
   hurtTime: 0,
   firedTime: 0,
   path: null,
+  turning: false,
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -142,6 +145,32 @@ function alertEnemy(enemy, x, y) {
   if (enemy.state === 'idle' || enemy.state === 'search') enemy.state = 'search';
 }
 
+// SHOT: whatever it was doing, a robot that's hit swings round to face you.
+// Not instantly: it turns at SHOT_TURN_SPEED, so a shot in the back buys you
+// a moment. Turning takes over from its state machine until it's facing you
+// (updateEnemy). An offline turret has been shut down and doesn't react.
+function turnTowardsPlayer(enemy) {
+  if (enemy.state === 'dead' || enemy.state === 'offline') return;
+  // Already facing you (say, a robot aiming at you): nothing to turn, and
+  // pausing it would let rapid fire freeze it in place.
+  const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  if (Math.abs(angleDiff(want, enemy.angle)) > 0.1) enemy.turning = true;
+}
+
+// One frame of turning: rotate towards you by at most SHOT_TURN_SPEED * dt,
+// the short way round. Returns true once it's facing you.
+function turnStep(enemy, dt) {
+  const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  const diff = angleDiff(want, enemy.angle);
+  const step = SHOT_TURN_SPEED * dt;
+  if (Math.abs(diff) <= step) {
+    enemy.angle = want;
+    return true;
+  }
+  enemy.angle += Math.sign(diff) * step;
+  return false;
+}
+
 // Wake a sleeping turret (a tripwire, or being shot). An offline one stays off.
 function wakeTurret(enemy) {
   if (enemy.type === 'turret' && enemy.state === 'dormant') enemy.state = 'idle';
@@ -207,6 +236,12 @@ function updateEnemy(enemy, dt) {
   enemy.path = null; // only set while it's following one this frame
   enemy.moving = false;
   if (enemy.state === 'dead') return;
+
+  // Just been shot: spin round to face you first, then carry on as normal.
+  if (enemy.turning) {
+    if (turnStep(enemy, dt)) enemy.turning = false;
+    return;
+  }
 
   if (ROBOT_TYPES[enemy.type].mobile) updateWalker(enemy, dt);
   else updateTurret(enemy, dt);

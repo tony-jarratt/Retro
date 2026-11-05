@@ -15,14 +15,14 @@ const player = {
   health: PLAYER_MAX_HEALTH,
   ammo: PLAYER_START_AMMO,
   keys: [],             // keycard colours collected, e.g. ['red']
-  weapons: ['pistol'],  // weapons carried (weapons.js), in the order picked up
-  weapon: 'pistol',     // the one in your hands
+  modes: ['single'],    // fire modes your gun can spin up to (weapons.js), in the order found
+  moving: false,        // walking this frame (it spoils your aim: MOVING_CONE)
   walkTime: 0,
 };
 
 const keys = {};   // e.code -> true while that key is held, e.g. keys.KeyW
 let mouseTurn = 0; // mouse pixels moved since the last frame
-let mouseHeld = false; // left button down (with the mouse captured): for automatic weapons
+let mouseHeld = false; // left button down (with the mouse captured): spins the gun up (weapons.js)
 
 // Is the trigger held down right now (Up arrow or left mouse button)?
 function triggerHeld() {
@@ -30,7 +30,7 @@ function triggerHeld() {
 }
 
 // on: the functions to call for one-off actions:
-// { toggleDebug, fire, restart, toggleFilter, toggleVisor, cycleWeapon, weaponKey }.
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -40,8 +40,6 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyR') on.restart();
       if (e.code === 'KeyC') on.toggleFilter();
       if (e.code === 'KeyV') on.toggleVisor();
-      if (e.code === 'KeyQ') on.cycleWeapon();
-      if (e.code.startsWith('Digit')) on.weaponKey(e.code);
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });
@@ -126,6 +124,7 @@ function updatePlayer(dt) {
   let moveX = dirX * forward + rightX * strafe;
   let moveY = dirY * forward + rightY * strafe;
   const len = Math.hypot(moveX, moveY);
+  player.moving = len > 0;
   if (len === 0) return;
   player.walkTime += dt;
   moveX /= len; // normalise, so moving diagonally isn't ~1.4x faster

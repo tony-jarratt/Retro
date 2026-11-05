@@ -86,11 +86,6 @@ setupInput(screenCanvas, {
   restart: restartGame,
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
   toggleVisor: () => { visorOn = !visorOn; },
-  cycleWeapon,
-  weaponKey: (code) => {
-    const id = WEAPON_ORDER.find((w) => WEAPONS[w].key === code);
-    if (id) selectWeapon(id); // does nothing for a weapon you don't have yet
-  },
 });
 
 let lastTime = performance.now();

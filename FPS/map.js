@@ -202,13 +202,13 @@ const TERMINALS = [
 ];
 
 // Things to collect (pickups.js): 'ammo' (+8), 'health' (+25), 'redkey', 'bluekey',
-// and weapons: 'scatter' (and 'autocannon', though that comes from heavies).
-// Destroyed robots also drop a 'clip' (+4) where they fall; the first heavy
-// you bring down drops its autocannon.
+// and fire-mode modules for your gun: 'burstmod' (and 'automod', though that
+// comes from heavies). Destroyed robots also drop a 'clip' (+4) where they
+// fall; the first heavy you bring down drops the automatic module.
 const PICKUPS = [
   { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay
   { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
-  { type: 'scatter', x: 17.5, y: 1.5 },  // fuel depot, far corner, behind the walker watching the door
+  { type: 'burstmod', x: 17.5, y: 1.5 }, // fuel depot, far corner, behind the walker watching the door
   { type: 'health',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
   { type: 'redkey',  x: 29.5, y: 6.5 },  // pipe works, far corner
   { type: 'ammo',    x: 20.5, y: 1.5 },  // pipe works
