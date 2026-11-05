@@ -260,6 +260,121 @@ function makeSuitDown(state) {
   });
 }
 
+// THE BLOOMER: one that's gone further. It has rooted where it stood: its legs
+// are a trunk, its roots spread across the floor, its arms hang as vines,
+// and its head is a great closed BUD. Get close and the bud swells, splits
+// with light, and bursts in a cloud of spores (spores.js). The same from
+// every side, so all four views are one picture. Poses:
+//   stand   the bud closed
+//   swell   the bud swollen, splitting, light in the seams: your warning
+//   open    burst: the petals splayed and drooping, the heart spent
+// and its corpse: withered, the bud fallen.
+const BUD = [168, 70, 128];
+const BUD_DARK = [96, 34, 76];
+const SEPAL = [70, 110, 50];
+const BLOUSE = [128, 146, 170];
+
+function bloomerShape(pose, dead) {
+  const wither = (c) => dead ? mix(c, [96, 80, 60], 0.65) : c;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    // The roots, spreading over the floor.
+    if (y >= 52) {
+      for (const [ex, ey] of [[-22, 62], [-13, 63], [-4, 63], [6, 63], [15, 63], [23, 61]]) {
+        if (segmentDistance(dx, y, ex * 0.15, 52, ex, ey) < (y > 59 ? 1.1 : 1.6)) return wither(brighten(ROOT, 0.8 + 0.3 * noise(x, y, 420)));
+      }
+    }
+    if (dead) {
+      // Withered: slumped to a heap, the bud fallen beside it.
+      const heap = inEllipse(dx, y, 0, 55, 9, 7);
+      if (heap !== null && y < 62) return brighten([100, 84, 64], 1 - 0.4 * heap + 0.1 * noise(x, y, 421));
+      const bud = inEllipse(dx, y, 13, 58, 5, 4);
+      if (bud !== null) return brighten([110, 70, 70], 0.9 - 0.3 * bud);
+      return null;
+    }
+    // Vines that were arms, hanging, with a few leaves.
+    for (const side of [-1, 1]) {
+      const vx = side * (8 + 4 * (y - 28) / 24) + Math.sin(y * 0.4 + side) * 1.2;
+      if (y > 27 && y < 54 && Math.abs(dx - vx) < 1.2) return brighten(SEPAL, 0.8);
+      if (y > 30 && y < 54 && noise(side + 2, y >> 2, 422) < 0.5 && Math.abs(dx - vx - side * 2) < 1.6 && (y & 3) < 2) return LEAF;
+    }
+    // The bud, where its head was.
+    const swell = pose === 'swell';
+    if (pose === 'open') {
+      // Five petals splayed out round a spent heart, drooping.
+      const cdx = dx, cdy = y + 0.5 - 17;
+      const r = Math.hypot(cdx, cdy * 1.3), a = Math.atan2(cdy, cdx);
+      const petal = 11 + 4 * Math.cos(5 * a);
+      if (r < 3.5) return brighten([96, 72, 40], 0.8 + 0.3 * noise(x, y, 423));
+      if (r < petal && cdy > -9) return brighten(BUD, 1.05 - 0.4 * (r / petal) - (Math.abs(Math.sin(5 * a / 2)) < 0.12 ? 0.25 : 0));
+    } else {
+      const rx = swell ? 9.5 : 7.5, ry = swell ? 12 : 10.5;
+      const cy = 15;
+      const u = dx / rx, v = (y + 0.5 - cy) / ry;
+      const pointed = v < 0 ? u * u * (1 + 1.5 * -v) + v * v : u * u + v * v; // a teardrop, tip up
+      if (pointed < 1) {
+        // Seams between the petals: dark when closed, split with light when swelling.
+        const seam = Math.abs(Math.sin(u * 2.4 + 0.3 * v)) < (swell ? 0.16 : 0.08);
+        if (seam) return swell ? glowing(SPORE_GLOW) : BUD_DARK;
+        if (y + 0.5 > cy + ry * 0.55) return brighten(SEPAL, 1 - 0.3 * Math.abs(u)); // green sepals cupping it
+        return brighten(BUD, (1.15 - 0.45 * Math.abs(u) - 0.1 * v) * (0.92 + 0.12 * noise(x >> 1, y >> 1, 424)));
+      }
+    }
+    // The body, slumped forward over its own trunk: a blouse, going green.
+    const torso = inEllipse(dx, y, 0, 33, 7, 7.5);
+    if (torso !== null) return noise(x >> 2, y >> 2, 425) < 0.25 ? brighten(MOSS, 0.9) : cloth(BLOUSE, x, y, 1.05 - 0.35 * torso, 426);
+    // The trunk that was its legs: bark, with scraps of skirt.
+    if (y >= 38 && y < 56 && Math.abs(dx) < 4.5 + (y - 38) * 0.08) {
+      if (y < 44) return cloth(SUIT_DARK, x, y, 1, 427);
+      return brighten(ROOT, 0.75 + 0.35 * noise(x >> 1, y, 428) - 0.25 * Math.abs(dx) / 5);
+    }
+    return null;
+  };
+}
+
+function makeBloomerFrames() {
+  const pose = (p) => makeTexture(BUD, bloomerShape(p, false));
+  const stand = pose('stand');
+  const views = { stand, walk1: stand, walk2: stand };
+  return { front: { ...views, swell: pose('swell'), open: pose('open') }, back: views, right: views, left: views };
+}
+
+// A SPORE CLOUD (spores.js): a soft, drifting haze, yellow-green, with motes
+// glowing in it. Several of these billboards together make one cloud.
+const SPORE_FRAMES_COUNT = 6;
+function makeSporeCloud(frame) {
+  const drift = frame * 48 / SPORE_FRAMES_COUNT;
+  return makeTexture([200, 210, 120], (x, y) => {
+    const r = Math.hypot(x + 0.5 - 32, y + 0.5 - 36) / 27;
+    if (r >= 1) return null;
+    const n = 0.6 * smoothNoise(x, y + drift, 8, 48, 430) + 0.4 * smoothNoise(x + 7, y + drift * 2, 4, 48, 431);
+    const density = (1 - r * r) * (0.25 + 0.75 * n);
+    if (noise(x, (y + Math.floor(drift)) & 63, 432) < 0.012 && density > 0.2) return glowing([230, 255, 150]); // a mote
+    if (density < 0.15) return null;
+    return seeThrough(brighten([196, 206, 110], 0.8 + 0.35 * n), Math.min(150, 200 * density));
+  });
+}
+const SPORE_FRAMES = [];
+for (let f = 0; f < SPORE_FRAMES_COUNT; f++) SPORE_FRAMES.push(makeSporeCloud(f));
+
+// SPRINKLER SPRAY (sprinklers.js): water falling from a ceiling head, fanning
+// out as it falls, in streaks that scroll down, splashing at the floor.
+const RAIN_FRAMES_COUNT = 4;
+function makeSprinklerRain(frame) {
+  return makeTexture([190, 210, 230], (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (Math.abs(dx) > 4 + y * 0.4) return null;                               // the fan of the spray
+    if (y >= 60) return noise(x, frame, 440) < 0.25 ? seeThrough([220, 235, 250], 200) : null; // splashes
+    if (noise(x, 0, 441) > 0.35) return null;                                   // only some columns carry a stream
+    const fall = (y + frame * 16 + Math.floor(noise(x, 1, 442) * 64)) % 16;
+    return fall < 6 ? seeThrough([200, 220, 240], 140 + 15 * fall) : null;
+  });
+}
+const RAIN_FRAMES = [];
+for (let f = 0; f < RAIN_FRAMES_COUNT; f++) RAIN_FRAMES.push(makeSprinklerRain(f));
+
 ROBOT_FRAMES.suit = makeSuitFrames();
+ROBOT_FRAMES.bloomer = makeBloomerFrames();
 const DOWNED_TEXTURES = { suit: { down: makeSuitDown('down'), twitch: makeSuitDown('twitch') } };
 CORPSE_TEXTURES.suit = makeSuitDown('finished');
+CORPSE_TEXTURES.bloomer = makeTexture(BUD, bloomerShape('stand', true));

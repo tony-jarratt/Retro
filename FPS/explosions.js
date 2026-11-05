@@ -59,6 +59,7 @@ function explodeAt(x, y, blast) {
   }
 
   finishDownedNear(x, y, blast.radius); // infected.js: burns the bodies, so they don't get up
+  sprinklersFeelBlast(x, y);            // sprinklers.js: the heat sets the fire system off
 
   const d = Math.hypot(player.x - x, player.y - y);
   if (d < blast.radius && clearLine(x, y, player.x, player.y)) {

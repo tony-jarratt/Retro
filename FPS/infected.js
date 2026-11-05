@@ -112,3 +112,50 @@ function downedTexture(enemy) {
   const twitching = enemy.downTime < SUIT_TWITCH_TIME && Math.floor(animTime * 7 + enemy.x) % 2 === 0;
   return twitching ? frames.twitch : frames.down;
 }
+
+// THE BLOOMER (ENEMY_TYPES 'bloomer'): rooted to the spot, so it never moves
+// and never chases. It doesn't need to see you: get within its aimRange,
+// with nothing in between, and it feels you there.
+//   idle    the bud closed
+//   swell   it's felt you: the bud swells and splits for `charge` seconds
+//           (your warning; backing off now won't stop it)
+//   spent   it's BURST: a spore cloud where it stands (spores.js). The bud
+//           grows back after BLOOMER_REGROW seconds, and it's idle again.
+// Kill it (2 hits) and it bursts as it dies, unless it's spent: so shoot it
+// from a distance, and its cloud goes off where you aren't. But a cloud
+// bursting is a noise, and the suits come to see.
+// Water makes it flower too (sprinklers.js): a quick swell, then the burst.
+const BLOOMER_REGROW = 12;
+const BLOOMER_WATERED = 0.6; // watered, it starts its swell this far through
+
+function updateBloomer(enemy, dt) {
+  const type = ENEMY_TYPES[enemy.type];
+  if (enemy.state === 'idle') {
+    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+    if (dist < type.aimRange && clearLine(enemy.x, enemy.y, player.x, player.y)) {
+      enemy.state = 'swell';
+      enemy.attackTime = 0;
+    }
+    return;
+  }
+  enemy.attackTime += dt;
+  if (enemy.state === 'swell' && enemy.attackTime >= type.charge) {
+    enemy.state = 'spent';
+    enemy.attackTime = 0;
+    sporeBurst(enemy.x, enemy.y); // spores.js
+  } else if (enemy.state === 'spent' && enemy.attackTime >= BLOOMER_REGROW) {
+    enemy.state = 'idle';
+  }
+}
+
+// Watered by a sprinkler: it flowers, whether you're near or not.
+function waterBloomer(enemy) {
+  if (ENEMY_TYPES[enemy.type].weapon !== 'spores' || enemy.state !== 'idle') return;
+  enemy.state = 'swell';
+  enemy.attackTime = ENEMY_TYPES[enemy.type].charge * BLOOMER_WATERED;
+}
+
+// About to die (combat.js): a bloomer bursts as it goes, if it has spores left.
+function bloomerDies(enemy) {
+  if (ENEMY_TYPES[enemy.type].weapon === 'spores' && enemy.state !== 'spent') sporeBurst(enemy.x, enemy.y);
+}

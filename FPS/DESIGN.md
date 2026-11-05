@@ -249,7 +249,7 @@ cameras, tripwires or terminals (owner, 2026-11-05).
   and the automatic module lies in the larvae's nest. They can't open doors
   and are never smart.
 
-### The HQ (third theme, stage 1 built)
+### The HQ (third theme, stages 1 and 2 built)
 
 The company's headquarters, where a **plant/fungal virus** got out of the
 atrium garden and into the air conditioning (owner's idea: "zombies,
@@ -275,10 +275,24 @@ Infected only: no robots (owner, 2026-11-05).
   woven roots round a great pulsing bloom, a red tie hanging under it and a
   hand reaching out (the chief executive). Burning it sets the infected
   loose, as the chamber does the lab's creatures.
-- **Still to build:** stage 2, **bloomers** (rooted infected that burst a
-  sight-blocking spore cloud when you get close, waking the suits) and the
-  **sprinklers** (a blast sets them off, and every bloomer they water
-  flowers at once); stage 3, the **pollinators** (a moth/wasp swarm, the
+- **The bloomer** (stage 2; `infected.js`): an infected rooted where it
+  stood, its head a great bud. Never moves. Come within 2.2 cells (with a
+  clear line; it doesn't need light) and the bud swells and splits with
+  light for 0.9s, then BURSTS: a **spore cloud** (`spores.js`), radius 1.6,
+  for 6s. In it you take 3 every 0.5s and your visor tints green; nothing
+  sees through it (it blocks sight like steam); the burst is a noise (6)
+  that brings the suits. The bud regrows in 12s. 2 hits kill it, and it
+  bursts as it dies, so shooting it from range sets its cloud off where
+  you aren't (but the noise still carries).
+- **Sprinklers** (stage 2; `sprinklers.js`, a level's `sprinklers`): the fire
+  system still works. A blast within 5 cells, with a clear line, sets a
+  head off, and every head it can see within 10 comes on too: one system
+  per room. For 10s water rains down, the floor round each head ends up in
+  puddles, and every bloomer within 2.5 of a running head is watered and
+  FLOWERS at once. The HQ's chain reaction: shoot the solvent drums at the
+  bottom of the atrium from the doorway, and its bloomers all go off while
+  you're out of reach, but the blast brings every suit in earshot.
+- **Still to build:** stage 3, the **pollinators** (a moth/wasp swarm, the
   drones' role).
 
 Levers for difficulty: how many robots, which types, how many smart; where

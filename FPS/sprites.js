@@ -64,6 +64,8 @@ function spriteThings(viewer) {
     ...larvaThings(thing),    // the lab's swarm (larvae.js)
     ...acidThings(thing),     // spitters' globs, and where they'll land (acid.js)
     ...chargeThings(thing),   // the demolition charge, once it's set (charge.js)
+    ...sporeThings(thing),    // spore clouds (spores.js)
+    ...sprinklerThings(thing), // sprinkler spray (sprinklers.js)
     ...rockets.map((r) => thing(r.x, r.y, ROCKET_TEXTURE, { effect: true })),
     ...glassBursts.map((g) => thing(g.x, g.y, glassBurstTexture(g), { effect: true })), // panels.js
     // Explosions come last: one drawn at the same spot as its drum's remains

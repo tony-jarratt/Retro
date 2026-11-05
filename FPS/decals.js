@@ -85,6 +85,17 @@ function makeLeaves(v) {
   });
 }
 
+// A sprinkler head on the ceiling (sprinklers.js): a brass rosette with a red bulb.
+function makeSprinklerHead() {
+  return makeTexture([190, 160, 80], (x, y) => {
+    const r = Math.hypot(x + 0.5 - 32, y + 0.5 - 32);
+    if (r < 2) return [200, 40, 30];                          // the glass bulb
+    if (r < 5) return brighten([196, 164, 84], 1.2 - 0.1 * r); // the deflector
+    if (r < 6) return [80, 66, 40];
+    return null;
+  });
+}
+
 function makeSlime(v) {
   const shape = (x, y) => blobT(x, y, 31 + v * 3, 32, 18 + v * 3, v * 2.3 + 0.7);
   const water = new Uint8Array(TEX_SIZE * TEX_SIZE);
@@ -352,6 +363,7 @@ const DECAL_TYPES = {
   // The lab's.
   slime:      { surfaces: ['floor'],            frames: [0, 1, 2].map(makeSlime) },
   leaves:     { surfaces: ['floor'],            frames: [0, 1, 2].map(makeLeaves) },
+  sprinkler:  { surfaces: ['ceiling'],          frames: [makeSprinklerHead()] },
   acid:       { surfaces: ['floor'],            frames: [0, 1].map(makeAcidPool) },
   pod:        { surfaces: ['wall'],             frames: [makePod(true)], text: true },
   podEmpty:   { surfaces: ['wall'],             frames: [makePod(false)], text: true },

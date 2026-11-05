@@ -53,6 +53,7 @@ const DRONE_PACKS    = CURRENT_LEVEL.dronePacks    || [];
 const HIVES          = CURRENT_LEVEL.hives         || [];
 const LARVA_PACKS    = CURRENT_LEVEL.larvae        || [];
 const PODS           = CURRENT_LEVEL.pods          || [];
+const SPRINKLERS     = CURRENT_LEVEL.sprinklers    || [];
 const DECALS         = CURRENT_LEVEL.decals        || [];
 const PLAYER_START   = CURRENT_LEVEL.playerStart;
 if (!PLAYER_START) throw new Error(`Level "${CURRENT_LEVEL.id}" has no playerStart.`);

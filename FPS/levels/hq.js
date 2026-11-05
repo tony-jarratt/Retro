@@ -2,7 +2,10 @@
 // headquarters, where the plant virus got out of the atrium garden: offices
 // going green, daylight through the skylights, and the staff still at work,
 // in a way. Its enemies are the INFECTED (infected.js): suits that grab and
-// hold on, and get back up unless you finish them on the floor.
+// hold on, and get back up unless you finish them on the floor; and
+// bloomers, rooted where they stood, that burst in clouds of spores
+// (spores.js) when you come close, or when the sprinklers water them
+// (sprinklers.js).
 //
 // The route: the lift and the front desk (top left) -> the open-plan office
 // -> through the atrium garden -> the boardroom at the back, where the
@@ -65,6 +68,10 @@ LEVELS.push({
     { type: 'plant', x: 14.5, y: 14.5 },
     { type: 'plant', x: 24.5, y: 11.5 },
     { type: 'plant', x: 25.5, y: 15.5 },
+    // Two drums of cleaning solvent, left at the bottom of the atrium. Shoot
+    // them from the doorway (x10, y9) and the blast sets the sprinklers off.
+    { type: 'drum',  x: 10.5, y: 16.5 },
+    { type: 'drum',  x: 11.5, y: 16.5 },
     // The boardroom.
     { type: 'plant', x: 6.5,  y: 18.5 },
     { type: 'plant', x: 21.5, y: 18.5 },
@@ -108,6 +115,24 @@ LEVELS.push({
     // The boardroom: the board, still in session.
     { type: 'suit', x: 10.5, y: 19.5, angle: -Math.PI / 2 },
     { type: 'suit', x: 16.5, y: 19.5, angle: -Math.PI / 2 },
+    // BLOOMERS, rooted. One just inside the exec suite, waiting for whoever
+    // comes through the door; two by each of the atrium's planters; one
+    // beside the mother plant.
+    { type: 'bloomer', x: 19.5, y: 4.5,  angle: Math.PI },
+    { type: 'bloomer', x: 7.5,  y: 12.5, angle: 0 },
+    { type: 'bloomer', x: 4.5,  y: 13.5, angle: 0 },
+    { type: 'bloomer', x: 17.5, y: 13.5, angle: 0 },
+    { type: 'bloomer', x: 20.5, y: 12.5, angle: 0 },
+    { type: 'bloomer', x: 17.5, y: 20.5, angle: 0 },
+  ],
+
+  // SPRINKLER heads (sprinklers.js), floor cells under them. The atrium's
+  // six are one system, over the bloomers by the planters; the boardroom
+  // has its own.
+  sprinklers: [
+    { x: 4, y: 11 }, { x: 7, y: 14 }, { x: 13, y: 12 },
+    { x: 19, y: 11 }, { x: 18, y: 15 }, { x: 24, y: 13 },
+    { x: 13, y: 19 }, { x: 17, y: 19 },
   ],
 
   // The infected drop nothing, so, as in the lab, the ammo comes in crates.

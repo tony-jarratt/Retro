@@ -47,6 +47,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 // THE HQ'S INFECTED (infected.js):
 //   suit     an office worker the plant virus took. Shambles, GRABS and holds
 //            on, and GETS BACK UP unless you finish it while it's down.
+//   bloomer  one gone further: rooted to the spot, its head a great bud. Get
+//            close and it swells, then BURSTS in a cloud of spores (spores.js).
 //
 // Every type gives these:
 //   speed      cells per second (the player does 3)
@@ -54,7 +56,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   aimRange   how close it gets before it stops and aims (for 'melee', its
 //              reach to start an attack)
 //   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js,
-//              acid.js), or 'grab' (infected.js: aimRange is its reach)
+//              acid.js), 'grab' (infected.js: aimRange is its reach), or
+//              'spores' (infected.js: aimRange is how close sets it off)
 // and these only if it differs from ENEMY_DEFAULTS:
 //   charge     seconds of charging (visor brightening) before each shot
 //   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
@@ -83,6 +86,7 @@ const ENEMY_TYPES = {
   lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true },
   spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
   suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
+  bloomer: { speed: 0,   health: 2, aimRange: 2.2, weapon: 'spores', charge: 0.9, mobile: false, creature: true },
 };
 // Fill in the defaults, so the rest of the code can read any field of any type.
 // A misspelt field would otherwise be silently ignored, so it's an error.
@@ -410,7 +414,9 @@ function updateEnemy(enemy, dt) {
     return;
   }
 
-  if (ENEMY_TYPES[enemy.type].mobile) updateWalker(enemy, dt);
+  const type = ENEMY_TYPES[enemy.type];
+  if (type.mobile) updateWalker(enemy, dt);
+  else if (type.weapon === 'spores') updateBloomer(enemy, dt); // infected.js
   else updateTurret(enemy, dt);
 
   // Charging only happens while aiming. Leaving 'aim' (you duck out of sight,
@@ -442,7 +448,7 @@ function enemyTexture(enemy, viewer) {
   }
   const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off'] : ROBOT_FRAMES[enemy.type];
   // A creature's attack faces you throughout, so it's only ever seen from the front.
-  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise' }[enemy.state];
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open' }[enemy.state];
   if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.

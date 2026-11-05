@@ -115,7 +115,7 @@ function drawDebug(ctx, player, hits) {
 
   // Robots: a dot coloured by state, with a line showing which way each faces,
   // and a dashed line through the cells of the path it's following (pathfinding.js).
-  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555', dormant: '#775', offline: '#333', windup: '#f0f', lunge: '#fff', recover: '#88f', grab: '#f0f', stagger: '#88f', rising: '#4f4' };
+  const STATE_COLOURS = { idle: '#a33', chase: '#f22', aim: '#ff0', search: '#f80', dead: '#555', dormant: '#775', offline: '#333', windup: '#f0f', lunge: '#fff', recover: '#88f', grab: '#f0f', stagger: '#88f', rising: '#4f4', swell: '#ff0', spent: '#555' };
   for (const enemy of enemies) {
     if (enemy.path && enemy.path.length > 0) {
       ctx.strokeStyle = STATE_COLOURS[enemy.state];

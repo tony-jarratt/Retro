@@ -139,6 +139,7 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
   enemy.hurtTime = HURT_FLASH_TIME;
   if (enemy.state === 'dormant' && ENEMY_TYPES[enemy.type].creature) wakeCreature(enemy); // shot in its tank (creatures.js)
   if (enemy.health <= 0) {
+    bloomerDies(enemy); // infected.js: it bursts as it goes
     enemy.state = 'dead';
     enemy.moving = false;
     if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up

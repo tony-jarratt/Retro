@@ -136,6 +136,8 @@ function frame(now) {
       updateDrones(dt);
       updateLarvae(dt);   // larvae.js
       updateAcid(dt);     // acid.js: globs in flight, pools burning
+      updateSpores(dt);   // spores.js: clouds hanging, burning you
+      updateSprinklers(dt); // sprinklers.js: running heads water the bloomers
       updateCreatures(dt); // creatures.js: once the lab's loose, they always know where you are
       updateCharge(dt);   // charge.js: setting the demolition charge, and its fuse
       updateCore();       // the objective: has the core gone, are you at the lift? (core.js)

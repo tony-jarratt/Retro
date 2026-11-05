@@ -45,6 +45,7 @@ function inPlume(vent, x, y, r) {
 const VENT_GAS = THEME.ventGas;
 
 function steamBlocksSight(x1, y1, x2, y2) {
+  if (sporesBlockSight(x1, y1, x2, y2)) return true; // spores.js: a spore cloud hides you just as well
   if (VENT_GAS) return false;
   return vents.some((v) => v.state === 'burst' && segmentDistance(v.x, v.y, x1, y1, x2, y2) < STEAM_RADIUS);
 }

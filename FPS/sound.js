@@ -469,6 +469,36 @@ function sfxSuitFinished(enemy) {
   noiseBurst(out, 'highpass', 3000, 1500, 0.6, 0.3, 0.04);
 }
 
+// THE BLOOMER swelling: a creak of stretching plant, rising, wet.
+function sfxBloomerSwell(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'triangle', 90, 260, ENEMY_TYPES.bloomer.charge, 0.12);
+  noiseBurst(out, 'bandpass', 600, 1800, ENEMY_TYPES.bloomer.charge, 0.18);
+}
+// A spore cloud bursting (spores.js): a soft, deep whump and a long breathy hiss.
+function sfxSporeBurst(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  drumHit(out, 'sine', 110, 40, 0.08, 0.3, 0.5);
+  noiseBurst(out, 'lowpass', 2500, 500, 1.2, 0.4, 0.03);
+}
+// The fire system going off (sprinklers.js): an electric bell, ringing hard.
+function sfxFireBell(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  for (let i = 0; i < 24; i++) tone(out, 'square', 2100, 2050, 0.06, 0.09, i * 0.075);
+}
+// A running sprinkler: a hiss of spray, renewed while it runs.
+function sfxSprinklerHiss(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 4000, 5000, 0.5, 0.15);
+}
+
 // The spitter spotting you: a wet, rattling hiss.
 function sfxSpitterHiss(enemy) {
   const out = placeAt(enemy.x, enemy.y);
@@ -769,6 +799,7 @@ function watchTheGame() {
         else sfxLurcherSnarl(e);
       }
       if (e.state === 'grab') sfxSuitGrab(e);
+      if (e.state === 'swell') sfxBloomerSwell(e);
       if (e.state === 'rising') sfxSuitRise(e);
       if (e.state === 'windup') sfxLurcherRear(e);
       if (e.state === 'lunge') sfxLurcherSwipe(e);

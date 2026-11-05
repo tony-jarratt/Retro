@@ -268,6 +268,7 @@ function drawHud(pixels) {
   if (game.hurtFlash > 0) tintScreen(pixels, [200, 0, 0], 0.45 * game.hurtFlash / PLAYER_HURT_FLASH);
   // Gold flash for collecting something.
   if (game.pickupFlash > 0) tintScreen(pixels, [255, 210, 90], 0.3 * game.pickupFlash / PICKUP_FLASH_TIME);
+  drawSporeTint(pixels); // spores.js: standing in a spore cloud
   // The helmet visor goes over the view but under the readouts, which sit on
   // its frame like displays built into the helmet (visor.js).
   if (visorOn) applyVisor(pixels);
