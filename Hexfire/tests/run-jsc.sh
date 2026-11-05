@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs the same checks without a browser, using macOS jsc, and prints every line plus the balance report.
-# Usage: Mech/tests/run-jsc.sh   (exit code 0 only if every check passes; add "nobalance" to skip the report)
+# Usage: Hexfire/tests/run-jsc.sh   (exit code 0 only if every check passes; add "nobalance" to skip the report)
 JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc
 HERE="$(cd "$(dirname "$0")" && pwd)"
 J="$HERE/../js"

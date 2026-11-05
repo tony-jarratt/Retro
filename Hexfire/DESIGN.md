@@ -2,7 +2,7 @@
 
 Turn-based tactical mech combat on a hex map, single player against a computer opponent. Inspired by the feel of the Battletech tabletop game (heat, armour per body location, positioning and range), but an original game in an original setting. Plain JavaScript on an HTML5 canvas, no build step: open `index.html` in a browser. Retro look to match the other games on the menu.
 
-The name is Hexfire. It has not been checked for existing marks yet (milestone 7). It lives in its own folder, `Games/Hexfire` (it was `Retro/Mech/` inside the arcade until 2026-10-25).
+The name is Hexfire. It has not been checked for existing marks yet (milestone 7). It lives in the Retro arcade as `Retro/Hexfire/` and is on the menu (it was `Retro/Mech/`, then its own project `Games/Hexfire` from 2026-10-25 to 2026-11-05).
 
 ## Decisions so far
 - **Design principles (the owner's).** (1) *You must be able to tell why you lost*: show the dice and the cause of every result. (2) *If you have to explain how a UX works, it is not a very good UX*: the screen should show what to do and what will happen (the banner, the yellow instruction line, the aiming callout, the range finder), not rely on help text or a manual. Easy, not simulationist; choices take effect at once.
@@ -270,7 +270,7 @@ Difficulty changes the enemy's base to-hit (and the enemy squad). Each decision 
 All in `data.js`: heat thresholds and sink rates, range band modifiers, hit location weights, armour and structure patterns, damage and heat per weapon, movement costs, budgets and enemy base to-hit per difficulty, the enemy squads, `POOL_SCALE` and `CRIT_ROLL` (damage), `COOL_FACTOR`, `STAND_COOLING` and `HOLD_FIRE_COOLING` (heat), `SMOKE_ROUNDS`, `SELF_DESTRUCT_DAMAGE`, chassis `capacity` and weapon `size`, `cost`, `heatOnHit`, `moverFactor`, `splash` and `minCapacity`. Camera push-in (`1.35` in the mockup) and effect durations are a later renderer matter.
 
 ## Working rules
-- **Version control: git, in this folder** (`Hexfire/.git`, branch `main`, `.gitignore` for `.DS_Store`). Hexfire was built inside the Retro arcade as `Retro/Mech/` and moved out to its own folder, `Games/Hexfire`, on 2026-10-25 with a fresh repository (its earlier history stays in the arcade's `Retro.git`, by the owner's choice). Before 2026-10-07 there was no version control at all, which is why options were kept behind flags and old behaviour was sometimes described instead of kept. Commit working states (the tests green) with a short message; revert with `git`, not by hand.
+- **Version control: the arcade's git** (`Retro.git`, branch `main`). Hexfire was built inside the Retro arcade as `Retro/Mech/`, moved out to its own folder `Games/Hexfire` on 2026-10-25 with a fresh repository, and came back as `Retro/Hexfire/` on 2026-11-05 by a subtree merge, so both its histories are in `Retro.git` (the early one under `Mech/`). Before 2026-10-07 there was no version control at all, which is why options were kept behind flags and old behaviour was sometimes described instead of kept. Commit working states (the tests green) with a short message; revert with `git`, not by hand.
 - Never swallow errors or odd cases silently: throw a typed error or log a warning with IDs and counts (a hit location that does not exist, a plan for a destroyed mech, weights that do not add up).
 - Simple over clever: no caching layers or lazy tricks, straight-line functions, parse and build everything up front.
 - Keep decisions in this file. Update it as the game changes.
