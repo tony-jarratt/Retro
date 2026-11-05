@@ -83,11 +83,17 @@ function applyCrtFilter(pixels, crush = 1, scanShade = SCANLINE_SHADE) {
 //   below 60   scanlines creep in, darker the more you're hurt
 //   below 40   the palette starts to crush, and the picture TEARS: for a
 //              frame, a band of rows jumps sideways
-//   below 20   the full crushed look, a COLOUR SPLIT (the red image slides
-//              off the green and blue, like a failing tube), and flicker
+//   below 20   the crush at its worst (MAX_CRUSH), a COLOUR SPLIT (the red
+//              image slides off the green and blue, like a failing tube), and flicker
 // Healing cleans it back up. Each effect is a 0..1 amount worked out from
 // your health, so it all fades in smoothly rather than switching on.
 const DAMAGE_START = 60, CRUSH_START = 40, SPLIT_START = 20;
+// How far each effect goes at its worst. Kept well short of the full CRT
+// look, so that even breached you can still see what's going on.
+const MAX_CRUSH = 0.45;       // palette crush: 0.45 of the way to the 32 colours
+const MAX_SCAN_DARKEN = 0.1;  // in-between rows lose at most 10% of their brightness
+const MAX_SPLIT = 1;          // pixels the red image slides off
+const FLICKER_CHANCE = 0.03, FLICKER_SHADE = 0.9;
 const TEAR_RATE = 5;          // tears per second at 0 health (fewer when less hurt)
 const TEAR_TIME = 0.06;       // seconds a tear lasts: about four frames
 const tears = [];             // tears showing: { y, h, shift, time }
@@ -128,7 +134,7 @@ function applyDamageFilter(pixels, health, dt) {
   // Colour split: the red channel alone, shifted right by 1-2 pixels. Walking
   // each row right to left means every pixel reads its left neighbour's red
   // before that neighbour has been changed.
-  const split = Math.round(2 * damageRamp(health, SPLIT_START, 0) + 0.49);
+  const split = Math.round(MAX_SPLIT * damageRamp(health, SPLIT_START, 0) + 0.49);
   if (health < SPLIT_START && split > 0) {
     for (let y = 0; y < SCREEN_H; y++) {
       const row = y * SCREEN_W * 4;
@@ -137,11 +143,11 @@ function applyDamageFilter(pixels, health, dt) {
   }
 
   // Scanlines and crush together, in one pass of the CRT filter.
-  const scanShade = 1 - (1 - SCANLINE_SHADE) * damageRamp(health, DAMAGE_START, SPLIT_START);
-  applyCrtFilter(pixels, damageRamp(health, CRUSH_START, SPLIT_START), scanShade);
+  const scanShade = 1 - MAX_SCAN_DARKEN * damageRamp(health, DAMAGE_START, SPLIT_START);
+  applyCrtFilter(pixels, MAX_CRUSH * damageRamp(health, CRUSH_START, SPLIT_START), scanShade);
 
   // Flicker: now and then, the whole picture dips.
-  if (health < SPLIT_START && Math.random() < 0.08) {
-    for (let i = 0; i < pixels.length; i += 4) for (let k = 0; k < 3; k++) pixels[i + k] *= 0.82;
+  if (health < SPLIT_START && Math.random() < FLICKER_CHANCE) {
+    for (let i = 0; i < pixels.length; i += 4) for (let k = 0; k < 3; k++) pixels[i + k] *= FLICKER_SHADE;
   }
 }
