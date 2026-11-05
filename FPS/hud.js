@@ -131,11 +131,17 @@ function tintScreen(pixels, rgb, amount) {
   }
 }
 
+// The readouts run along one line in the visor's bottom rim (visor.js):
+// HP and its bar on the left, keycards and ammo on the right.
+const READOUT_Y = SCREEN_H - 6;
+const READOUT_MARGIN = 10;
+
 function drawHealth(pixels) {
-  const x = 6;
-  const y = SCREEN_H - 12;
+  const label = 'HP ' + player.health;
   const low = player.health <= 30;
-  drawText(pixels, 'HP ' + player.health, x, y - 8, low ? HUD_WARN : HUD_GREEN, 1);
+  drawText(pixels, label, READOUT_MARGIN, READOUT_Y, low ? HUD_WARN : HUD_GREEN, 1);
+  const x = READOUT_MARGIN + textWidth(label, 1) + 4; // the bar sits just after the label
+  const y = READOUT_Y;
   fillRect(pixels, x, y, 62, 6, [0, 0, 0]);             // bar border
   fillRect(pixels, x + 1, y + 1, 60, 4, [20, 60, 30]);  // empty part
   // The bar is cut into 5-pixel segments, like an old LED gauge.
@@ -145,20 +151,24 @@ function drawHealth(pixels) {
   }
 }
 
-// Bottom right, level with the HP label; red when you're out.
-function drawAmmo(pixels) {
-  const text = 'AMMO ' + player.ammo;
-  const colour = player.ammo === 0 ? HUD_WARN : HUD_GREEN;
-  drawText(pixels, text, SCREEN_W - 6 - textWidth(text, 1), SCREEN_H - 20, colour, 1);
+// Bottom right; red when you're out.
+function ammoText() {
+  return 'AMMO ' + player.ammo;
 }
 
-// The keycards you're carrying: a small card in each colour, under the ammo count.
+function drawAmmo(pixels) {
+  const colour = player.ammo === 0 ? HUD_WARN : HUD_GREEN;
+  drawText(pixels, ammoText(), SCREEN_W - READOUT_MARGIN - textWidth(ammoText(), 1), READOUT_Y, colour, 1);
+}
+
+// The keycards you're carrying: a small card in each colour, just left of the ammo count.
 function drawKeys(pixels) {
+  const right = SCREEN_W - READOUT_MARGIN - textWidth(ammoText(), 1) - 6;
   player.keys.forEach((colour, n) => {
-    const x = SCREEN_W - 6 - 9 - n * 11;
-    fillRect(pixels, x, SCREEN_H - 12, 9, 6, [0, 0, 0]);
-    fillRect(pixels, x + 1, SCREEN_H - 11, 7, 4, KEY_COLOURS[colour]);
-    fillRect(pixels, x + 1, SCREEN_H - 10, 7, 1, [235, 235, 235]); // stripe
+    const x = right - 9 - n * 11;
+    fillRect(pixels, x, READOUT_Y, 9, 6, [0, 0, 0]);
+    fillRect(pixels, x + 1, READOUT_Y + 1, 7, 4, KEY_COLOURS[colour]);
+    fillRect(pixels, x + 1, READOUT_Y + 2, 7, 1, [235, 235, 235]); // stripe
   });
 }
 
@@ -175,6 +185,10 @@ function drawHud(pixels) {
   // Dead: the view slowly fills with dark red.
   if (game.state === 'dead') tintScreen(pixels, [90, 0, 0], Math.min(0.75, game.endTime * 0.6));
 
+  // The helmet visor goes over the view but under the readouts, which sit on
+  // its frame like displays built into the helmet (visor.js).
+  if (visorOn) applyVisor(pixels);
+
   drawHealth(pixels);
   drawAmmo(pixels);
   drawKeys(pixels);
@@ -188,12 +202,9 @@ function drawHud(pixels) {
     }
     // While any alarm is going, a red ALARM blinks at the top of the screen.
     if (Object.values(alarms).some((t) => t > 0) && Math.floor(animTime * 3) % 2 === 0) {
-      drawTextCentred(pixels, 'ALARM', 6, HUD_WARN, 1);
+      drawTextCentred(pixels, 'ALARM', 1, HUD_WARN, 1); // on the visor's top rim
     }
   }
-  const left = enemies.filter((e) => e.state !== 'dead').length;
-  const counter = 'ROBOTS ' + left;
-  drawText(pixels, counter, SCREEN_W - 6 - textWidth(counter, 1), 6, HUD_GREEN, 1);
 
   if (game.state === 'dead') {
     drawTextCentred(pixels, 'SCRAPPED', 70, HUD_WARN, 4);

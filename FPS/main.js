@@ -85,6 +85,7 @@ setupInput(screenCanvas, {
   fire: playerFire,
   restart: restartGame,
   toggleFilter: () => { crtFilterOn = !crtFilterOn; },
+  toggleVisor: () => { visorOn = !visorOn; },
 });
 
 let lastTime = performance.now();
