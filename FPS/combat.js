@@ -89,6 +89,7 @@ function fireRound() {
   const mode = FIRE_MODES[gun.pullMode];
   if (player.ammo === 0) { gun.burstLeft = 0; return; }
   player.ammo -= 1;
+  sfxPlayerShot(gun.pullMode); // sound.js
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
@@ -152,7 +153,8 @@ function robotHitChance(type, dist) {
 function robotFires(enemy, dist) {
   const type = ROBOT_TYPES[enemy.type];
   enemy.firedTime = type.volley > 1 ? ROBOT_FIRE_FLASH / 2 : ROBOT_FIRE_FLASH; // a volley flickers
-  if (type.weapon === 'rocket') { launchRocket(enemy); return; } // explosions.js
+  if (type.weapon === 'rocket') { launchRocket(enemy); sfxRocketLaunch(enemy); return; } // explosions.js, sound.js
+  sfxRobotShot(enemy);
   const glass = glassInTheWay(enemy.x, enemy.y, player.x, player.y); // panels.js
   if (glass) hitGlass(glass);
   else if (Math.random() < robotHitChance(type, dist)) damagePlayer(type.damage);
@@ -164,6 +166,7 @@ function robotFires(enemy, dist) {
 function damagePlayer(amount) {
   if (game.state !== 'playing') return;
   game.hurtFlash = PLAYER_HURT_FLASH;
+  sfxSuitHit(); // sound.js
   if (player.armour === 0) {
     game.state = 'dead';
     return;

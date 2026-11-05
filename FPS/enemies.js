@@ -229,7 +229,7 @@ function updateVolley(enemy, dt) {
   enemy.volleyLeft -= 1;
   enemy.volleyTimer = ROBOT_TYPES[enemy.type].volleyGap;
   if (canSee(enemy)) robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
-  else enemy.firedTime = ROBOT_FIRE_FLASH / 2; // still fires, at where you were
+  else { enemy.firedTime = ROBOT_FIRE_FLASH / 2; sfxRobotShot(enemy); } // still fires, at where you were
 }
 
 // SMART: sidestep across your line of fire while charging. It goes one way

@@ -97,6 +97,7 @@ function destroyDrone(d) {
   if (d.state === 'dead') return;
   d.state = 'dead';
   explosions.push({ x: d.x, y: d.y, time: EXPLOSION_TIME * 0.4 }); // start part-way: a small, quick pop
+  sfxDronePop(d); // sound.js
 }
 
 // It reached you: it goes off.
