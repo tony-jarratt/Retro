@@ -948,7 +948,10 @@ function updateSound(dt) {
   // wind-up you are, and a click marks each coil locking on.
   if (!spinWhine) spinWhine = makeVoice('sawtooth');
   const winding = triggerHeld() && game.state === 'playing' && player.modes.length > 1;
-  const wind = Math.min(1, gun.heldTime / SPIN_UP[player.modes[player.modes.length - 1]]); // up to the last mode you've got
+  // How far through the wind-up, to the last mode you've got (with only single
+  // shot there's nothing to wind up to, and its spin-up time is 0: no whine).
+  const top = SPIN_UP[player.modes[player.modes.length - 1]];
+  const wind = top > 0 ? Math.min(1, gun.heldTime / top) : 0;
   spinWhine.gain.gain.setTargetAtTime(winding ? 0.05 + 0.05 * wind : 0, audio.ctx.currentTime, 0.05);
   spinWhine.osc.frequency.setTargetAtTime(110 + 520 * wind, audio.ctx.currentTime, 0.05);
   spinWhine.filter.frequency.setTargetAtTime(1200 + 2500 * wind, audio.ctx.currentTime, 0.05);
