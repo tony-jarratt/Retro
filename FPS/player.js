@@ -44,7 +44,7 @@ function triggerHeld() {
 }
 
 // on: the functions to call for one-off actions:
-// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, levelChooser, togglePause, loadAmmo, toggleScanner, cheatScanner, toggleInvulnerable }.
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, togglePause, loadAmmo, toggleScanner, toggleInvulnerable }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -57,10 +57,8 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyN') on.toggleSound();
       if (e.code === 'Enter') on.enter();
       if (e.code === 'KeyU') on.toggleMusic();
-      if (e.code === 'KeyL') on.levelChooser();
       if (e.code === 'KeyP') on.togglePause();
       if (e.code === 'KeyX') on.toggleScanner(); // scanner.js
-      if (e.code === 'KeyK') on.cheatScanner();  // play-testing only (main.js)
       if (e.code === 'KeyI') on.toggleInvulnerable(); // play-testing only (main.js)
       for (const type of AMMO_ORDER) if (e.code === 'Digit' + AMMO_TYPES[type].key) on.loadAmmo(type); // ammo.js
     }

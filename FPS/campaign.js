@@ -200,6 +200,7 @@ function runRating() {
 // (With ?playtest and no level, main.js shows the level chooser instead.)
 game.state = PAGE_ARGS.has('level') ? 'briefing' : 'title';
 applyLoadout();
+if (PLAYTEST) player.scanner = true; // play-testing: you always have the scanner (X switches it on and off)
 let titleAwake = false; // the title waits for a first key or click: the browser won't play music before one
 let finaleTime = 0;
 playTrack(game.state === 'title' ? 'title' : THEME_NAME); // music.js: it starts once there's sound

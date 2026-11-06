@@ -14,21 +14,20 @@ function togglePause() {
   mouseTurn = 0;       // player.js: don't turn by however far the mouse moved meanwhile
 }
 
-// The controls, as [keys, what they do]. The map, visor and CRT keys, and
-// the level chooser, only exist when play-testing (main.js). R and Enter
+// The controls, as [keys, what they do]. The map, visor, CRT and
+// invulnerability keys only exist when play-testing (main.js). R and Enter
 // aren't listed: the screens where they do something say so.
 const CONTROLS = [
   ['WASD', 'MOVE'],
   ['LEFT / RIGHT', 'TURN'],
   ['CLICK / UP', 'FIRE  HOLD TO SPIN UP'],
   ['1 2 3', 'LOAD STANDARD  INCENDIARY  PIERCING'],
-  ['X', 'SCANNER ON / OFF  ONCE FOUND'],
+  ['X', PLAYTEST ? 'SCANNER ON / OFF' : 'SCANNER ON / OFF  ONCE FOUND'],
   ['CLICK VIEW', 'CAPTURE MOUSE'],
   ['ESC', 'FREE MOUSE'],
-  ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT'], ['K', 'GIVE SCANNER'], ['I', 'INVULNERABLE']] : []),
+  ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT'], ['I', 'INVULNERABLE']] : []),
   ['N', 'SOUND'],
   ['U', 'MUSIC'],
-  ...(PLAYTEST ? [['L', 'LEVEL CHOOSER']] : []),
 ];
 
 const PAUSE_DIM = 0.65;       // how far the view darkens behind the text

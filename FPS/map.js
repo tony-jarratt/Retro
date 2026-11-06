@@ -6,7 +6,7 @@
 // so every piece of state starts fresh, the same simple trick.
 //
 // PLAY-TESTING: index.html?playtest shows a level chooser before the game
-// starts (main.js), and L in a game goes back to it.
+// starts (main.js); reload the page to choose again.
 //
 // Everything below just copies the chosen level's data into the names the
 // rest of the code has always used (MAP, SPRITES, ENEMIES, ...), so no other
