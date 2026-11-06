@@ -39,6 +39,13 @@ function blastStrength(blast, d) {
 }
 
 // A blast at (x, y): fireball, damage to robots and you, and drums set off.
+// A destroyed robot going up (pickups.js, dropSalvage): the fireball and its
+// light, and nothing else. No damage, no chain, no scorch: it's the look of
+// it. (Its crunch is sfxRobotDown, sound.js.)
+function robotBlowsUp(enemy) {
+  explosions.push({ x: enemy.x, y: enemy.y, time: 0, small: true });
+}
+
 function explodeAt(x, y, blast) {
   explosions.push({ x, y, time: 0 });
   sfxExplosion(x, y, blast.radius); // sound.js

@@ -1,5 +1,6 @@
 // Pickups: ammo boxes, suit repair kits, keycards, gun modules, the demolition
-// charge, and clips dropped by destroyed robots.
+// charge. (Destroyed robots drop nothing: they blow up. Only a heavy leaves
+// something worth having, the automatic fire module.)
 // They're drawn as sprites (sprites.js) and collected by walking over them.
 // Where the starting ones lie is listed in the level file (levels/*.js, `pickups`).
 
@@ -40,6 +41,11 @@ const PICKUP_TYPES = {
   piercing: {
     texture: ROUNDS_BOX_TEXTURES.piercing,
     collect: () => { collectRounds('piercing'); return true; },
+  },
+  // The structural scanner (scanner.js): found once, then yours.
+  scanner: {
+    texture: SCANNER_MODULE_TEXTURE,
+    collect: () => { collectScanner(); return true; },
   },
   // Fire-mode upgrade modules for your gun (weapons.js): switched on at once.
   burstmod: {
@@ -88,13 +94,14 @@ function updatePickups() {
   }
 }
 
-// A destroyed robot drops a clip on its wreck. Both sprites then sit at the
-// same distance; the sort in placeSprites keeps ties in list order, and
-// pickups come after robots in that list, so the clip is drawn on top.
-// A heavy drops the AUTOMATIC fire module instead, if you haven't got it yet
-// (and there isn't one already lying about): bring down a heavy for it.
-function dropClip(enemy) {
-  const wantModule = enemy.type === 'heavy' && !player.modes.includes('auto') &&
-    !pickups.some((p) => p.type === 'automod');
-  pickups.push({ type: wantModule ? 'automod' : 'clip', x: enemy.x, y: enemy.y });
+// A destroyed robot BLOWS UP (owner, 2026-11-06): a fireball over its wreck,
+// harmless (explosions.js: robotBlowsUp), and nothing to salvage. Except a
+// HEAVY: it leaves the AUTOMATIC fire module, if you haven't got it yet (and
+// there isn't one already lying about): bring down a heavy for it. The
+// module and the wreck sit at the same distance; the sort in placeSprites
+// keeps ties in list order, and pickups come after robots, so it's drawn on top.
+function dropSalvage(enemy) {
+  robotBlowsUp(enemy); // explosions.js
+  if (enemy.type !== 'heavy' || player.modes.includes('auto') || pickups.some((p) => p.type === 'automod')) return;
+  pickups.push({ type: 'automod', x: enemy.x, y: enemy.y });
 }

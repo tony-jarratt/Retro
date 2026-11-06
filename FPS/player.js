@@ -8,7 +8,7 @@ const PLAYER_RADIUS = 0.2;        // half-width of the player's collision box, i
 // you and the robots: hits wear it down, and once it's gone the suit is
 // BREACHED and the next hit kills you. Repair kits patch it up; nothing heals you.
 const PLAYER_MAX_ARMOUR = 100;
-const PLAYER_START_AMMO = 12;     // enough for the first fight or two; robots drop clips
+const PLAYER_START_AMMO = 12;     // enough for the first fight or two; after that, boxes (robots drop nothing)
 
 // walkTime counts up while you're moving; the HUD uses it to bob the gun.
 const player = {
@@ -24,6 +24,8 @@ const player = {
   rounds: { incendiary: 0, piercing: 0 },
   found: [],
   loaded: 'standard',
+  scanner: false,       // found the structural scanner (scanner.js)
+  scanning: false,      // ...and it's on: the vector view, a third slower
   moving: false,        // walking this frame (it spoils your aim: MOVING_CONE)
   walkTime: 0,
 };
@@ -38,7 +40,7 @@ function triggerHeld() {
 }
 
 // on: the functions to call for one-off actions:
-// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, levelChooser, togglePause, loadAmmo }.
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, levelChooser, togglePause, loadAmmo, toggleScanner, cheatScanner }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -53,6 +55,8 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyU') on.toggleMusic();
       if (e.code === 'KeyL') on.levelChooser();
       if (e.code === 'KeyP') on.togglePause();
+      if (e.code === 'KeyX') on.toggleScanner(); // scanner.js
+      if (e.code === 'KeyK') on.cheatScanner();  // play-testing only (main.js)
       for (const type of AMMO_ORDER) if (e.code === 'Digit' + AMMO_TYPES[type].key) on.loadAmmo(type); // ammo.js
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
@@ -146,7 +150,7 @@ function updatePlayer(dt) {
 
   // Move one axis at a time. If x is blocked but y isn't, you still slide
   // along the wall instead of sticking to it.
-  const step = MOVE_SPEED * dt * (playerHeld() ? GRAB_SLOW : 1); // infected.js: something has hold of you
+  const step = MOVE_SPEED * dt * (playerHeld() ? GRAB_SLOW : 1) * (player.scanning ? SCAN_SLOW : 1); // infected.js: something has hold of you; scanner.js: scanning
   const newX = player.x + moveX * step;
   if (!blocked(newX, player.y)) player.x = newX;
   const newY = player.y + moveY * step;

@@ -1379,6 +1379,16 @@ for (const ammo of AMMO_ORDER) GUN_TEXTURES[ammo] = [null, ...[1, 2, 3].map((lit
 const ROUNDS_BOX_TEXTURES = { incendiary: makeRoundsBox('incendiary'), piercing: makeRoundsBox('piercing') };
 const FLAME_FRAMES = [0, 1, 2].map(makeFlames);
 const BURST_MODULE_TEXTURE = makeUpgradeModule(2);
+// The STRUCTURAL SCANNER (scanner.js), lying on the floor: a squat grey
+// unit with a round green lens and a little wireframe grid on its face.
+const SCANNER_MODULE_TEXTURE = makeTexture(STEEL, (x, y) => {
+  if (y < 48 || y >= 62 || x < 22 || x >= 42) return null;
+  if (y === 48 || y === 61 || x === 22 || x === 41) return DARK_STEEL;
+  const lens = Math.hypot(x + 0.5 - 27, y + 0.5 - 54.5);
+  if (lens < 3) return glowing(lens < 1.2 ? [200, 255, 210] : [70, 230, 120]);
+  if (x >= 32 && x <= 39 && y >= 51 && y <= 58) return (x - 32) % 3 === 0 || (y - 51) % 3 === 0 ? glowing([70, 230, 120]) : [10, 24, 14];
+  return brighten(STEEL, 0.75 + 0.2 * noise(x, y, 51));
+});
 const AUTO_MODULE_TEXTURE = makeUpgradeModule(3);
 
 const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
@@ -1452,6 +1462,19 @@ function wallTexture(cell) {
 const LOCKED_DOOR_TEXTURES = {};
 for (const colour in KEY_COLOURS) LOCKED_DOOR_TEXTURES[colour] = makeBlastDoor(colour);
 
+// A BULKHEAD (lockdown.js): a heavy shutter of thick slats, hazard-striped
+// across the middle, with a red lamp: this one isn't opening again.
+const BULKHEAD_TEXTURE = makeTexture([70, 72, 76], (x, y) => {
+  if (x < 3 || x >= 61) return DARK_STEEL;                                     // the frame it runs in
+  if (y >= 26 && y < 38) return hazard(x, y, true);                            // the warning band
+  if (Math.hypot(x + 0.5 - 32, y + 0.5 - 16) < 2.5) return glowing([255, 40, 30]); // the lamp
+  const slat = y % 8;
+  if (slat === 0) return brighten([70, 72, 76], 0.45);
+  if (slat === 1) return brighten([70, 72, 76], 1.4);
+  return brighten([70, 72, 76], 0.9 + 0.15 * noise(x >> 1, y, 57));
+});
+
 function doorTexture(door) {
+  if (door.bulkhead) return BULKHEAD_TEXTURE;
   return door.lock ? LOCKED_DOOR_TEXTURES[door.lock] : TEXTURES[DOOR_CELL];
 }

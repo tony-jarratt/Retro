@@ -182,7 +182,7 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
     guardDies(enemy);   // guard.js: its ammo, and its torch on the floor
     enemy.state = 'dead';
     enemy.moving = false;
-    if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
+    if (!ENEMY_TYPES[enemy.type].creature) dropSalvage(enemy); // pickups.js: it blows up; a heavy leaves its module
     knockedDown(enemy); // infected.js: a suit is only down
     if (onFire) burnUp(enemy); // ammo.js: ash, and a suit stays down
     return;

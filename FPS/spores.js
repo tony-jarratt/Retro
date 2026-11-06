@@ -48,7 +48,7 @@ function updateSpores(dt) {
   }
   if (inSpores(player.x, player.y)) {
     sporeTimer += dt;
-    if (sporeTimer >= SPORE_TICK) { sporeTimer -= SPORE_TICK; damagePlayer(SPORE_DAMAGE); }
+    if (sporeTimer >= SPORE_TICK) { sporeTimer -= SPORE_TICK; damagePlayer(SPORE_DAMAGE); grimeVisor('spores'); } // atmosphere.js: they settle on your visor
   } else {
     sporeTimer = 0;
   }

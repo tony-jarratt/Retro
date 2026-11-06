@@ -165,6 +165,12 @@ LEVELS.push({
   ],
 
   // The infected drop nothing, so, as in the lab, the ammo comes in crates.
+  // LOCKDOWN (lockdown.js): the plant burnt, a bulkhead seals the atrium's door
+  // up to the front desk. The way home is through the open-plan office.
+  lockdown: [
+    { x: 2, y: 9 },
+  ],
+
   pickups: [
     { type: 'ammocrate', x: 1.5,  y: 7.5 },  // behind the front desk: the first room's ammo...
     { type: 'repair',    x: 4.5,  y: 7.5 },  // ...and armour

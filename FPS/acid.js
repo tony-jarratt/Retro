@@ -71,7 +71,10 @@ function globPosition(g) {
 function globLands(g) {
   sfxAcidSplash(g.x1, g.y1); // sound.js
   if (g.glass) { shatterGlass(g.glass); return; } // panels.js: it eats through
-  if (Math.hypot(player.x - g.x1, player.y - g.y1) < GLOB_SPLASH) damagePlayer(ENEMY_TYPES.spitter.damage);
+  if (Math.hypot(player.x - g.x1, player.y - g.y1) < GLOB_SPLASH) {
+    damagePlayer(ENEMY_TYPES.spitter.damage);
+    grimeVisor('acid'); // atmosphere.js: splashes on your visor
+  }
   const x = Math.floor(g.x1), y = Math.floor(g.y1);
   if (MAP[y]?.[x] !== 0) return; // landed in a doorway: it splashes, but there's no floor to pool on
   const pool = pools.find((p) => p.x === x && p.y === y);

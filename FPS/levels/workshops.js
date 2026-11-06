@@ -152,6 +152,9 @@ LEVELS.push({
     { type: 'ammo',     x: 2.5,  y: 20.5 }, // the paint store
     { type: 'repair',   x: 2.5,  y: 21.5 },
     { type: 'ammo',     x: 6.5,  y: 19.5 },
+    // Robots drop nothing now (they blow up: pickups.js), so two more boxes.
+    { type: 'ammo',     x: 24.5, y: 5.5 },  // the foreman's office
+    { type: 'ammo',     x: 1.5,  y: 10.5 }, // the locker room
   ],
 
   vents: [

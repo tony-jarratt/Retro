@@ -146,6 +146,7 @@ function objectiveDone() {
     alarms[z.id] = Infinity;
   }
   showSecurityMessage(OBJECTIVE_LOOK.done);
+  startLockdown(); // lockdown.js: on a level with bulkheads, they come down
   disarmTraps(); // traps.js: the data-security protocol stands down
   if (OBJECTIVE_LOOK.creatures) creaturesComeLoose(); // creatures.js: every tank breaks, every pod bursts, everything hunts you
 }

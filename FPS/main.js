@@ -92,6 +92,13 @@ setupInput(screenCanvas, {
   levelChooser: () => { if (PLAYTEST) location.search = '?playtest'; },
   togglePause, // pause.js
   loadAmmo,    // ammo.js: keys 1-3
+  toggleScanner, // scanner.js: X
+  // Play-testing: K gives you the scanner without finding it, and switches it on.
+  cheatScanner: () => {
+    if (!PLAYTEST) return;
+    player.scanner = true;
+    if (!player.scanning) toggleScanner();
+  },
 });
 
 // THE PLAY-TEST LEVEL CHOOSER: with ?playtest and no level picked yet, show a
@@ -146,9 +153,12 @@ function frame(now) {
       updateManagers(dt); // manager.js: the PA, the badge, cut lights and sealed doors running down
       updateTraps(dt);    // traps.js: trapped terminals you've come too close to
       updateBurning(dt);  // ammo.js: creatures alight from incendiary rounds
+      updateLockdown(dt); // lockdown.js: bulkheads coming down
+      updateAtmosphere(dt); // atmosphere.js: your breathing, the building, the old PA, the visor's grime
     }
     updateCombat(dt);
     updateWeapons(dt);
+    updateScanner(dt); // scanner.js: off when the level's over; its tick
     updatePanels(dt); // falling glass
     updateExplosions(dt); // outside the "playing" check, so a fireball finishes even if it killed you
     updateLighting(); // after combat, so this frame's muzzle flashes light the scene
@@ -161,7 +171,8 @@ function frame(now) {
     drawCutscene(frameImage.data); // campaign.js: the lift ride or the finale, instead of the 3D view
   } else {
     hits = castRays(player);
-    renderView(frameImage, hits, player);
+    if (player.scanning) renderScanView(frameImage, hits, player); // scanner.js: the vector view
+    else renderView(frameImage, hits, player);
     drawHud(frameImage.data); // flat on top of the 3D view, same buffer
   }
   // Last of all, so it covers the HUD too: the full CRT look if you've asked

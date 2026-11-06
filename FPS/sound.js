@@ -392,6 +392,77 @@ function sfxSuitHit() {
   if (!audioReady()) return;
   tone(audio.master, 'sine', 140, 50, 0.18, 0.7);
   noiseBurst(audio.master, 'highpass', 5000, 3000, 0.2, 0.25);
+  sfxBreath(true, 0.16, 0.14, 0.05); // your breath catches (atmosphere.js)
+}
+
+// ONE BREATH, inside the helmet (atmosphere.js schedules them): noise
+// through a band-pass, swelling up and dying away, not the sharp start of
+// noiseBurst. An in-breath rises in pitch and is a little brighter; an
+// out-breath falls and is longer, softer. Straight to the speakers, unpanned:
+// it's you.
+function sfxBreath(inhale, dur, vol, delay = 0) {
+  if (!audioReady()) return;
+  const ctx = audio.ctx, t = ctx.currentTime + delay;
+  const src = ctx.createBufferSource();
+  src.buffer = audio.noise;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 0.8;
+  f.frequency.setValueAtTime(inhale ? 700 : 1000, t);
+  f.frequency.linearRampToValueAtTime(inhale ? 1300 : 550, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + dur * (inhale ? 0.6 : 0.3)); // the swell
+  g.gain.linearRampToValueAtTime(0.0001, t + dur);                      // and away
+  src.connect(f).connect(g).connect(audio.master);
+  src.start(t, Math.random() * 0.5);
+  src.stop(t + dur + 0.02);
+}
+
+// THE SCANNER (scanner.js): a blip up as it comes on, down as it goes off,
+// and while it's on, a soft tick each sweep (and its hum: updateWorldLoops).
+function sfxScanToggle(on) {
+  if (!audioReady()) return;
+  tone(audio.master, 'sine', on ? 600 : 1400, on ? 1400 : 600, 0.12, 0.1);
+  tone(audio.master, 'square', on ? 2100 : 900, on ? 2100 : 900, 0.04, 0.04, 0.1);
+}
+function sfxScanTick() {
+  if (!audioReady()) return;
+  tone(audio.master, 'sine', 2600, 2400, 0.03, 0.035);
+}
+
+// A BULKHEAD slamming shut (lockdown.js): a huge low boom, the steel ringing, a hiss of air.
+function sfxBulkheadSlam(door) {
+  if (!audioReady()) return; // called from the game, not the watcher: the sound may not be on yet
+  const out = placeAt(door.x + 0.5, door.y + 0.5);
+  if (!out) return;
+  drumHit(out, 'sine', 120, 35, 0.12, 0.9, 1.0);
+  tone(out, 'triangle', 220, 205, 1.2, 0.18, 0.02);
+  noiseBurst(out, 'lowpass', 900, 120, 0.6, 0.6);
+  noiseBurst(out, 'highpass', 3000, 6000, 0.5, 0.12, 0.15);
+}
+
+// THE BUILDING MOVING ROUND YOU (atmosphere.js): one sound from behind a
+// wall at (x, y), muffled by it. `kind`: 'machine' (robots about),
+// 'creature' (the lab's), 'infected' (the HQ's).
+function sfxBuilding(kind, x, y) {
+  if (!audioReady()) return; // called from the game, not the watcher: the sound may not be on yet
+  const out = placeAt(x, y);
+  if (!out) return;
+  const pick = Math.floor(Math.random() * 3);
+  if (kind === 'machine') {
+    if (pick === 0) { tone(out, 'sawtooth', 180, 420, 0.6, 0.08); tone(out, 'sawtooth', 420, 160, 0.5, 0.06, 0.65); }  // a servo, there and back
+    else if (pick === 1) { for (const [f, d] of [[380, 0], [300, 0.5]]) { tone(out, 'sine', f, f * 0.97, 0.3, 0.3, d); tone(out, 'sine', f * 1.58, f * 1.5, 0.2, 0.15, d); } } // something heavy set down
+    else { noiseBurst(out, 'bandpass', 1500, 600, 0.9, 0.25); drumHit(out, 'sine', 90, 40, 0.1, 0.5, 0.4, 0.8); }   // hydraulics, a door cycling
+  } else if (kind === 'creature') {
+    if (pick === 0) { for (let i = 0; i < 4; i++) noiseBurst(out, 'bandpass', 2400, 1800, 0.08, 0.2, i * 0.13); }     // claws on tile
+    else if (pick === 1) { noiseBurst(out, 'lowpass', 500, 200, 1.4, 0.35); }                                         // something wet, dragged
+    else { tone(out, 'sawtooth', 95, 70, 0.7, 0.07); tone(out, 'square', 1400, 900, 0.05, 0.05, 0.3); }               // a low chitter
+  } else {
+    if (pick === 0) { for (let i = 0; i < 3; i++) noiseBurst(out, 'lowpass', 600, 300, 0.12, 0.3, i * 0.55); }        // shuffling steps
+    else if (pick === 1) { drumHit(out, 'sine', 110, 60, 0.04, 0.2, 0.5); drumHit(out, 'sine', 110, 60, 0.04, 0.2, 0.45, 0.4); } // a knock on the wall
+    else { tone(out, 'sine', 140, 110, 1.4, 0.08); tone(out, 'sine', 210, 160, 1.2, 0.04, 0.1); }                     // a moan
+  }
 }
 
 // The suit's breach alarm: a short synth beep (repeated by updateSound).
@@ -745,6 +816,7 @@ function sfxPickup(type) {
     repair: [440, 554, 660, 880],
     redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
     burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319],
+    scanner: [392, 523, 784, 1047, 784, 1047],
     charge: [330, 330, 494],
     liftkey: [784, 988, 1175, 1568],
   }[type] || [880];
@@ -834,6 +906,8 @@ const robotWhines = new Map();   // robot -> voice, while it's charging a shot
 const droneBuzzes = new Map();   // drone -> voice, while it's out and about
 const mothBuzzes = new Map();    // moth -> voice, while it's swarming
 let spinWhine = null;            // your gun winding up
+let breachHiss = null;           // air escaping a breached suit
+let scanHum = null;              // the scanner, running
 let lastLit = 1;                 // coils lit last frame, to hear one lock on
 let breachTimer = 0;             // seconds to the next breach beep
 let gameOver = false;             // set once the game has ended and the loops have faded (R reloads the page)
@@ -932,7 +1006,7 @@ function updateSound(dt) {
 const LOOP_FADE = 0.6;
 function fadeOutLoops() {
   const t = audio.ctx.currentTime;
-  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...mothBuzzes.values(), ...ventHisses.values(), spinWhine, siren, ...(ambience || [])];
+  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...mothBuzzes.values(), ...ventHisses.values(), spinWhine, breachHiss, scanHum, siren, ...(ambience || [])];
   for (const v of all) {
     if (!v) continue;
     v.gain.gain.cancelScheduledValues(t);
@@ -943,7 +1017,7 @@ function fadeOutLoops() {
   droneBuzzes.clear();
   mothBuzzes.clear();
   ventHisses.clear();
-  spinWhine = siren = ambience = null;
+  spinWhine = breachHiss = scanHum = siren = ambience = null;
 }
 
 // Note how everything is now, to compare against next frame.
@@ -1048,6 +1122,12 @@ function updateWorldLoops() {
     if (!active && voice) { stopVoice(voice); ventHisses.delete(v); continue; }
     if (voice) steerVoice(voice, v.x, v.y, v.state === 'burst' ? 0.5 : 0.15, v.state === 'burst' ? 3500 : 2000);
   }
+  // THE SCANNER's hum, while it's on (scanner.js).
+  if (!scanHum) { scanHum = makeVoice('sine'); scanHum.osc.frequency.value = 96; scanHum.filter.frequency.value = 600; }
+  scanHum.gain.gain.setTargetAtTime(player.scanning && game.state === 'playing' ? 0.03 : 0, t, 0.1);
+  // A BREACHED SUIT: a thin hiss of air, all the time it's open.
+  if (!breachHiss) breachHiss = makeNoiseVoice(6500);
+  breachHiss.gain.gain.setTargetAtTime(game.state === 'playing' && player.armour === 0 ? 0.03 : 0, t, 0.2);
   // THE ALARM: a two-tone wail while any zone's alarm is going.
   const alarmOn = game.state === 'playing' && Object.values(alarms).some((a) => a > 0);
   if (!siren) siren = makeVoice('square');

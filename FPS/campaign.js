@@ -90,6 +90,7 @@ function applyLoadout() {
   for (const t of SPECIAL_AMMO) player.rounds[t] = Math.max(0, rounds[t]);
   player.found = SPECIAL_AMMO.filter((t) => found.includes(t));
   player.loaded = roundsOf(loaded) > 0 ? loaded : 'standard';
+  player.scanner = kit.scanner === true; // scanner.js
 }
 
 // Everything you've destroyed on this level: robots and creatures (a downed
@@ -195,7 +196,7 @@ function handleEnter() {
     run.kills += levelKills();
     run.cleared += 1;
     run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes],
-      rounds: { ...player.rounds }, found: [...player.found], loaded: player.loaded } : null;
+      rounds: { ...player.rounds }, found: [...player.found], loaded: player.loaded, scanner: player.scanner } : null;
     saveRun();
     game.state = 'lift';
     startLiftRide(CURRENT_LEVEL.floor, next ? next.floor : ROOF_FLOOR); // lift.js
@@ -273,6 +274,7 @@ function drawCampaignScreen(pixels) {
   drawTextCentred(pixels, OBJECTIVE_LOOK.goal, 126, HUD_WARN, 1); // core.js
   // What you've brought with you.
   const modules = player.modes.filter((m) => m !== 'single').map((m) => FIRE_MODES[m].name);
+  if (player.scanner) modules.push('SCANNER'); // scanner.js
   const kit = `ARMOUR ${player.armour}   ROUNDS ${player.ammo}` + (modules.length ? `   ${modules.join(' + ')}` : '');
   drawTextCentred(pixels, kit, 138, HUD_GREEN, 1);
   // ...and the special rounds you've found (ammo.js), each in its colour.

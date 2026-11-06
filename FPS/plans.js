@@ -60,11 +60,13 @@ function planInView() {
 function planCell(x, y) {
   const cell = MAP[y][x];
   if (cell === 0) return 'room';
-  if (cell === DOOR_CELL) return 'door';
+  if (cell === DOOR_CELL) return doorAt(x, y).bulkhead ? 'sealed' : 'door'; // lockdown.js
   if (cell === LIFT_CELL) return 'exit';
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (MAP[y + dy]?.[x + dx] === 0) return 'wall';
   return null;
 }
+
+const PLAN_SEALED = [230, 40, 30]; // a bulkhead that's come down (lockdown.js), on every look
 
 // The three looks, as colours: the panel, its border, walls, doors, the title, YOU ARE HERE, the EXIT.
 const PLAN_LOOKS = {
@@ -91,6 +93,7 @@ function drawPlan(pixels) {
     for (let x = 0; x < cols; x++) {
       const kind = planCell(x, y);
       if (kind === 'exit') { fillRect(pixels, x0 + x * size, y0 + y * size, size, size, look.exit); continue; }
+      if (kind === 'sealed') { fillRect(pixels, x0 + x * size, y0 + y * size, size, size, PLAN_SEALED); continue; } // a bulkhead, down
       if (kind === 'wall' || (kind === 'door' && look.door)) {
         if (THEME_NAME === 'lab' && noise(x, y, 125) < 0.12) continue; // the marker skipped
         fillRect(pixels, x0 + x * size, y0 + y * size, size, size, kind === 'door' ? look.door : look.wall);

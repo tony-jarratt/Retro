@@ -19,7 +19,7 @@ const DOORS = findDoors();
 // The key colour of the locked door you're standing at without its card, or
 // null. The HUD shows "RED KEYCARD NEEDED" while this is set.
 let lockedDoorHint = null;
-let sealedDoorHint = false; // you're at a door the Manager has sealed (manager.js)
+let sealedDoorHint = false; // you're at a sealed door: true (the Manager's, manager.js), or 'bulkhead' (lockdown.js)
 
 function findDoors() {
   const isSolid = (x, y) => { const c = MAP[y]?.[x]; return c !== undefined && c !== 0 && c !== DOOR_CELL; };
@@ -95,7 +95,7 @@ function updateDoors(dt) {
     // and an open one shuts as soon as the doorway's clear.
     const sealed = door.sealed > 0;
     if (near && !playerCanOpen(door)) lockedDoorHint = door.lock;
-    if (near && sealed && playerCanOpen(door)) sealedDoorHint = true;
+    if (near && sealed && playerCanOpen(door)) sealedDoorHint = door.bulkhead ? 'bulkhead' : true;
     if (sealed && door.state === 'open' && !doorwayOccupied(door)) door.state = 'closing';
     // The Manager (manager.js) opens doors too: the only one of them that can.
     const opener = door.lock === null && enemies.some((e) => e.state !== 'dead' && ENEMY_TYPES[e.type].opensDoors &&

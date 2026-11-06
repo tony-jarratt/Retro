@@ -64,6 +64,7 @@ function updateSteam(dt) {
   // Scalding: time in a plume adds up, and every tick of it costs health.
   // Out of the steam, the count starts again from nothing.
   if (bursting.some((v) => inPlume(v, player.x, player.y, PLAYER_RADIUS))) {
+    grimeVisor(THEME.ventGas ? 'gas' : 'steam'); // atmosphere.js: it mists your visor
     playerScald += dt;
     if (playerScald >= SCALD_TICK) {
       playerScald -= SCALD_TICK;

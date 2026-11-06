@@ -251,7 +251,7 @@ function updateLighting() {
   }
   // Explosions: a big orange light that dies away with the fireball.
   for (const b of explosions) {
-    addLight(lightGrid, b.x, b.y, BLAST_LIGHT.colour, BLAST_LIGHT.radius, 1 - b.time / EXPLOSION_TIME);
+    addLight(lightGrid, b.x, b.y, BLAST_LIGHT.colour, b.small ? BLAST_LIGHT.radius * 0.6 : BLAST_LIGHT.radius, 1 - b.time / EXPLOSION_TIME); // a robot going up: smaller (explosions.js)
   }
   // Rockets light their way as they fly: you see one coming down a dark corridor.
   for (const r of rockets) addLight(lightGrid, r.x, r.y, ROCKET_LIGHT.colour, ROCKET_LIGHT.radius, 1);

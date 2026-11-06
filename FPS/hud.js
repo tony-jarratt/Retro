@@ -315,6 +315,7 @@ function drawHud(pixels) {
   // Gold flash for collecting something.
   if (game.pickupFlash > 0) tintScreen(pixels, [255, 210, 90], 0.3 * game.pickupFlash / PICKUP_FLASH_TIME);
   drawSporeTint(pixels); // spores.js: standing in a spore cloud
+  drawGrime(pixels);     // atmosphere.js: smears and mist on the visor's glass
   // The helmet visor goes over the view but under the readouts, which sit on
   // its frame like displays built into the helmet (visor.js).
   if (visorOn) applyVisor(pixels);
@@ -322,6 +323,7 @@ function drawHud(pixels) {
   drawArmour(pixels);
   drawAmmoReadout(pixels);
   drawKeys(pixels);
+  drawScanReadout(pixels); // scanner.js
   if (paused) { drawPauseScreen(pixels); return; } // pause.js: the controls, instead of any messages
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);
   if (game.state === 'playing') {
@@ -329,7 +331,7 @@ function drawHud(pixels) {
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
-    if (sealedDoorHint) drawTextCentred(pixels, 'DOOR SEALED', 40, HUD_WARN, 1); // manager.js
+    if (sealedDoorHint) drawTextCentred(pixels, sealedDoorHint === 'bulkhead' ? 'BULKHEAD SEALED' : 'DOOR SEALED', 40, HUD_WARN, 1); // manager.js, lockdown.js
     drawChargeReadout(pixels); // charge.js: setting it, and the fuse
     // The Manager on the PA (manager.js), and its ID badge when you first see it.
     if (paTime > 0) drawTextCentred(pixels, 'PA: ' + paMessage, 30, PA_COLOUR, 1);

@@ -83,6 +83,43 @@ YOU ARE HERE, a triangle where you stand pointing the way you face (snapped
 to 8 directions, so it reads at this resolution), and the EXIT: the lift's
 cells in green (bright on the screen) with EXIT beside them, room side.
 
+### The structural scanner (`scanner.js`, owner 2026-11-06)
+
+X toggles it (a toggle, not a hold: the cost should be lived with, not
+peeked). The view goes VECTOR: green lines only, no textures or light: wall
+edges and corners, door frames, a faint floor grid, and ONE WALL THROUGH (the
+room behind, dimmer), all fading out by 8 cells. It sees only SOLID things:
+robots and wrecks, turrets, drones, cameras, props, pickups; nothing animal
+or vegetable (no creatures, infected, bodies, larvae, moths, potted plants).
+The cost: a third off your walking speed while it's on, and no textures (a trapped desk
+or a keycard door looks like any other). Found as a module in the Hangar's
+start bay ("PRESS X TO SCAN"); carried up in the lift. A hum and a soft tick
+while it runs; SCAN blinks on the visor's top rim.
+
+### Claustrophobia (`atmosphere.js`, `lockdown.js`, owner 2026-11-06)
+
+The owner noticed the suit and visor give the game a sealed-in feel and
+wanted more of it, kept original (no borrowed twists: the visor never lies,
+the climb ends in a real dawn).
+
+- **Breathing**, always there and quiet, inside the helmet. It quickens and
+  grows louder with stress (armour under 50, grabbed, in the dark, just hit,
+  breached), tensing fast and calming slowly. A hit makes it catch; a breach
+  adds a hiss of air; dying, it stops.
+- **The building** makes sounds from behind a wall near you: servos and
+  hydraulics (robots), claws and dragging (creatures), shuffling, knocking,
+  moaning (the infected). Pure atmosphere, from a random spot, never where
+  anything is. But only what's alive makes them: fewer left, rarer; all
+  dead, silence.
+- **The old PA** loops cheerful, wrong announcements on levels with no
+  Manager; now and then the tape cuts out.
+- **Visor grime**: spores and acid splashes smear the glass and clear over
+  about 10 s; steam and gas mist it from the edges.
+- **Lockdown** (the Hangar, Genetics, the Atrium only): 2.5 s after the
+  objective goes, bulkheads slam across chosen doors for good (heavy striped
+  shutter, red lamp, BULKHEAD SEALED). The way you came is cut, the plans show
+  them in red, and a load-time check makes sure the lift is still reachable.
+
 ### Ammo types (`ammo.js`, owner 2026-11-06)
 
 Three kinds of round; keys **1 2 3** load them. The coils and the muzzle
@@ -168,7 +205,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | | Strut | Solid cover |
 | | Lamp | Light; can flicker |
 | `CEILING_LIGHTS` | Strip light | Turns red and pulses in an alarm |
-| `PICKUPS` | Ammo (+8), repair kit (+25 armour), red/blue keycard, burst module | Robots also drop clips (+4); the first heavy destroyed drops the auto module |
+| `PICKUPS` | Ammo (+8), repair kit (+25 armour), red/blue keycard, burst module | Destroyed robots blow up (a harmless fireball) and drop nothing (owner, 2026-11-06: no clips); the first heavy destroyed drops the auto module |
 | `ZONES` | Security rectangle | Everything security-related belongs to a zone |
 | `CAMERAS` | Sweeping camera | 7 cells, 50°, can be shot |
 | `TRIPWIRES` | Laser across floor cells | Wakes the zone's turrets only (no alarm). Only the core going down disarms them: they're the obstacle to solve |
@@ -596,11 +633,11 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · 1 2 3 load standard / incendiary / piercing · N sound · U music · R restart (once you've died) ·
+fire (hold to spin up) · 1 2 3 load standard / incendiary / piercing · X scanner (once found) · N sound · U music · R restart (once you've died) ·
 Enter carry on (title, briefing, LEVEL COMPLETE, finale) · P pause (shows
 the controls; R and Enter aren't listed, the screens that use them say so;
 the page itself has no help text) · with `?playtest` only: M map, V visor,
-C CRT, L level chooser.
+C CRT, K give the scanner (and switch it on), L level chooser.
 
 ---
 

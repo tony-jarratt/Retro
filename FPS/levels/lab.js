@@ -107,6 +107,13 @@ LEVELS.push({
     { x: 13, y: 15, face: 'N', count: 5 },
   ],
 
+  // LOCKDOWN (lockdown.js): the chamber burnt, a bulkhead seals the specimen
+  // hall's door to the start room. The way home is through the side room, past
+  // whatever's left of its larvae.
+  lockdown: [
+    { x: 10, y: 3 },
+  ],
+
   // Creatures drop nothing, so the lab's ammo comes in big supply crates (+20).
   pickups: [
     { type: 'ammocrate', x: 8.5,  y: 1.5 },  // start room: the first room's ammo...
