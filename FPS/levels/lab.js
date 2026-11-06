@@ -135,6 +135,15 @@ LEVELS.push({
     { x: 16, y: 5, delay: 0.5 },
   ],
 
+  // CEILING VENTS (ambush.js): rattle and drip, then drop the membrane on you.
+  // One is a decoy.
+  drops: [
+    { x: 17.5, y: 5.5 },               // the specimen hall, between the tanks
+    { x: 13.5, y: 9.5, decoy: true },
+    { x: 8.5,  y: 9.5 },               // the side room, with its larvae
+    { x: 5.5,  y: 13.5 },              // the lower lab
+  ],
+
   // POWER (power.js): it goes with the lockdown; the breaker is in the side
   // room, on the way home.
   breakers: [

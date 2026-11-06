@@ -34,7 +34,7 @@ let breathTimer = 1;          // seconds until the next breath
 function stressNow() {
   const lowArmour = Math.max(0, Math.min(1, (50 - player.armour) / 40)); // from 50 armour down, full at 10
   const dark = (1 - playerVisibility()) * 0.45;                       // creatures.js
-  return Math.max(lowArmour, dark, player.armour === 0 ? 1 : 0, playerHeld() ? 1 : 0, game.hurtFlash > 0 ? 0.7 : 0);
+  return Math.max(lowArmour, dark, player.armour === 0 ? 1 : 0, playerHeld() ? 1 : 0, membraneOn() ? 1 : 0, game.hurtFlash > 0 ? 0.7 : 0); // ambush.js: the membrane
 }
 
 function updateBreathing(dt) {
@@ -158,6 +158,7 @@ const MIST_CLEAR = 4;           // seconds for a full mist to clear
 const GRIME_LOOKS = {
   spores: { colour: [190, 200, 90], size: [6, 12], count: 2 },
   acid:   { colour: [120, 210, 70], size: [8, 16], count: 3 },
+  membrane: { colour: [214, 200, 160], size: [14, 26], count: 3 }, // ambush.js: what it leaves when it bursts
 };
 const MIST_COLOUR = { steam: [210, 215, 220], gas: [150, 200, 140] };
 const smears = [];

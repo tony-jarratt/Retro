@@ -142,6 +142,7 @@ function fireRound() {
 // One round of ammo `type` (ammo.js) arriving at something it hit.
 function shotHits(target, type = 'standard') {
   if (target.panel) { hitGlass(target.panel); return; }            // panels.js
+  if (target.root) { hitRoot(target.root, type); return; }         // ambush.js: a root up out of the floor
   if (target.core) { damageCore(objectiveHits(type)); return; }   // core.js; ammo.js: what this type is worth on it
   if (target.bay) { damageBay(target.bay, type === 'piercing' ? 2 : 1); return; } // repair.js
   if (target.enemy && target.enemy.state !== 'dead' && target.enemy.type === 'guard' && guardTorchHit(target.enemy, target.texX, target.texY)) {

@@ -147,6 +147,23 @@ the climb ends in a real dawn).
   shutter, red lamp, BULKHEAD SEALED). The way you came is cut, the plans show
   them in red, and a load-time check makes sure the lift is still reachable.
 
+### Ambushes: creeping horror (`ambush.js`, owner 2026-11-06)
+
+Hand-placed, each with a TELL first, and some DECOYS (the tell, then nothing).
+- **The lab: ceiling vents** (`drops`). Within 4 cells it rattles and slime
+  drips. Step under it: it bangs open and a pale shape falls (0.5 s: back
+  off and it splats on the floor). Otherwise the MEMBRANE is on your visor: a
+  lab-grown veined jelly (deliberately not a crab or hand: no facehugger)
+  across most of the glass, squelching in the helmet, draining 2 armour a
+  second down to a breach but never killing you, breathing at full panic. It
+  lets go after 6 s, or SPIN HARD (two quick full turns) to shake it off; it
+  bursts and smears the glass. Storage and Genetics, 3 live + 1 decoy each.
+- **The HQ: roots** (`roots`). Within 4 cells the carpet bulges and splits,
+  with a creak. Step close: a root lashes up and holds you (slowed), 3
+  armour every 0.8 s, until shot (2 hits; incendiary or a blast burns it in
+  one) or it sinks after 5 s. Miss its reach and it stands swaying, waiting.
+  Vegetable: the scanner can't see it. Offices and Atrium, 3 live + 1 decoy.
+
 ### Power failure (`power.js`, owner 2026-11-06)
 
 The lights flicker and buzz for 2 s, a deep clunk, then the strips drop to a

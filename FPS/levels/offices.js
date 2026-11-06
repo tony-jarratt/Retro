@@ -151,6 +151,14 @@ LEVELS.push({
     { type: 'incendiary', x: 19.5, y: 11.5 }, // the open plan
   ],
 
+  // ROOTS (ambush.js): the carpet bulges, then a root has your legs. One is a decoy.
+  roots: [
+    { x: 18.5, y: 2.5 },               // the corridor
+    { x: 16.5, y: 7.5 },               // the open plan
+    { x: 9.5,  y: 11.5, decoy: true },
+    { x: 13.5, y: 16.5 },              // the archive
+  ],
+
   // POWER (power.js): the lights die as you step into the archive; the
   // breaker is in the kitchen beyond it.
   powerCut: { x: 14.5, y: 14.5, radius: 1.2 },

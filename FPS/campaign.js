@@ -150,7 +150,7 @@ function countsAsHit(target) {
   if (target.enemy) return target.enemy.state !== 'dead' || target.enemy.downTime > 0; // a downed suit, finished off
   if (target.prop) return (Boolean(SPRITE_TYPES[target.prop.type].explosive) || liveTrap(target.prop)) && target.prop.state !== 'exploded'; // a drum, or a trapped desk (traps.js)
   if (target.bay) return target.bay.health > 0;
-  return Boolean(target.camera || target.drone || target.larva || target.moth || target.core);
+  return Boolean(target.camera || target.drone || target.larva || target.moth || target.core || target.root); // ambush.js: a root
 }
 
 // Accuracy as a whole percentage, or null if nothing was fired (shown as --).

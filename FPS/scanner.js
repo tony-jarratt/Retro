@@ -69,7 +69,7 @@ function updateScanner(dt) {
 
 // Does the scanner see this sprite? Solid, not living, not growing.
 function scannerSees(thing) {
-  if (thing.effect || thing.larva || thing.moth) return false;
+  if (thing.effect || thing.larva || thing.moth || thing.root) return false; // a root (ambush.js) is vegetable
   if (thing.enemy) return !ENEMY_TYPES[thing.enemy.type].creature; // a robot, standing or wrecked
   if (thing.prop) return thing.prop.type !== 'plant' && thing.prop.type !== 'lamp';
   return true; // drones, cameras, pickups, the charge

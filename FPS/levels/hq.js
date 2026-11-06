@@ -203,6 +203,14 @@ LEVELS.push({
     { type: 'piercing',   x: 22.5, y: 1.5 },  // exec lounge
   ],
 
+  // ROOTS (ambush.js): the carpet bulges, then a root has your legs. One is a decoy.
+  roots: [
+    { x: 11.5, y: 12.5 },              // the garden, between the planters
+    { x: 21.5, y: 15.5 },
+    { x: 6.5,  y: 15.5, decoy: true },
+    { x: 13.5, y: 18.5 },              // just inside the boardroom
+  ],
+
   // POWER (power.js): it goes with the lockdown; the breaker is in the
   // open-plan office, on the way home.
   breakers: [

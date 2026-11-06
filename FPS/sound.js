@@ -431,6 +431,72 @@ function sfxScanTick() {
   tone(audio.master, 'sine', 2600, 2400, 0.03, 0.035);
 }
 
+// AMBUSHES (ambush.js). The vent: a rattle of loose metal, a bang as it
+// opens, slime dripping. The membrane: a wet SPLAT right on you (unpanned:
+// it's on your face), squelching inside the helmet, and a burst as it goes.
+// The roots: a creak and rustle as the carpet stirs, a whip-crack and a
+// burst of soil as one lashes up, a dry snap as it dies.
+function sfxVentRattle(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  for (let i = 0; i < 6; i++) tone(out, 'square', 900 + 300 * Math.random(), 700, 0.03, 0.06, i * 0.07);
+}
+function sfxVentBang(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  drumHit(out, 'sine', 300, 90, 0.05, 0.3, 0.6);
+  noiseBurst(out, 'bandpass', 2500, 900, 0.15, 0.5);
+}
+function sfxDrip(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  tone(out, 'sine', 1400, 600, 0.06, 0.08);
+}
+function sfxMembraneSplat() {
+  if (!audioReady()) return;
+  noiseBurst(audio.master, 'lowpass', 1800, 200, 0.35, 0.9);
+  drumHit(audio.master, 'sine', 160, 50, 0.05, 0.3, 0.7);
+}
+function sfxMembraneMiss(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 1500, 200, 0.3, 0.6);
+}
+function sfxSquelch() {
+  if (!audioReady()) return;
+  noiseBurst(audio.master, 'bandpass', 500 + 400 * Math.random(), 250, 0.18, 0.25);
+}
+function sfxMembraneBurst() {
+  if (!audioReady()) return;
+  noiseBurst(audio.master, 'lowpass', 2500, 300, 0.4, 0.8);
+  tone(audio.master, 'sine', 300, 80, 0.2, 0.2);
+}
+function sfxRootStir(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  tone(out, 'sawtooth', 70, 55, 0.9, 0.06);
+  for (let i = 0; i < 5; i++) noiseBurst(out, 'bandpass', 3000, 2000, 0.06, 0.12, i * 0.15);
+}
+function sfxRootLash(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 4000, 1500, 0.08, 0.7);
+  noiseBurst(out, 'lowpass', 600, 100, 0.4, 0.5, 0.05);
+}
+function sfxRootDie(x, y) {
+  if (!audioReady()) return;
+  const out = placeAt(x, y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 2000, 800, 0.12, 0.5);
+  tone(out, 'triangle', 200, 80, 0.3, 0.12);
+}
+
 // THE POWER (power.js). Failing: an electrical buzz stuttering for the two
 // seconds of flicker. Down: a deep clunk and a falling whine, the building
 // powering off. A breaker thrown: a heavy lever, and the power humming back up.

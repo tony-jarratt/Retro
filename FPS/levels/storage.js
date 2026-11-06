@@ -115,6 +115,15 @@ LEVELS.push({
     { x: 23, y: 16, delay: 1.0 }, // the cold store: gas, which burns but hides nobody
   ],
 
+  // CEILING VENTS (ambush.js): rattle and drip, then drop the membrane on you.
+  // One is a decoy.
+  drops: [
+    { x: 13.5, y: 3.5 },               // the long corridor
+    { x: 20.5, y: 2.5, decoy: true },  // ...and further along it, nothing. This time.
+    { x: 3.5,  y: 12.5 },              // the service passage
+    { x: 19.5, y: 17.5 },              // the cold store, just off its flickering light
+  ],
+
   // POWER (power.js): the lights die as you go down into the tank hall; the
   // breaker is on its far wall, past the tanks.
   powerCut: { x: 17.5, y: 6.5, radius: 1.2 },

@@ -155,6 +155,7 @@ function frame(now) {
       updateBurning(dt);  // ammo.js: creatures alight from incendiary rounds
       updateLockdown(dt); // lockdown.js: bulkheads coming down
       updatePower(dt);    // power.js: power cuts, and the breakers
+      updateAmbushes(dt); // ambush.js: ceiling vents and roots
       updateAtmosphere(dt); // atmosphere.js: your breathing, the building, the old PA, the visor's grime
     }
     updateCombat(dt);

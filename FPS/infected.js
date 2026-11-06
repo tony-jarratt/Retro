@@ -32,7 +32,7 @@ const INFECTED_STATES = ['grab', 'stagger', 'rising'];
 
 // Is anything holding on to you? (player.js slows you.)
 function playerHeld() {
-  return enemies.some((e) => e.state === 'grab');
+  return enemies.some((e) => e.state === 'grab') || rootHolding(); // ambush.js: or a root has your legs
 }
 
 // Called by updateWalker when a grabbing creature is in reach and sees you.

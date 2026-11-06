@@ -61,6 +61,7 @@ function spriteThings(viewer) {
       aimRow: e.state === 'dead' && e.downTime > 0 ? SUIT_DOWN_AIM_ROW : null, // a downed suit, on the floor (infected-art.js)
     })),
     ...flameThings(thing),    // creatures alight (ammo.js): after them, so drawn on top
+    ...ambushThings(thing),   // drips, the falling membrane, roots (ambush.js)
     ...pickups.map((p) => thing(p.x, p.y, PICKUP_TYPES[p.type].texture)),
     ...securityThings(thing), // cameras and tripwire beams (security.js)
     ...steamThings(thing),    // plumes of steam (steam.js)

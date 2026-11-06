@@ -55,6 +55,7 @@ function explodeAt(x, y, blast) {
   if (!blast.spareDrones) blastDrones(x, y, blast.radius); // drones.js
   blastLarvae(x, y, blast.radius); // larvae.js
   blastMoths(x, y, blast.radius);  // pollinators.js
+  blastRoots(x, y, blast.radius);  // ambush.js: roots burn
   blastCore(x, y, blast); // core.js: a drum set off by the core hurts it
   blastBays(x, y, blast); // repair.js
   burnCorpsesNear(x, y, blast.radius); // feeding.js: burnt bodies are no food
