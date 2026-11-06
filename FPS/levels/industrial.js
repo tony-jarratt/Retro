@@ -200,14 +200,14 @@ LEVELS.push({
 
   // Things to collect (pickups.js): 'ammo' (+8), 'repair' (+25 armour), 'redkey', 'bluekey',
   // 'charge' (the demolition charge: charge.js),
-  // and fire-mode modules for your gun: 'burstmod' (and 'automod', though that
+  // and fire-mode modules for your gun: 'burstmod' (found in the Workshops; and 'automod', though that
   // comes from heavies). Destroyed robots blow up and drop nothing, except
   // the first heavy you bring down: it leaves the automatic module.
   pickups: [
     { type: 'ammo',    x: 6.5,  y: 6.5 },  // start bay: the first room's ammo...
     { type: 'repair',  x: 1.5,  y: 6.5 },  // ...and armour
     { type: 'ammo',    x: 9.5,  y: 1.5 },  // fuel depot, by the drums
-    { type: 'burstmod', x: 17.5, y: 1.5 }, // fuel depot, far corner, behind the walker watching the door
+    { type: 'ammo',    x: 17.5, y: 1.5 },  // fuel depot, far corner, behind the walker watching the door
     { type: 'repair',  x: 25.5, y: 1.5 },  // pipe works, top of the gap
     { type: 'redkey',  x: 29.5, y: 6.5 },  // pipe works, far corner
     { type: 'ammo',    x: 20.5, y: 1.5 },  // pipe works
@@ -222,8 +222,6 @@ LEVELS.push({
     { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
     { type: 'ammo',    x: 11.5, y: 10.5 }, // server room (robots drop nothing now: pickups.js)
     { type: 'ammo',    x: 21.5, y: 9.5 },  // workshop, by the door from the corridor
-    // THE STRUCTURAL SCANNER (scanner.js): found here, in the start bay, where robots first come in numbers.
-    { type: 'scanner',  x: 4.5,  y: 1.5 },
     // ARMOUR-PIERCING ROUNDS (ammo.js): first found here, through the depot door, in plain sight.
     { type: 'piercing', x: 9.5,  y: 6.5 },  // fuel depot, by its door: where you find the type
     { type: 'piercing', x: 29.5, y: 12.5 }, // workshop, by its repair bay

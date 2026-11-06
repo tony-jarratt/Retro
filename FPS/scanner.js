@@ -5,7 +5,7 @@
 // SCANNING, the view is VECTOR: no textures, no light, only lines in green
 // phosphor. Wall corners and edges, door frames, a faint grid on the floor.
 // And it sees ONE WALL THROUGH: the room behind the nearest wall, fainter.
-// Everything fades out by SCAN_RANGE.
+// Everything fades out by SCAN_RANGE (SCAN_RANGE_MK2 with the upgrade).
 //
 // IT ONLY SEES SOLID THINGS: walls, doors, robots and their wrecks, turrets,
 // drones, cameras, props (drums, struts, desks), and the things lying about
@@ -18,10 +18,13 @@
 // to the scanner), and with no textures you can't tell an amber trapped
 // screen from a green one, or a red keycard door from any other.
 //
-// You FIND it: a module in the Hangar (its first pickup tells you the key);
-// then it goes up in the lift with you (campaign.js).
+// You FIND it: a module at the end of the Workshops, by the lift key, just as
+// the alarm brings everything out for you (its first pickup tells you the key);
+// then it goes up in the lift with you (campaign.js). THE UPGRADE, in the
+// Offices, sees TWO walls through, and further (SCAN_RANGE_MK2).
 
 const SCAN_RANGE = 8;          // cells: nothing further shows
+const SCAN_RANGE_MK2 = 12;     // ...with the upgrade
 const SCAN_SLOW = 0.67;        // your walking speed while scanning: a third slower (owner, 2026-11-06: was half)
 const SCAN_BEHIND = 0.5;       // how bright what's behind a wall is, against what's in front
 const SCAN_GREEN = [70, 230, 120];
@@ -45,6 +48,17 @@ function collectScanner() {
   showWeaponMessage('STRUCTURAL SCANNER', 'PRESS X TO SCAN'); // weapons.js
 }
 
+// The upgrade (pickups.js).
+function collectScannerUpgrade() {
+  player.scanner = true;
+  player.scannerMk2 = true;
+  showWeaponMessage('SCANNER UPGRADE', 'TWO WALLS DEEP  RANGE ' + SCAN_RANGE_MK2);
+}
+
+// How far it sees, and how many walls through.
+function scanRange() { return player.scannerMk2 ? SCAN_RANGE_MK2 : SCAN_RANGE; }
+function scanWalls() { return player.scannerMk2 ? 2 : 1; }
+
 // Each frame (main.js): it switches off when the level ends, and ticks while on.
 function updateScanner(dt) {
   if (game.state !== 'playing') player.scanning = false;
@@ -61,9 +75,9 @@ function scannerSees(thing) {
   return true; // drones, cameras, pickups, the charge
 }
 
-// How bright a line is at distance d: full close to, nothing at SCAN_RANGE.
+// How bright a line is at distance d: full close to, nothing at the scan's range.
 function scanFade(d) {
-  return Math.max(0, 1 - d / SCAN_RANGE);
+  return Math.max(0, 1 - d / scanRange());
 }
 
 function scanPixel(pixels, x, y, level) {
@@ -82,7 +96,7 @@ function hitBeyond(hit, rayX, rayY) {
     const cell = MAP[Math.floor(y)]?.[Math.floor(x)];
     if (cell === undefined) return null;
     if (cell !== 0) continue;
-    if (hit.dist + t > SCAN_RANGE) return null;
+    if (hit.dist + t > scanRange()) return null;
     const next = castRay(x, y, rayX, rayY);
     return { ...next, dist: hit.dist + t + next.dist };
   }
@@ -120,7 +134,7 @@ function renderScanView(image, hits, player) {
   const horizon = SCREEN_H / 2;
   for (let row = horizon; row < SCREEN_H; row++) {
     const d = 0.5 * PROJ_DIST / (row + 0.5 - horizon);
-    if (d > SCAN_RANGE) continue;
+    if (d > scanRange()) continue;
     const w = SCAN_GRID * d + 0.003;
     for (let col = 0; col < SCREEN_W; col++) {
       if (d > hits[col].perpDist) continue; // the floor beyond the wall isn't seen from here
@@ -131,34 +145,43 @@ function renderScanView(image, hits, player) {
     }
   }
 
-  // THE WALLS: the room behind first (dim), then the nearest wall over it.
-  const behind = new Array(SCREEN_W);
+  // THE WALLS, layer by layer: layers[0] is what you'd see, layers[1] the
+  // wall behind that, (with the upgrade) layers[2] the one behind that.
+  // Drawn deepest first, each fainter by SCAN_BEHIND than the one in front.
+  const range = scanRange();
+  const layers = [hits];
+  for (let k = 1; k <= scanWalls(); k++) {
+    const prev = layers[k - 1], next = new Array(SCREEN_W);
+    for (let col = 0; col < SCREEN_W; col++) {
+      const relAngle = Math.atan((2 * (col + 0.5) / SCREEN_W - 1) * halfWidth);
+      const a = player.angle + relAngle;
+      const hit = prev[col];
+      next[col] = hit && hit.dist < range ? hitBeyond(hit, Math.cos(a), Math.sin(a)) : null;
+      if (next[col]) next[col].perpDist = next[col].dist * Math.cos(relAngle);
+    }
+    layers.push(next);
+  }
+  // How deep each column can be seen into: to the last wall the scan reaches.
   const behindDepth = new Float32Array(SCREEN_W);
   for (let col = 0; col < SCREEN_W; col++) {
-    const relAngle = Math.atan((2 * (col + 0.5) / SCREEN_W - 1) * halfWidth);
-    const a = player.angle + relAngle;
-    const hit = hits[col];
-    behind[col] = hit.dist < SCAN_RANGE ? hitBeyond(hit, Math.cos(a), Math.sin(a)) : null;
-    if (behind[col]) behind[col].perpDist = behind[col].dist * Math.cos(relAngle);
-    behindDepth[col] = behind[col] ? behind[col].perpDist : hit.perpDist; // what a sprite can be seen up to
+    let deepest = hits[col].perpDist;
+    for (const layer of layers) if (layer[col]) deepest = layer[col].perpDist;
+    behindDepth[col] = deepest;
   }
-  for (let col = 0; col < SCREEN_W; col++) {
-    const b = behind[col];
-    if (!b || b.dist > SCAN_RANGE) continue;
-    const newFace = col > 0 && faceKey(behind[col - 1]) !== faceKey(b);
-    drawScanWall(pixels, col, b.perpDist, newFace, SCAN_BEHIND * scanFade(b.dist));
-  }
-  for (let col = 0; col < SCREEN_W; col++) {
-    const hit = hits[col];
-    if (hit.dist > SCAN_RANGE) continue;
-    const newFace = col > 0 && faceKey(hits[col - 1]) !== faceKey(hit);
-    drawScanWall(pixels, col, hit.perpDist, newFace, scanFade(hit.dist));
+  for (let k = layers.length - 1; k >= 0; k--) {
+    const layer = layers[k];
+    for (let col = 0; col < SCREEN_W; col++) {
+      const h = layer[col];
+      if (!h || h.dist > range) continue;
+      const newFace = col > 0 && faceKey(layer[col - 1]) !== faceKey(h);
+      drawScanWall(pixels, col, h.perpDist, newFace, Math.pow(SCAN_BEHIND, k) * scanFade(h.dist));
+    }
   }
 
   // THE SOLID THINGS: each as an outline, bright in front of the nearest
   // wall, dim behind it (and not at all behind the second).
   for (const p of placeSprites(player)) { // sprites.js
-    if (!scannerSees(p.thing) || p.forward > SCAN_RANGE) continue;
+    if (!scannerSees(p.thing) || p.forward > range) continue;
     const { thing, size, left, top, forward } = p;
     const opaque = (col, row) => {
       const tx = Math.floor((col + 0.5 - left) / size * TEX_SIZE), ty = Math.floor((row + 0.5 - top) / size * TEX_SIZE);
@@ -168,7 +191,10 @@ function renderScanView(image, hits, player) {
     const r0 = Math.max(0, Math.floor(top)), r1 = Math.min(SCREEN_H - 1, Math.ceil(top + size));
     for (let col = c0; col <= c1; col++) {
       if (behindDepth[col] < forward) continue; // behind the second wall too
-      const level = (hits[col].perpDist < forward ? SCAN_BEHIND : 1) * scanFade(forward);
+      // Bright in front of the nearest wall; a wall fainter for each one it's behind.
+      let walls = 0;
+      for (let k = 0; k < layers.length - 1; k++) if (layers[k][col] && layers[k][col].perpDist < forward) walls = k + 1;
+      const level = Math.pow(SCAN_BEHIND, walls) * scanFade(forward);
       for (let row = r0; row <= r1; row++) {
         if (!opaque(col, row)) continue;
         if (opaque(col - 1, row) && opaque(col + 1, row) && opaque(col, row - 1) && opaque(col, row + 1)) continue; // inside, not edge

@@ -7,7 +7,8 @@
 // bloomers, rooted where they stood, that burst in clouds of spores
 // (spores.js) when you come close, or when the sprinklers water them
 // (sprinklers.js); and the pollinators, packs of infected moths circling the
-// skylights, that your muzzle flash brings down on you (pollinators.js).
+// skylights, that your muzzle flash brings down on you (pollinators.js). And,
+// for the finale, ROBOTS: the chairman's executive protection, still on duty.
 //
 // One desk terminal, picked at random each time, is BOOBY-TRAPPED
 // (traps.js): its screen is amber. Not the front desk's: it's too near the start.
@@ -142,6 +143,19 @@ LEVELS.push({
     { type: 'bloomer', x: 17.5, y: 13.5, angle: 0 },
     { type: 'bloomer', x: 20.5, y: 12.5, angle: 0 },
     { type: 'bloomer', x: 17.5, y: 20.5, angle: 0 },
+    // THE CHAIRMAN'S EXECUTIVE PROTECTION (enemies.js: elite; owner 2026-11-06):
+    // robots, in white and brass. Machines can't catch a plant virus, so
+    // they're still on duty, guarding the chairman, who is inside the mother
+    // plant now. Dumb, but tough and quick to fire. Two walkers in the exec
+    // suite (one by the charge), a scout pair in the garden among the suits,
+    // and two turrets either side of the plant that wake the moment it's hit:
+    // burn it and it's a fight; set the charge and they never stir.
+    { type: 'walker', x: 25.5, y: 1.5,  angle: Math.PI, elite: true },
+    { type: 'walker', x: 24.5, y: 6.5,  angle: Math.PI, elite: true },
+    { type: 'scout',  x: 12.5, y: 15.5, angle: -Math.PI / 2, elite: true },
+    { type: 'scout',  x: 24.5, y: 14.5, angle: Math.PI, elite: true },
+    { type: 'turret', x: 7.5,  y: 20.5, angle: -Math.PI / 2, elite: true, wakesOnObjective: true },
+    { type: 'turret', x: 19.5, y: 20.5, angle: -Math.PI / 2, elite: true, wakesOnObjective: true },
   ],
 
   // POLLINATORS (pollinators.js): packs of moths, each circling a skylight
@@ -164,22 +178,22 @@ LEVELS.push({
     { x: 13, y: 19 }, { x: 17, y: 19 },
   ],
 
-  // The infected drop nothing, so, as in the lab, the ammo comes in crates.
   // LOCKDOWN (lockdown.js): the plant burnt, a bulkhead seals the atrium's door
   // up to the front desk. The way home is through the open-plan office.
   lockdown: [
     { x: 2, y: 9 },
   ],
 
+  // The infected drop nothing, so, as in the lab, the ammo comes in crates.
   pickups: [
     { type: 'ammocrate', x: 1.5,  y: 7.5 },  // behind the front desk: the first room's ammo...
     { type: 'repair',    x: 4.5,  y: 7.5 },  // ...and armour
-    { type: 'burstmod',  x: 16.5, y: 1.5 },  // open plan, far corner
+    { type: 'ammo',      x: 16.5, y: 1.5 },  // open plan, far corner
     { type: 'ammo',      x: 7.5,  y: 1.5 },
     { type: 'repair',    x: 26.5, y: 4.5 },  // exec lounge
     { type: 'charge',    x: 26.5, y: 7.5 },  // the exec office: the demolition charge (charge.js)
     { type: 'ammocrate', x: 18.5, y: 6.5 },
-    { type: 'automod',   x: 1.5,  y: 16.5 }, // atrium, far corner
+    { type: 'overdrivemod', x: 1.5, y: 16.5 }, // atrium, far corner: OVERDRIVE, the last level's upgrade
     { type: 'ammocrate', x: 26.5, y: 10.5 },
     { type: 'repair',    x: 13.5, y: 10.5 },
     { type: 'ammo',      x: 7.5,  y: 18.5 }, // boardroom

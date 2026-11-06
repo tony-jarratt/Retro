@@ -69,10 +69,13 @@ function saveRun() {
 const run = loadRun();
 
 // Arriving by lift: you bring what you had. (Only into the level it was
-// packed for: picking another level from the play-test chooser starts fresh.)
+// packed for.) Starting a level any other way (the play-test chooser, a
+// ?level= address), there's no loadout: you get the EARLIER LEVELS' KIT
+// instead (earlierKit), so each level plays as it would in the campaign.
 function applyLoadout() {
   const kit = run.loadout;
-  if (!kit || kit.level !== CURRENT_LEVEL.id || game.state !== 'briefing') return;
+  if (game.state !== 'briefing') return;
+  if (!kit || kit.level !== CURRENT_LEVEL.id) { earlierKit(); return; }
   const modesOk = Array.isArray(kit.modes) && kit.modes.length > 0 && kit.modes.every((m) => m in FIRE_MODES);
   // Special rounds (ammo.js). A loadout saved before there were any has none: that's fine.
   const rounds = kit.rounds || { incendiary: 0, piercing: 0 };
@@ -84,13 +87,38 @@ function applyLoadout() {
     console.warn(`The saved loadout for "${kit.level}" doesn't make sense (${JSON.stringify(kit)}): starting this level with the usual kit.`);
     return;
   }
-  player.armour = Math.max(0, Math.min(PLAYER_MAX_ARMOUR, kit.armour));
+  player.maxArmour = kit.maxArmour === PLATED_MAX_ARMOUR ? PLATED_MAX_ARMOUR : PLAYER_MAX_ARMOUR; // the plating (pickups.js)
+  player.armour = Math.max(0, Math.min(player.maxArmour, kit.armour));
   player.ammo = Math.max(0, kit.ammo);
   player.modes = MODE_ORDER.filter((m) => kit.modes.includes(m)); // weapons.js: kept in spin-up order
   for (const t of SPECIAL_AMMO) player.rounds[t] = Math.max(0, rounds[t]);
   player.found = SPECIAL_AMMO.filter((t) => found.includes(t));
   player.loaded = roundsOf(loaded) > 0 ? loaded : 'standard';
   player.scanner = kit.scanner === true; // scanner.js
+  player.scannerMk2 = kit.scannerMk2 === true;
+}
+
+// Every upgrade the levels before this one hold, as if you'd found them all:
+// the fire modules (and auto, if a heavy was there to drop it), the scanner
+// and its upgrade, the plating, and each special ammo type with a box's worth
+// of rounds. Full armour, and a reasonable stock of standard rounds.
+const EARLIER_KIT_AMMO = 40;
+function earlierKit() {
+  const before = LEVELS.slice(0, LEVELS.indexOf(CURRENT_LEVEL));
+  if (before.length === 0) return; // the first level: you start with nothing, as you should
+  const types = before.flatMap((l) => (l.pickups || []).map((p) => p.type));
+  const heavy = before.some((l) => (l.enemies || []).some((e) => e.type === 'heavy'));
+  const modes = { burstmod: 'burst', automod: 'auto', overdrivemod: 'overdrive' };
+  const got = new Set(types.map((t) => modes[t]).filter(Boolean));
+  if (heavy) got.add('auto');
+  player.modes = MODE_ORDER.filter((m) => m === 'single' || got.has(m));
+  player.scanner = types.includes('scanner') || types.includes('scannerup');
+  player.scannerMk2 = types.includes('scannerup');
+  if (types.includes('plating')) player.maxArmour = PLATED_MAX_ARMOUR;
+  player.armour = player.maxArmour;
+  player.ammo = EARLIER_KIT_AMMO;
+  player.found = SPECIAL_AMMO.filter((t) => types.includes(t));
+  for (const t of player.found) player.rounds[t] = ROUNDS_PER_BOX;
 }
 
 // Everything you've destroyed on this level: robots and creatures (a downed
@@ -196,7 +224,8 @@ function handleEnter() {
     run.kills += levelKills();
     run.cleared += 1;
     run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes],
-      rounds: { ...player.rounds }, found: [...player.found], loaded: player.loaded, scanner: player.scanner } : null;
+      rounds: { ...player.rounds }, found: [...player.found], loaded: player.loaded, scanner: player.scanner,
+      scannerMk2: player.scannerMk2, maxArmour: player.maxArmour } : null;
     saveRun();
     game.state = 'lift';
     startLiftRide(CURRENT_LEVEL.floor, next ? next.floor : ROOF_FLOOR); // lift.js
@@ -274,7 +303,7 @@ function drawCampaignScreen(pixels) {
   drawTextCentred(pixels, OBJECTIVE_LOOK.goal, 126, HUD_WARN, 1); // core.js
   // What you've brought with you.
   const modules = player.modes.filter((m) => m !== 'single').map((m) => FIRE_MODES[m].name);
-  if (player.scanner) modules.push('SCANNER'); // scanner.js
+  if (player.scanner) modules.push(player.scannerMk2 ? 'SCANNER MK2' : 'SCANNER'); // scanner.js
   const kit = `ARMOUR ${player.armour}   ROUNDS ${player.ammo}` + (modules.length ? `   ${modules.join(' + ')}` : '');
   drawTextCentred(pixels, kit, 138, HUD_GREEN, 1);
   // ...and the special rounds you've found (ammo.js), each in its colour.

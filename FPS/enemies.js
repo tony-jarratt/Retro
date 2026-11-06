@@ -134,13 +134,25 @@ for (const [name, type] of Object.entries(ENEMY_TYPES)) {
 //   path                   the cells it's following this frame (pathfinding.js), or null
 //   turning                true while it's spinning round to face whoever shot it
 //   smart                  the better brain (see above)
+//   elite                  the chairman's EXECUTIVE PROTECTION (the Atrium, owner
+//                          2026-11-06): dumb, but tough and quick to fire: ELITE_TOUGH
+//                          times the health, ELITE_FIRE times the charge (and a
+//                          turret's volley gap), in white and brass (robot-art.js).
+//                          Machines can't catch a plant virus: they're still guarding
+//                          the chairman, who is inside the mother plant now.
+//   wakesOnObjective       a turret that wakes when the objective is first hit (core.js),
+//                          not only by a tripwire or a shot
 //   strafeDir, strafeTimer which way it's sidestepping (+1 / -1), and for how much longer
 //   volleyLeft, volleyTimer rounds of the current volley still to fire, and when the next goes
 ENEMIES.forEach((e, n) => {
   if (!ENEMY_TYPES[e.type]) throw new Error(`ENEMIES[${n}] has type "${e.type}". Types: ${Object.keys(ENEMY_TYPES).join(', ')}.`);
   if (e.smart && e.type === 'turret') throw new Error(`ENEMIES[${n}] is a smart turret: turrets are always dumb.`);
   if (e.smart && ENEMY_TYPES[e.type].creature) throw new Error(`ENEMIES[${n}] is a smart ${e.type}: only robots can be smart.`);
+  if (e.elite && !ELITE_ROBOT_FRAMES[e.type]) throw new Error(`ENEMIES[${n}] is an elite ${e.type}: only walkers, scouts and turrets come in executive livery.`);
+  if (e.elite && e.smart) throw new Error(`ENEMIES[${n}] is elite and smart: the executive detail is dumb.`);
 });
+const ELITE_TOUGH = 1.5;  // an elite's health, against its type's
+const ELITE_FIRE = 0.75;  // an elite's charge times (and a turret's volley gap), against its type's
 const enemies = ENEMIES.map((start) => ({
   type: start.type,
   x: start.x,
@@ -153,7 +165,9 @@ const enemies = ENEMIES.map((start) => ({
   lastSeenY: start.y,
   moving: false,
   walkTime: 0,
-  health: ENEMY_TYPES[start.type].health,
+  health: Math.round(ENEMY_TYPES[start.type].health * (start.elite ? ELITE_TOUGH : 1)),
+  elite: start.elite === true,
+  wakesOnObjective: start.wakesOnObjective === true,
   charge: 0,
   hurtTime: 0,
   firedTime: 0,
@@ -291,6 +305,11 @@ function wakeTurret(enemy) {
   if (enemy.type === 'turret' && enemy.state === 'dormant') enemy.state = 'idle';
 }
 
+// The objective's been hit (core.js): the turrets set to guard it wake.
+function wakeObjectiveGuards() {
+  for (const e of enemies) if (e.wakesOnObjective) wakeTurret(e);
+}
+
 // Aiming: face the player, charge up, then fire. Shared by every type.
 // A finished charge starts a VOLLEY: `volley` rounds, `volleyGap` apart
 // (one round, for everything but the turret). updateVolley fires them.
@@ -310,7 +329,7 @@ function aimAndFire(enemy, dt) {
 // followUp once it has fired and still has you in its sights.
 function chargeTime(enemy) {
   const type = ENEMY_TYPES[enemy.type];
-  return enemy.onTarget && type.followUp > 0 ? type.followUp : type.charge;
+  return (enemy.onTarget && type.followUp > 0 ? type.followUp : type.charge) * (enemy.elite ? ELITE_FIRE : 1);
 }
 
 // The rounds of a volley, one each time the gap runs out. Each is its own
@@ -321,7 +340,7 @@ function updateVolley(enemy, dt) {
   enemy.volleyTimer -= dt;
   if (enemy.volleyTimer > 0) return;
   enemy.volleyLeft -= 1;
-  enemy.volleyTimer = ENEMY_TYPES[enemy.type].volleyGap;
+  enemy.volleyTimer = ENEMY_TYPES[enemy.type].volleyGap * (enemy.elite ? ELITE_FIRE : 1);
   if (canSee(enemy)) robotFires(enemy, Math.hypot(player.x - enemy.x, player.y - enemy.y));
   else if (ENEMY_TYPES[enemy.type].weapon === 'lob') lobAcid(enemy, enemy.lastSeenX, enemy.lastSeenY); // a spitter lobs it where you were
   else { enemy.firedTime = ROBOT_FIRE_FLASH / 2; sfxRobotShot(enemy); } // still fires, at where you were
@@ -505,6 +524,7 @@ function enemyTexture(enemy, viewer) {
     return corpseTexture(enemy) || WRECK_TEXTURE; // feeding.js: whole, bones or ash; a heap looks the same from every side
   }
   const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off']
+    : enemy.elite ? ELITE_ROBOT_FRAMES[enemy.type]                            // robot-art.js: executive livery
     : enemy.type === 'stalker' ? STALKER_FRAMES[stalkerVisibility(enemy)] // stalker.js: seen only as well as it's lit
     : enemy.type === 'guard' && enemy.torchBroken ? GUARD_DARK_FRAMES        // guard-art.js: its torch shot out
     : ROBOT_FRAMES[enemy.type];

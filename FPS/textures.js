@@ -1129,7 +1129,7 @@ function makeDeskWreck() {
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
 // at 2x size. `flash` draws it firing. The coils show the FIRE MODE
 // (weapons.js): `lit` of them glow, counting from the body: one is single
-// shot, two burst, three automatic. Their COLOUR is the AMMO loaded
+// shot, two burst, three automatic, four overdrive. Their COLOUR is the AMMO loaded
 // (ammo.js: cyan standard, orange incendiary, white armour-piercing), and
 // so is the muzzle flash's.
 const COIL_COLOUR = AMMO_TYPES.standard.coil;
@@ -1159,7 +1159,7 @@ function makeGun(flash, lit, ammo) {
     if (y >= 13 && y < 27) {                                              // barrel shroud, tapering to the front
       const halfW = 3 + (y - 13) * 0.15;
       if (ax >= halfW) return null;
-      const n = [24, 20, 16].indexOf(y);                                  // coil 0 nearest the body
+      const n = [24, 20, 16, 13].indexOf(y);                              // coil 0 nearest the body; the 4th (overdrive) at the tip
       if (n !== -1 && n < lit) return glowing(coil);                      // a lit coil
       if (n !== -1) return [30, 34, 40];                                  // an unlit one
       if (y < 15) return brighten(DARK_STEEL, roundShade(dx / halfW));    // bare barrel tip
@@ -1201,8 +1201,8 @@ function makeUpgradeModule(stripes) {
   return makeTexture(COIL_COLOUR, (x, y) => {
     if (y < 50 || y >= 62 || x < 22 || x >= 42) return null;
     if (y === 50 || y === 61 || x === 22 || x === 41) return DARK_STEEL;   // casing edge
-    const band = Math.floor((x - 25) / 5);                                 // three stripe slots
-    if (y >= 53 && y < 59 && (x - 25) % 5 < 3 && band >= 0 && band < 3) {
+    const band = Math.floor((x - 24) / 4);                                 // four stripe slots
+    if (y >= 53 && y < 59 && (x - 24) % 4 < 3 && band >= 0 && band < 4) {
       return band < stripes ? glowing(COIL_COLOUR) : [30, 34, 40];
     }
     return brighten(STEEL, 0.8 + 0.2 * noise(x, y, 50));
@@ -1375,21 +1375,39 @@ const SPARK_TEXTURES = [0, 1, 2].map(makeSparks);
 // GUN_TEXTURES[ammo][n] is the gun loaded with that ammo type (ammo.js), n
 // coils lit: [normal, firing]. ([ammo][0] is null, so [ammo][1] is one coil.)
 const GUN_TEXTURES = {};
-for (const ammo of AMMO_ORDER) GUN_TEXTURES[ammo] = [null, ...[1, 2, 3].map((lit) => [makeGun(false, lit, ammo), makeGun(true, lit, ammo)])];
+for (const ammo of AMMO_ORDER) GUN_TEXTURES[ammo] = [null, ...[1, 2, 3, 4].map((lit) => [makeGun(false, lit, ammo), makeGun(true, lit, ammo)])];
 const ROUNDS_BOX_TEXTURES = { incendiary: makeRoundsBox('incendiary'), piercing: makeRoundsBox('piercing') };
 const FLAME_FRAMES = [0, 1, 2].map(makeFlames);
 const BURST_MODULE_TEXTURE = makeUpgradeModule(2);
 // The STRUCTURAL SCANNER (scanner.js), lying on the floor: a squat grey
 // unit with a round green lens and a little wireframe grid on its face.
-const SCANNER_MODULE_TEXTURE = makeTexture(STEEL, (x, y) => {
-  if (y < 48 || y >= 62 || x < 22 || x >= 42) return null;
-  if (y === 48 || y === 61 || x === 22 || x === 41) return DARK_STEEL;
-  const lens = Math.hypot(x + 0.5 - 27, y + 0.5 - 54.5);
-  if (lens < 3) return glowing(lens < 1.2 ? [200, 255, 210] : [70, 230, 120]);
-  if (x >= 32 && x <= 39 && y >= 51 && y <= 58) return (x - 32) % 3 === 0 || (y - 51) % 3 === 0 ? glowing([70, 230, 120]) : [10, 24, 14];
-  return brighten(STEEL, 0.75 + 0.2 * noise(x, y, 51));
-});
+// `lenses` 1 for the scanner, 2 for its upgrade (the Offices: two walls through).
+function makeScannerModule(lenses) {
+  return makeTexture(STEEL, (x, y) => {
+    if (y < 48 || y >= 62 || x < 22 || x >= 42) return null;
+    if (y === 48 || y === 61 || x === 22 || x === 41) return DARK_STEEL;
+    for (let n = 0; n < lenses; n++) {
+      const lens = Math.hypot(x + 0.5 - 27, y + 0.5 - (lenses === 1 ? 54.5 : 51.5 + n * 6));
+      if (lens < (lenses === 1 ? 3 : 2.3)) return glowing(lens < 1.1 ? [200, 255, 210] : [70, 230, 120]);
+    }
+    if (x >= 32 && x <= 39 && y >= 51 && y <= 58) return (x - 32) % 3 === 0 || (y - 51) % 3 === 0 ? glowing([70, 230, 120]) : [10, 24, 14];
+    return brighten(STEEL, 0.75 + 0.2 * noise(x, y, 51));
+  });
+}
+const SCANNER_MODULE_TEXTURE = makeScannerModule(1);
+const SCANNER_UPGRADE_TEXTURE = makeScannerModule(2);
 const AUTO_MODULE_TEXTURE = makeUpgradeModule(3);
+const OVERDRIVE_MODULE_TEXTURE = makeUpgradeModule(4);
+// REINFORCED PLATING (pickups.js): a stack of curved armour plates, strapped.
+const PLATING_TEXTURE = makeTexture([120, 128, 136], (x, y) => {
+  const dx = x + 0.5 - 32;
+  if (y < 46 || y >= 62 || Math.abs(dx) > 13) return null;
+  const plate = Math.floor((y - 46) / 4);                       // four plates, each a little narrower
+  if (Math.abs(dx) > 13 - plate) return null;
+  if ((y - 46) % 4 === 3) return DARK_STEEL;                    // the gap between plates
+  if (Math.abs(Math.abs(dx) - 6) < 1) return [150, 110, 50];    // the straps
+  return brighten([120, 128, 136], roundShade(dx / 13) * (1.1 - 0.06 * ((y - 46) % 4)));
+});
 
 const GLASS_TEXTURES = { intact: makeGlass('intact'), cracked: makeGlass('cracked'), shattered: makeGlass('shattered') };
 const GRATE_TEXTURE = makeGrate();

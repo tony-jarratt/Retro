@@ -188,7 +188,7 @@ function drawArmour(pixels) {
   fillRect(pixels, x, y, 62, 6, [0, 0, 0]);             // bar border
   fillRect(pixels, x + 1, y + 1, 60, 4, [20, 60, 30]);  // empty part
   // The bar is cut into 5-pixel segments, like an old LED gauge.
-  const filled = Math.ceil(12 * player.armour / PLAYER_MAX_ARMOUR); // any armour at all shows a segment
+  const filled = Math.ceil(12 * player.armour / player.maxArmour); // any armour at all shows a segment
   for (let seg = 0; seg < filled; seg++) {
     fillRect(pixels, x + 1 + seg * 5, y + 1, 4, 4, low ? HUD_WARN : [60, 200, 90]);
   }

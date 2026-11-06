@@ -119,9 +119,9 @@ LEVELS.push({
     { type: 'ammocrate', x: 8.5,  y: 1.5 },  // start room: the first room's ammo...
     { type: 'repair',    x: 1.5,  y: 5.5 },  // ...and armour
     { type: 'repair',    x: 22.5, y: 1.5 },
-    { type: 'burstmod',  x: 12.5, y: 5.5 },
+    { type: 'ammo',      x: 12.5, y: 5.5 },
     { type: 'ammo',      x: 12.5, y: 9.5 },  // specimen hall
-    { type: 'automod',   x: 1.5,  y: 7.5 },  // side room, under the larvae
+    { type: 'plating',   x: 1.5,  y: 7.5 },  // side room, under the larvae: REINFORCED PLATING, this level's upgrade
     { type: 'ammocrate', x: 1.5,  y: 10.5 }, // side room
     { type: 'charge',    x: 1.5,  y: 9.5 },  // side room, past the larvae: the quiet way to burn the chamber (charge.js)
     { type: 'ammocrate', x: 21.5, y: 12.5 }, // lower lab

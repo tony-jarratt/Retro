@@ -65,8 +65,8 @@ One pulse gun. You never switch it: it **spins up**.
 | Automatic | holding 1.2 s | 8 a second | widest |
 
 Letting go drops it back to single. **Modules** found in the level decide how
-far it can spin up (burst module, auto module). **Low ammo** holds it back:
-burst needs 3, auto needs 8 (of the loaded type). Walking widens every cone.
+far it can spin up (burst, auto, and in the Atrium overdrive). **Low ammo** holds it back:
+burst needs 3, auto needs 8, overdrive 12 (of the loaded type). Walking widens every cone.
 Lit coils on the barrel show the stage by their count; their colour is the
 ammo loaded.
 
@@ -83,6 +83,33 @@ YOU ARE HERE, a triangle where you stand pointing the way you face (snapped
 to 8 directions, so it reads at this resolution), and the EXIT: the lift's
 cells in green (bright on the screen) with EXIT beside them, room side.
 
+### The executive protection detail (the Atrium, owner 2026-11-06)
+
+So the finale has every kind of enemy (and the scanner earns its keep at the
+top): robots in the Atrium, in white and brass. Machines can't catch a plant
+virus: they're still guarding the chairman, who is inside the mother plant.
+`elite: true` on a level's enemy: DUMB (never smart, never raises alarms)
+but tough and quick: 1.5x health, 0.75x charge times (a walker's 1 s / 0.6 s
+becomes 0.75 / 0.45; a turret's volley gap too). Two walkers in the exec
+suite, two scouts in the garden, two turrets either side of the mother plant
+that wake when it's first hit (`wakesOnObjective`): burn it and it's a
+fight; set the charge and they never stir.
+
+### The upgrades: one hook per floor (owner, 2026-11-06)
+
+Upgrades are a reason to keep climbing, so each level has its own, placed
+somewhere you'll remember (no duplicates: a level started from the chooser
+gets the earlier levels' kit instead, campaign.js `earlierKit`).
+
+| Level | Upgrade |
+|---|---|
+| 1 Workshops | Burst module (foreman's office); the **scanner**, by the lift key, just as the alarm brings everything out |
+| 2 Hangar | **Armour-piercing** rounds (first by the depot door); the **auto module** from the first heavy |
+| 3 Storage | **Incendiary** rounds (end of the long corridor) |
+| 4 Genetics | **Reinforced plating**: max armour 100 -> 125, the new plates full (side room, under the larvae) |
+| 5 Offices | **Scanner upgrade**: two walls through, range 12 (print room) |
+| 6 Atrium | **Overdrive**: a fourth coil, past auto at 2.2 s: 0.065 s between rounds, cone 0.09, needs 12 rounds (atrium, far corner) |
+
 ### The structural scanner (`scanner.js`, owner 2026-11-06)
 
 X toggles it (a toggle, not a hold: the cost should be lived with, not
@@ -92,8 +119,8 @@ room behind, dimmer), all fading out by 8 cells. It sees only SOLID things:
 robots and wrecks, turrets, drones, cameras, props, pickups; nothing animal
 or vegetable (no creatures, infected, bodies, larvae, moths, potted plants).
 The cost: a third off your walking speed while it's on, and no textures (a trapped desk
-or a keycard door looks like any other). Found as a module in the Hangar's
-start bay ("PRESS X TO SCAN"); carried up in the lift. A hum and a soft tick
+or a keycard door looks like any other). Found as a module at the end of the
+Workshops, by the lift key ("PRESS X TO SCAN"); carried up in the lift. A hum and a soft tick
 while it runs; SCAN blinks on the visor's top rim.
 
 ### Claustrophobia (`atmosphere.js`, `lockdown.js`, owner 2026-11-06)
@@ -205,7 +232,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | | Strut | Solid cover |
 | | Lamp | Light; can flicker |
 | `CEILING_LIGHTS` | Strip light | Turns red and pulses in an alarm |
-| `PICKUPS` | Ammo (+8), repair kit (+25 armour), red/blue keycard, burst module | Destroyed robots blow up (a harmless fireball) and drop nothing (owner, 2026-11-06: no clips); the first heavy destroyed drops the auto module |
+| `PICKUPS` | Ammo (+8), repair kit (+25 armour), red/blue keycard, the upgrades (see The upgrades) | Destroyed robots blow up (a harmless fireball) and drop nothing (owner, 2026-11-06: no clips); the first heavy destroyed drops the auto module |
 | `ZONES` | Security rectangle | Everything security-related belongs to a zone |
 | `CAMERAS` | Sweeping camera | 7 cells, 50°, can be shot |
 | `TRIPWIRES` | Laser across floor cells | Wakes the zone's turrets only (no alarm). Only the core going down disarms them: they're the obstacle to solve |
@@ -227,7 +254,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | A tripwire is broken | **Turrets in its zone wake** — nothing else: no alarm, no lights, no drones, the rest of the zone stays unaware |
 | You reach a terminal | The zone's cameras go off for good and its alarm stops. Tripwires and turrets stay live |
 | You shoot a robot | It turns to face you; idle ones chase; a sleeping turret wakes |
-| A robot is destroyed | Drops a clip (first heavy: the auto module) |
+| A robot is destroyed | Blows up, harmlessly; drops nothing (first heavy: the auto module) |
 | A drum is shot or caught in a blast | Explodes, chains, damages everything with a clear line, kills drones, shatters glass |
 | A rocket hits anything | Blast, radius 1.5, up to 40 |
 | A vent bursts | Hides you from robots, cameras and drones; scalds anyone inside |

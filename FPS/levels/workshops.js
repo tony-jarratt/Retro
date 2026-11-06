@@ -148,6 +148,7 @@ LEVELS.push({
     { type: 'ammo',     x: 29.5, y: 13.5 }, // the loading bay
     { type: 'ammo',     x: 22.5, y: 21.5 },
     { type: 'liftkey',  x: 2.5,  y: 14.5 }, // dispatch: the objective
+    { type: 'scanner',  x: 4.5,  y: 15.5 }, // ...and beside it, the STRUCTURAL SCANNER (scanner.js), just as everything comes for you
     { type: 'ammo',     x: 10.5, y: 13.5 },
     { type: 'ammo',     x: 2.5,  y: 20.5 }, // the paint store
     { type: 'repair',   x: 2.5,  y: 21.5 },

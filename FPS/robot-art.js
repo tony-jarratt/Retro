@@ -211,8 +211,9 @@ const robotPoses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk
 // side of the robot you can see; its left side is its right side mirrored.
 // Every picture of one walking type. `beacon` is undefined for an ordinary
 // robot, or true / false for a smart one with its beacon lit / unlit.
-function makeWalkerFrames(styleName, beacon) {
-  const style = { ...ROBOT_STYLES[styleName], beacon };
+// `livery` repaints it (EXEC_LIVERY: the chairman's protection detail).
+function makeWalkerFrames(styleName, beacon, livery) {
+  const style = { ...ROBOT_STYLES[styleName], beacon, ...(livery || {}) };
   const bake = (shape) => makeTexture(style.hull, scaledShape(shape, style.scale));
   const front = (pose) => bake(walkerFrontBackShape(style, 'front', pose));
   return {
@@ -226,9 +227,8 @@ function makeWalkerFrames(styleName, beacon) {
 // THE TURRET: a twin-barrelled gun head on a pedestal, painted hazard yellow.
 // Poses: 'dormant' (asleep: sensor eye dark, waiting for a tripwire),
 // 'stand' (awake, looking for you), 'aim' and 'fire'.
-function turretShape(view, pose) {
+function turretShape(view, pose, paint = [150, 124, 40]) {
   const awake = pose !== 'dormant';
-  const paint = [150, 124, 40];
   return (x, y) => {
     const dx = x + 0.5 - 32;
     const adx = Math.abs(dx);
@@ -263,14 +263,14 @@ function turretShape(view, pose) {
   };
 }
 
-function makeTurretFrames() {
+function makeTurretFrames(paint = [150, 124, 40]) {
   const poses = (make) => ({ dormant: make('dormant'), stand: make('stand') });
-  const bake = (shape) => makeTexture([150, 124, 40], shape);
+  const bake = (shape) => makeTexture(paint, shape);
   return {
-    front: { ...poses((p) => bake(turretShape('front', p))), aim: bake(turretShape('front', 'aim')), fire: bake(turretShape('front', 'fire')) },
-    back:  poses((p) => bake(turretShape('back', p))),
-    right: poses((p) => bake(turretShape('side', p))),
-    left:  poses((p) => bake(mirroredShape(turretShape('side', p), true))),
+    front: { ...poses((p) => bake(turretShape('front', p, paint))), aim: bake(turretShape('front', 'aim', paint)), fire: bake(turretShape('front', 'fire', paint)) },
+    back:  poses((p) => bake(turretShape('back', p, paint))),
+    right: poses((p) => bake(turretShape('side', p, paint))),
+    left:  poses((p) => bake(mirroredShape(turretShape('side', p, paint), true))),
   };
 }
 
@@ -280,6 +280,14 @@ const ROBOT_FRAMES = {
   scout:  makeWalkerFrames('scout'),
   heavy:  makeWalkerFrames('heavy'),
   turret: makeTurretFrames(),
+};
+// The EXECUTIVE PROTECTION detail (enemies.js: elite), in the Atrium: the
+// same machines in white and brass, the company's colours, not the factory's.
+const EXEC_LIVERY = { hull: [206, 204, 196], dark: [132, 106, 58], visor: [90, 190, 255], visorHot: [210, 240, 255] };
+const ELITE_ROBOT_FRAMES = {
+  walker: makeWalkerFrames('walker', undefined, EXEC_LIVERY),
+  scout:  makeWalkerFrames('scout', undefined, EXEC_LIVERY),
+  turret: makeTurretFrames([200, 198, 190]),
 };
 // Smart versions of the walking types (turrets are never smart): beacon lit and unlit.
 const SMART_ROBOT_FRAMES = {};

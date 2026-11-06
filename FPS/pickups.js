@@ -28,8 +28,8 @@ const PICKUP_TYPES = {
   repair: {
     texture: REPAIR_KIT_TEXTURE,
     collect: () => {
-      if (player.armour >= PLAYER_MAX_ARMOUR) return false;
-      player.armour = Math.min(PLAYER_MAX_ARMOUR, player.armour + 25);
+      if (player.armour >= player.maxArmour) return false;
+      player.armour = Math.min(player.maxArmour, player.armour + 25);
       return true;
     },
   },
@@ -41,6 +41,26 @@ const PICKUP_TYPES = {
   piercing: {
     texture: ROUNDS_BOX_TEXTURES.piercing,
     collect: () => { collectRounds('piercing'); return true; },
+  },
+  // REINFORCED PLATING (Genetics): the suit takes 25 more, and the new plates come full.
+  plating: {
+    texture: PLATING_TEXTURE,
+    collect: () => {
+      player.maxArmour = PLATED_MAX_ARMOUR;
+      player.armour = Math.min(player.maxArmour, player.armour + (PLATED_MAX_ARMOUR - PLAYER_MAX_ARMOUR));
+      showWeaponMessage('REINFORCED PLATING', 'ARMOUR UP TO ' + PLATED_MAX_ARMOUR);
+      return true;
+    },
+  },
+  // The scanner upgrade (Offices, scanner.js): two walls through, further. (Brings the scanner with it, if you'd somehow not got one.)
+  scannerup: {
+    texture: SCANNER_UPGRADE_TEXTURE,
+    collect: () => { collectScannerUpgrade(); return true; },
+  },
+  // The OVERDRIVE module (the Atrium, weapons.js): a fourth coil, past automatic.
+  overdrivemod: {
+    texture: OVERDRIVE_MODULE_TEXTURE,
+    collect: () => { collectModule('overdrive'); return true; },
   },
   // The structural scanner (scanner.js): found once, then yours.
   scanner: {

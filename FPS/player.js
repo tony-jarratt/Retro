@@ -7,7 +7,8 @@ const PLAYER_RADIUS = 0.2;        // half-width of the player's collision box, i
 // You're in an armoured biomechanical suit. ARMOUR is all that stands between
 // you and the robots: hits wear it down, and once it's gone the suit is
 // BREACHED and the next hit kills you. Repair kits patch it up; nothing heals you.
-const PLAYER_MAX_ARMOUR = 100;
+const PLAYER_MAX_ARMOUR = 100;   // the suit as you start; REINFORCED PLATING (Genetics) raises it
+const PLATED_MAX_ARMOUR = 125;
 const PLAYER_START_AMMO = 12;     // enough for the first fight or two; after that, boxes (robots drop nothing)
 
 // walkTime counts up while you're moving; the HUD uses it to bob the gun.
@@ -16,6 +17,7 @@ const player = {
   y: PLAYER_START.y,
   angle: PLAYER_START.angle,
   armour: PLAYER_MAX_ARMOUR, // 0 = breached: one more hit and it's over
+  maxArmour: PLAYER_MAX_ARMOUR, // PLATED_MAX_ARMOUR once you've found the plating (pickups.js)
   ammo: PLAYER_START_AMMO,
   keys: [],             // keycard colours collected, e.g. ['red']
   charge: false,        // carrying the demolition charge (charge.js)
@@ -26,6 +28,7 @@ const player = {
   loaded: 'standard',
   scanner: false,       // found the structural scanner (scanner.js)
   scanning: false,      // ...and it's on: the vector view, a third slower
+  scannerMk2: false,    // the scanner upgrade (Offices): two walls through, further (scanner.js)
   moving: false,        // walking this frame (it spoils your aim: MOVING_CONE)
   walkTime: 0,
 };

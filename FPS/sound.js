@@ -248,8 +248,8 @@ function drumHit(dest, type, f0, f1, drop, dur, vol, delay = 0) {
 // whoomph of burning air, an armour-piercing one a hard metallic ring.
 function sfxPlayerShot(mode, ammo = 'standard') {
   if (!audioReady()) return;
-  const pitch = { single: 1, burst: 0.92, auto: 0.85 }[mode];
-  const len = mode === 'auto' ? 0.7 : 1;
+  const pitch = { single: 1, burst: 0.92, auto: 0.85, overdrive: 0.8 }[mode];
+  const len = mode === 'auto' ? 0.7 : mode === 'overdrive' ? 0.5 : 1;
   drumHit(audio.gun, 'sine', 220 * pitch, 50, 0.04, 0.2 * len, 1.0);        // kick
   drumHit(audio.gun, 'triangle', 140 * pitch, 90, 0.06, 0.12 * len, 0.45);  // body
   noiseBurst(audio.gun, 'bandpass', 2600, 1800, 0.03, 0.7);                 // thud
@@ -815,7 +815,8 @@ function sfxPickup(type) {
   const notes = {
     repair: [440, 554, 660, 880],
     redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
-    burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319],
+    burstmod: [523, 659, 784, 1047, 1319], automod: [523, 659, 784, 1047, 1319], overdrivemod: [523, 659, 784, 1047, 1319, 1568],
+    plating: [330, 440, 554, 660], scannerup: [392, 523, 784, 1047, 1319],
     scanner: [392, 523, 784, 1047, 784, 1047],
     charge: [330, 330, 494],
     liftkey: [784, 988, 1175, 1568],
@@ -947,7 +948,7 @@ function updateSound(dt) {
   // wind-up you are, and a click marks each coil locking on.
   if (!spinWhine) spinWhine = makeVoice('sawtooth');
   const winding = triggerHeld() && game.state === 'playing' && player.modes.length > 1;
-  const wind = Math.min(1, gun.heldTime / SPIN_UP.auto);
+  const wind = Math.min(1, gun.heldTime / SPIN_UP[player.modes[player.modes.length - 1]]); // up to the last mode you've got
   spinWhine.gain.gain.setTargetAtTime(winding ? 0.05 + 0.05 * wind : 0, audio.ctx.currentTime, 0.05);
   spinWhine.osc.frequency.setTargetAtTime(110 + 520 * wind, audio.ctx.currentTime, 0.05);
   spinWhine.filter.frequency.setTargetAtTime(1200 + 2500 * wind, audio.ctx.currentTime, 0.05);

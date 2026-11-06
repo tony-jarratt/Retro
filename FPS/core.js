@@ -107,6 +107,7 @@ function liftTexture() {
 
 function damageCore(hits) {
   if (core.state !== 'online') return;
+  wakeObjectiveGuards(); // enemies.js: the Atrium's turrets, guarding the plant
   core.health = Math.max(0, core.health - hits);
   if (core.health === 0) destroyCore();
 }

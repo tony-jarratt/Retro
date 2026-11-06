@@ -37,7 +37,7 @@
 // the HQ's infected suits in infected.js.
 
 // How far each noise carries, in cells.
-const SHOT_NOISE = { single: 4, burst: 6, auto: 9 }; // one round, by the gun's mode
+const SHOT_NOISE = { single: 4, burst: 6, auto: 9, overdrive: 10 }; // one round, by the gun's mode
 const BLAST_NOISE = 12;
 const WALL_MUFFLE = 0.5;   // a wall (or closed door) in the way: the noise carries half as far
 
