@@ -51,6 +51,7 @@ function explodeAt(x, y, blast) {
   blastCore(x, y, blast); // core.js: a drum set off by the core hurts it
   blastBays(x, y, blast); // repair.js
   burnCorpsesNear(x, y, blast.radius); // feeding.js: burnt bodies are no food
+  guardsFeelBlast(x, y, blast.radius); // guard.js: it gets out of its cover
 
   // Robots take up to BLAST_ROBOT_HITS hits: point blank destroys most outright.
   // (A heavy's own rockets hurt robots too: lure one into firing past its friends.)

@@ -26,8 +26,10 @@
 //     overgrown 'v' cell, or a potted plant) away from you, roots into it
 //     and heals, REROOT_HEAL seconds a hit. Rooted, it gives no orders: a
 //     window, if you can find it.
-//   IT OPENS DOORS: the only infected that can (enemies.js: opensDoors).
-//     Its suits can follow it through while the door's open.
+//   IT OPENS DOORS: the only infected that can, with the guards (enemies.js:
+//     opensDoors). Its suits can follow it through while the door's open.
+//   ITS GUARDS (guard.js) are staff too: they wake it, wait in ambush when
+//     told, and reel when it dies; but it never sends them in to grab you.
 //   KILL IT, and the PA dies in a screech of feedback; every suit it was
 //     running staggers, and goes back to shambling.
 //
@@ -84,9 +86,9 @@ function compassWord(dx, dy) {
   return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'EAST' : 'WEST') : (dy > 0 ? 'SOUTH' : 'NORTH');
 }
 
-// The suits this manager runs: up, and within COMMAND_RANGE of it.
-function commandedSuits(m) {
-  return enemies.filter((e) => e.type === 'suit' && e.state !== 'dead' && Math.hypot(e.x - m.x, e.y - m.y) <= COMMAND_RANGE);
+// The staff this manager runs: suits and guards, up, and within COMMAND_RANGE of it.
+function commandedStaff(m) {
+  return enemies.filter((e) => (e.type === 'suit' || e.type === 'guard') && e.state !== 'dead' && Math.hypot(e.x - m.x, e.y - m.y) <= COMMAND_RANGE);
 }
 
 // A floor point the manager can walk to that meets `good(x, y)` (cell
@@ -130,7 +132,7 @@ function planterSpot(m) {
 // THE ORDERS. Each returns false if it can't be given right now (no suits,
 // no sprinklers near you...), and the manager tries the next one.
 function orderSurround(m, suits) {
-  const going = suits.filter((s) => s.state !== 'grab');
+  const going = suits.filter((s) => s.type === 'suit' && s.state !== 'grab'); // guards keep their cover
   if (going.length < 2) return false;
   // Each suit gets a point round you, spread evenly, starting from the side it's on.
   const start = Math.atan2(going[0].y - player.y, going[0].x - player.x);
@@ -148,7 +150,7 @@ function orderSurround(m, suits) {
 }
 
 function orderAmbush(m, suits) {
-  const hidden = suits.filter((s) => s.state !== 'grab' && !canSee(s) && Math.hypot(s.x - player.x, s.y - player.y) > SPRING_RANGE);
+  const hidden = suits.filter((s) => s.state !== 'grab' && !(s.type === 'guard' && s.engaged) && !canSee(s) && Math.hypot(s.x - player.x, s.y - player.y) > SPRING_RANGE);
   if (hidden.length === 0) return false;
   for (const s of hidden) s.order = { kind: 'hold', until: animTime + ORDER_TIME };
   announce('PLEASE RETURN TO YOUR DESKS. WORK CONTINUES AS NORMAL.');
@@ -185,7 +187,7 @@ function orderSealDoor() {
 }
 
 function giveOrder(m) {
-  const suits = commandedSuits(m);
+  const suits = commandedStaff(m);
   const give = { surround: orderSurround, ambush: orderAmbush, fire: orderFireDrill, lights: orderLightsOut, seal: orderSealDoor };
   for (let tries = 0; tries < ORDERS.length; tries++) {
     const kind = ORDERS[m.orderIndex % ORDERS.length];
@@ -229,7 +231,7 @@ function updateManager(m, dt) {
   if (m.state === 'idle') {
     // It wakes if it sees you, or the moment any suit it runs is after you:
     // they're all one network.
-    const staffAlerted = commandedSuits(m).some((s) => ['chase', 'aim', 'grab'].includes(s.state));
+    const staffAlerted = commandedStaff(m).some((s) => ['chase', 'aim', 'grab', 'cover', 'duck', 'reload'].includes(s.state));
     if (canSee(m) || staffAlerted || m.health < ENEMY_TYPES.manager.health) m.state = 'command';
     return;
   }
@@ -280,7 +282,7 @@ function updateManager(m, dt) {
 // Killed (combat.js, via damageEnemy): the PA dies, and its suits reel.
 function managerDies(m) {
   if (m.type !== 'manager') return;
-  for (const s of commandedSuits(m)) {
+  for (const s of commandedStaff(m)) {
     s.order = null;
     if (s.state !== 'dead') loseGrip(s); // infected.js: staggers back (and lets go of you)
   }

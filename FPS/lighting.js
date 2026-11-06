@@ -74,6 +74,31 @@ function addLight(grid, x, y, colour, radius, strength) {
   }
 }
 
+// A BEAM (a guard's torch, guard.js): addLight cut down to a cone `half`
+// radians either side of `angle`, its edges softened, falling off more
+// slowly than a lamp so it reaches. Nothing behind the lens: the guard
+// holding it isn't lit by its own torch.
+function addBeam(grid, x, y, angle, colour, radius, half, strength) {
+  const { sx0, sx1, sy0, sy1 } = lightBox(x, y, radius);
+  for (let sy = sy0; sy <= sy1; sy++) {
+    for (let sx = sx0; sx <= sx1; sx++) {
+      const px = (sx + 0.5) / LIGHT_RES, py = (sy + 0.5) / LIGHT_RES;
+      const dx = px - x, dy = py - y;
+      const d = Math.hypot(dx, dy);
+      if (d >= radius || isSolidCell(px, py)) continue;
+      const off = Math.abs(angleDiff(Math.atan2(dy, dx), angle));
+      if (off > half) continue;
+      if (d > 0.01 && castRay(x, y, dx / d, dy / d).dist < d) continue;
+      const edge = Math.min(1, (half - off) / (half * 0.4)); // soft edges
+      const f = strength * edge * (1 - d / radius);
+      const i = (sy * LIGHT_W + sx) * 3;
+      grid[i] += colour[0] * f;
+      grid[i + 1] += colour[1] * f;
+      grid[i + 2] += colour[2] * f;
+    }
+  }
+}
+
 // Samples inside walls get no light of their own, but the blending in lightAt
 // reaches up to one sample into a wall when lighting its face. So each wall
 // sample takes the average of its open neighbours, or a dark seam would
@@ -220,7 +245,8 @@ function updateLighting() {
     addLight(lightGrid, player.x, player.y, GUN_FLASH_LIGHT, PLAYER_FLASH_RADIUS, gun.flash / GUN_FLASH_TIME);
   }
   for (const e of enemies) {
-    if (ENEMY_TYPES[e.type].creature) continue; // a spitter has no muzzle flash: its glob carries its own light (acid.js)
+    // A spitter has no muzzle flash (its glob carries its own light, acid.js); a guard's pistol does.
+    if (ENEMY_TYPES[e.type].creature && ENEMY_TYPES[e.type].weapon !== 'pistol') continue;
     if (e.firedTime > 0) addLight(lightGrid, e.x, e.y, ROBOT_FLASH.colour, ROBOT_FLASH.radius, e.firedTime / ROBOT_FIRE_FLASH);
   }
   // Explosions: a big orange light that dies away with the fireball.
@@ -237,6 +263,7 @@ function updateLighting() {
   addCoreLights(lightGrid);     // the core's pulsing heart (core.js)
   addRepairLights(lightGrid);   // repair bays' lamps and welding (repair.js)
   addBroodLights(lightGrid);    // the brood mother's glowing belly (brood.js)
+  addGuardLights(lightGrid);    // guards' torches (guard.js)
   addAcidLights(lightGrid);     // globs in flight and pools of acid (acid.js)
   addSporeLights(lightGrid);    // spore clouds' glowing motes (spores.js)
 

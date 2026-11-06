@@ -458,7 +458,42 @@ Infected only: no robots (owner, 2026-11-05).
   Its ID BADGE shows on your visor the first time you get a lit look at it
   within 9 cells (`badge: ['NAME', 'TITLE']` on its level entry). One in
   the Offices: D. HARLOW, REGIONAL OPERATIONS MANAGER, in meeting room 2.
-  The armed security GUARD (pistol, cover) was agreed as a later addition.
+  Its guards are staff too: they wake it and take AMBUSH orders, but it
+  never sends them to SURROUND (they keep their cover).
+- **The Security Guard** (`guard.js`, art in `guard-art.js`; owner
+  2026-11-06: infected, partly hittable in cover, a shootable torch, drops
+  ammo and its torch). HQ only (elsewhere a load error). Pale blue uniform,
+  peaked cap, radio, holster, one milky eye, tendrils at collar and cuffs.
+  A creature (hears; needs light to spot you), but sees to 8 cells, not 5.
+  4 hits, speed 1.4, opens doors. Pistol: 0.5 s to aim, bursts of 3 rounds
+  0.3 s apart, 8 damage, 70% at 1 cell falling to 35% at 6.
+  - **The torch**: a real beam of light (`addBeam`, lighting.js; 6.5 cells,
+    a narrow cone), sweeping ±0.45 rad on watch, held on you in a fight.
+    Stand in it and you're lit up, for it and for every suit. A round on
+    its lens breaks it (no damage; it knows you're there). The lens is at
+    eye height from the front and sides, not from behind or ducked.
+  - **Cover**: in a fight it runs for the nearest desk or plant pot (never
+    a drum) within 6 cells with you on the far side, 2.5-6 cells from you,
+    and a clear shot from there. Behind a desk it crouches 0.25 to your
+    right of the monitor, so its head shows. DUCKED, only its head and cap
+    reach eye height: hard to hit, not impossible. It stands for a burst,
+    ducks 1.2-2 s, and again. It MOVES when you flank it (it stands up and
+    sees its cover no longer covers it), when it's hit or a blast goes off
+    near it (it won't go back to the same cover straight away), or when
+    you get within 1.8 cells. No cover: it stands and shoots.
+  - **Reload**: 6 rounds, then 2 s down changing the clip (the clip drops,
+    the slide racks). Count its shots.
+  - **Radio**: starting a fight, it calls it in (squelch and pips): the
+    other guards on the floor come to where you are (every 10 s at most).
+  - **Dead**: an ammo box, and its torch lies by the body, still lit and
+    shining the way it was pointing (unless you'd shot it out).
+  The Offices: one in facilities, minding the lift key (a second desk was
+  added there so it has somewhere to fall back to). The Atrium: a pair,
+  one among the open-plan desks and one at a new reception desk in the
+  exec suite; the first to see you radios the other in.
+  Not done from the pitch: accuracy that improves the longer it holds you
+  in its sights (dropped for simplicity), and searching cover-to-cover
+  (it searches like any creature, torch first).
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of

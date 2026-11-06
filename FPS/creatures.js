@@ -166,8 +166,9 @@ function makeNoise(x, y, radius) {
 // for a noise), it depends on the light where you stand: ambient (about
 // 0.3) is dark, under a strip light (about 1.3) is full sight.
 function creatureSightRange(enemy) {
-  if (enemy.state !== 'idle' && enemy.state !== 'search') return CREATURE_SIGHT;
-  return CREATURE_SIGHT * playerVisibility();
+  const full = enemy.type === 'guard' ? GUARD_SIGHT : CREATURE_SIGHT; // a guard sees further (guard.js)
+  if (enemy.state !== 'idle' && enemy.state !== 'search') return full;
+  return full * playerVisibility();
 }
 
 // How visible the light makes you: DARK_SIGHT in the dark, up to 1 in full light.

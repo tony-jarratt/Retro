@@ -56,6 +56,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //            you, and re-roots in a planter to heal (manager.js)
 //   bloomer  one gone further: rooted to the spot, its head a great bud. Get
 //            close and it swells, then BURSTS in a cloud of spores (spores.js).
+//   guard    a security officer that kept its training: carries a torch, takes
+//            cover, fires bursts from a pistol, reloads, radios (guard.js)
 //
 // Every type gives these:
 //   speed      cells per second (the player does 3)
@@ -65,7 +67,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js,
 //              acid.js), 'grab' (infected.js: aimRange is its reach), or
 //              'spores' (infected.js: aimRange is how close sets it off), or
-//              'slash' (stalker.js: aimRange is its reach to start one)
+//              'slash' (stalker.js: aimRange is its reach to start one), or
+//              'pistol' (guard.js: the guard's, fired in bursts from cover)
 // and these only if it differs from ENEMY_DEFAULTS:
 //   charge     seconds of charging (visor brightening) before each shot
 //   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
@@ -100,6 +103,7 @@ const ENEMY_TYPES = {
   manager: { speed: 1.6, health: 4,  aimRange: 0,  weapon: 'command',            creature: true, opensDoors: true },
   suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
   bloomer: { speed: 0,   health: 2, aimRange: 2.2, weapon: 'spores', charge: 0.9, mobile: false, creature: true },
+  guard:   { speed: 1.4, health: 4, aimRange: 6,   weapon: 'pistol', charge: 0.5, damage: 8,  hitNear: 0.7,  hitFar: 0.35, creature: true, opensDoors: true },
 };
 // Fill in the defaults, so the rest of the code can read any field of any type.
 // A misspelt field would otherwise be silently ignored, so it's an error.
@@ -256,7 +260,7 @@ function turnTowardsPlayer(enemy) {
   if (enemy.type === 'brood') return; // she turns herself, slowly (brood.js)
   if (ATTACK_STATES.includes(enemy.state)) return; // a creature mid-attack is already facing you, and won't be put off
   if (enemy.state === 'retreat' || enemy.state === 'repair') return; // fleeing to a bay, or docked: it shows you its back (repair.js)
-  if (['hungry', 'feed', 'slash', 'flee', 'lurk'].includes(enemy.state)) return; // going to eat or eating (feeding.js); a stalker's own moves (stalker.js)
+  if (['hungry', 'feed', 'slash', 'flee', 'lurk', 'cover'].includes(enemy.state)) return; // going to eat or eating (feeding.js); a stalker's own moves (stalker.js); a guard running for cover (guard.js)
   // Already facing you (say, a robot aiming at you): nothing to turn, and
   // pausing it would let rapid fire freeze it in place.
   const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -372,6 +376,7 @@ function updateWalker(enemy, dt) {
   if (updateRepairing(enemy, dt)) return; // smart, and badly hurt: off to a repair bay (repair.js)
   if (updateFeeding(enemy, dt)) return;   // a wounded lurcher, off to eat the dead (feeding.js)
   if (followOrder(enemy, dt)) return;     // a suit doing what the Manager said (manager.js)
+  if (type.weapon === 'pistol' && updateGuard(enemy, dt)) return; // a guard in a fight: cover, bursts, reloads (guard.js)
   const sees = canSee(enemy);
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
@@ -488,9 +493,10 @@ function enemyTexture(enemy, viewer) {
   }
   const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off']
     : enemy.type === 'stalker' ? STALKER_FRAMES[stalkerVisibility(enemy)] // stalker.js: seen only as well as it's lit
+    : enemy.type === 'guard' && enemy.torchBroken ? GUARD_DARK_FRAMES        // guard-art.js: its torch shot out
     : ROBOT_FRAMES[enemy.type];
   // A creature's attack faces you throughout, so it's only ever seen from the front.
-  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open', slash: 'slash', labour: 'swell' }[enemy.state];
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open', slash: 'slash', labour: 'swell', duck: 'duck', reload: 'duck' }[enemy.state];
   if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.

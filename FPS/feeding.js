@@ -120,5 +120,6 @@ function burnCorpsesInPools() {
 function corpseTexture(enemy) {
   if (enemy.burnt) return ASH_TEXTURE;
   if (enemy.meat <= 0) return BONES_TEXTURE;
+  if (enemy.type === 'guard' && enemy.torchBroken) return GUARD_DARK_CORPSE; // guard-art.js: its torch on the floor, dead
   return CORPSE_TEXTURES[enemy.type];
 }

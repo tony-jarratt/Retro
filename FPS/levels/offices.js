@@ -21,6 +21,9 @@
 //   - THE MANAGER, in meeting room 2: once it's awake it runs the floor
 //     over the PA (surround, ambush, fire drill, lights out, sealed doors)
 //     and keeps out of your sight. Hunt it down and the suits fall apart.
+//   - A SECURITY GUARD minds the lift key in facilities, behind the desk,
+//     its torch sweeping the room: it takes cover and shoots back. See its
+//     beam through the door first.
 //
 // THE RACE BACK: taking the lift key sets every suit on the floor hunting
 // you. Back up through the meeting rooms (the bloomer by the door), or the
@@ -76,7 +79,8 @@ LEVELS.push({
     { type: 'drum',  x: 11.5, y: 17.5 }, // the archive
     { type: 'drum',  x: 12.5, y: 17.5 },
     { type: 'plant', x: 1.5,  y: 14.5 }, // the kitchen
-    { type: 'desk',  x: 24.5, y: 15.5 }, // facilities
+    { type: 'desk',  x: 24.5, y: 15.5 }, // facilities: the guard's cover...
+    { type: 'desk',  x: 21.5, y: 17.5 }, // ...and somewhere to fall back to
   ],
 
   ceilingLights: [
@@ -110,6 +114,7 @@ LEVELS.push({
     { type: 'suit', x: 7.5,  y: 17.5, angle: Math.PI },
     { type: 'suit', x: 20.5, y: 15.5, angle: Math.PI },      // facilities
     { type: 'suit', x: 23.5, y: 17.5, angle: Math.PI },
+    { type: 'guard', x: 25.5, y: 15.5, angle: Math.PI },     // minding the lift key (guard.js)
     { type: 'bloomer', x: 11.5, y: 8.5,  angle: 0 },         // by the planter
     { type: 'bloomer', x: 16.5, y: 10.5, angle: 0 },
     { type: 'bloomer', x: 24.5, y: 7.5,  angle: 0 },         // just inside meeting room 1

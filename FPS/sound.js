@@ -284,6 +284,42 @@ function sfxRobotShot(enemy) {
   tone(out, 'triangle', light ? 220 : 120, 50, light ? 0.06 : 0.12, 0.5);
 }
 
+// THE GUARD (guard.js). Its pistol: a short, hard crack, higher and drier
+// than any robot's gun, with a little slap of echo.
+function sfxPistol(enemy) {
+  if (!audioReady()) return;
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 2200, 1200, 0.05, 0.9);
+  noiseBurst(out, 'bandpass', 900, 400, 0.12, 0.45, 0.02);
+  tone(out, 'square', 420, 120, 0.04, 0.25);
+}
+// Calling it in: the squelch of a radio opening, three quick pips, and static.
+function sfxRadio(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 2500, 1800, 0.12, 0.35);
+  for (let n = 0; n < 3; n++) tone(out, 'square', 1250, 1250, 0.05, 0.08, 0.15 + n * 0.09);
+  noiseBurst(out, 'bandpass', 1800, 2600, 0.5, 0.18, 0.45);
+}
+// Changing the clip: the empty one dropping out, and (when it's done) the slide racking.
+function sfxGuardReload(enemy, time) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'triangle', 900, 700, 0.05, 0.25);
+  tone(out, 'triangle', 600, 500, 0.05, 0.2, 0.25);                  // the clip landing on the floor
+  noiseBurst(out, 'bandpass', 3000, 2000, 0.05, 0.35, time - 0.35);  // the new one going in...
+  noiseBurst(out, 'bandpass', 2400, 1400, 0.09, 0.5, time - 0.12);   // ...and the slide, back and forward
+  tone(out, 'square', 1500, 900, 0.03, 0.15, time - 0.05);
+}
+// Its torch shot out: a tink of glass and a pop.
+function sfxTorchBreak(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sine', 3400, 3000, 0.12, 0.2);
+  noiseBurst(out, 'highpass', 5000, 3000, 0.08, 0.4);
+}
+
 // A heavy's rocket leaving the tube: a rising whoosh.
 function sfxRocketLaunch(enemy) {
   if (!audioReady()) return;
@@ -877,7 +913,7 @@ function fadeOutLoops() {
 function rememberState() {
   for (const d of DOORS) last.doors.set(d, d.state);
   for (const p of PANELS) last.panels.set(p, p.state);
-  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime, pairCaller: e.pairCaller });
+  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime, pairCaller: e.pairCaller, radioCalls: e.radioCalls, torchBroken: e.torchBroken });
   last.pickups = new Set(pickups);
   for (const h of hives) last.hives.set(h, h.left);
   for (const t of terminals) last.terminals.set(t, t.state);
@@ -926,11 +962,14 @@ function watchTheGame() {
     if (e.state === 'retreat' && was.state !== 'retreat') sfxRobotRetreat(e);
     if (e.state === 'feed' && Math.random() < 0.05) sfxFeeding(e); // feeding.js: tearing, now and then
     if (e.pairCaller && !was.pairCaller) sfxPairCall(e);           // creatures.js: a pair has seen you
+    if (e.radioCalls > was.radioCalls) sfxRadio(e);                // guard.js: calling it in
+    if (e.torchBroken && !was.torchBroken) sfxTorchBreak(e);       // ...its torch shot out
+    if (e.state === 'reload' && was.state !== 'reload') sfxGuardReload(e, GUARD_RELOAD);
     if (creature && e.state !== was.state) {
       if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) {
         if (e.type === 'spitter') sfxSpitterHiss(e);
         else if (e.type === 'suit') sfxSuitMoan(e);
-        else if (e.type !== 'stalker') sfxLurcherSnarl(e); // the stalker comes silently
+        else if (e.type !== 'stalker' && e.type !== 'guard') sfxLurcherSnarl(e); // the stalker comes silently; a guard radios instead
       }
       if (e.state === 'grab') sfxSuitGrab(e);
       if (e.state === 'swell') sfxBloomerSwell(e);

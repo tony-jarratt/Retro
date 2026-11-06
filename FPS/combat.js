@@ -125,6 +125,10 @@ function shotHits(target) {
   if (target.core) { damageCore(1); return; }          // core.js
   if (target.bay) { damageBay(target.bay, 1); return; } // repair.js
   if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
+  if (target.enemy && target.enemy.state !== 'dead' && target.enemy.type === 'guard' && guardTorchHit(target.enemy, target.texX, target.texY)) {
+    breakTorch(target.enemy); // guard.js: a round on its torch puts the light out, and does it no harm
+    return;
+  }
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
     const hits = target.enemy.type === 'brood' ? (broodBellyHit(target.enemy, target.texX, target.texY) ? 2 : 1) // brood.js: the belly
@@ -151,6 +155,7 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
   if (enemy.health <= 0) {
     bloomerDies(enemy); // infected.js: it bursts as it goes
     managerDies(enemy); // manager.js: the PA dies, its suits reel
+    guardDies(enemy);   // guard.js: its ammo, and its torch on the floor
     enemy.state = 'dead';
     enemy.moving = false;
     if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
@@ -158,6 +163,7 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
     return;
   }
   if (enemy.state === 'grab') loseGrip(enemy); // infected.js: shot, it lets go of you
+  guardHurt(enemy); // guard.js: hit in cover, it moves
   if (!byPlayer) return;
   wakeTurret(enemy);
   turnTowardsPlayer(enemy);
@@ -185,7 +191,7 @@ function robotFires(enemy, dist) {
   enemy.firedTime = type.volley > 1 ? ROBOT_FIRE_FLASH / 2 : ROBOT_FIRE_FLASH; // a volley flickers
   if (type.weapon === 'rocket') { launchRocket(enemy); sfxRocketLaunch(enemy); return; } // explosions.js, sound.js
   if (type.weapon === 'lob') { lobAcid(enemy, player.x, player.y); return; }              // a spitter (acid.js)
-  sfxRobotShot(enemy);
+  if (type.weapon === 'pistol') sfxPistol(enemy); else sfxRobotShot(enemy); // sound.js
   const glass = glassInTheWay(enemy.x, enemy.y, player.x, player.y); // panels.js
   if (glass) hitGlass(glass);
   else if (Math.random() < robotHitChance(type, dist)) damagePlayer(type.damage);

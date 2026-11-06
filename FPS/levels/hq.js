@@ -69,6 +69,7 @@ LEVELS.push({
     { type: 'plant', x: 16.5, y: 8.5 },
     // Exec suite.
     { type: 'plant', x: 26.5, y: 1.5 },
+    { type: 'desk',  x: 20.5, y: 3.5 },  // the exec suite's reception: the guard's cover
     { type: 'desk',  x: 24.5, y: 7.5 },
     { type: 'plant', x: 18.5, y: 8.5 },
     // The atrium.
@@ -115,6 +116,11 @@ LEVELS.push({
     // The exec suite.
     { type: 'suit', x: 24.5, y: 3.5,  angle: Math.PI },
     { type: 'suit', x: 21.5, y: 7.5,  angle: -Math.PI / 2 },
+    // SECURITY GUARDS (guard.js), a pair: one patrolling the open plan
+    // among the desks, one on the exec suite's reception. The first to see
+    // you radios the other in.
+    { type: 'guard', x: 13.5, y: 5.0,  angle: Math.PI },
+    { type: 'guard', x: 22.5, y: 2.5,  angle: Math.PI },
     // The atrium: a crowd in the garden.
     { type: 'suit', x: 8.5,  y: 11.5, angle: Math.PI / 2 },
     { type: 'suit', x: 9.5,  y: 15.5, angle: -Math.PI / 2 },
