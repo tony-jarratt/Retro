@@ -5,6 +5,7 @@
 
 const HUD_GREEN = [120, 255, 150];
 const HUD_WARN = [255, 96, 64];
+const PA_COLOUR = [255, 214, 120]; // the building's PA: the Manager (manager.js)
 const CONTROLS_HINT_TIME = 5; // seconds 'PRESS P FOR CONTROLS' shows as a level starts
 
 // A BITMAP FONT. Each character is a 3x5 grid of pixels: '#' on, '.' off.
@@ -303,7 +304,16 @@ function drawHud(pixels) {
     if (lockedDoorHint) {
       drawTextCentred(pixels, lockedDoorHint.toUpperCase() + ' KEYCARD NEEDED', 40, KEY_COLOURS[lockedDoorHint], 1);
     }
+    if (sealedDoorHint) drawTextCentred(pixels, 'DOOR SEALED', 40, HUD_WARN, 1); // manager.js
     drawChargeReadout(pixels); // charge.js: setting it, and the fuse
+    // The Manager on the PA (manager.js), and its ID badge when you first see it.
+    if (paTime > 0) drawTextCentred(pixels, 'PA: ' + paMessage, 30, PA_COLOUR, 1);
+    if (badgeTime > 0) {
+      fillRect(pixels, 104, 140, 112, 20, [226, 224, 214]);
+      fillRect(pixels, 104, 140, 112, 4, LANYARD);
+      drawTextCentred(pixels, badgeShown[0], 146, [30, 30, 36], 1);
+      drawTextCentred(pixels, badgeShown[1], 153, [80, 80, 90], 1);
+    }
     if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
     if (securityMessageTime > 0) {
       const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === OBJECTIVE_LOOK.goal;

@@ -51,6 +51,9 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 // THE HQ'S INFECTED (infected.js):
 //   suit     an office worker the plant virus took. Shambles, GRABS and holds
 //            on, and GETS BACK UP unless you finish it while it's down.
+//   manager  the one the plant took whole: never fights; keeps out of sight,
+//            orders the suits about over the PA, uses the building against
+//            you, and re-roots in a planter to heal (manager.js)
 //   bloomer  one gone further: rooted to the spot, its head a great bud. Get
 //            close and it swells, then BURSTS in a cloud of spores (spores.js).
 //
@@ -79,9 +82,10 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //              (and shows you its back) rather than fire, unless it's cornered
 //   rises      shot down, it gets back up unless finished off (infected.js)
 //   feeds      wounded, it eats the dead to heal (feeding.js)
+//   opensDoors it can open (unlocked, unsealed) doors, like you: the Manager only
 const ENEMY_DEFAULTS = {
   charge: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
-  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false, feeds: false,
+  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false, feeds: false, opensDoors: false,
 };
 const ENEMY_REQUIRED = ['speed', 'health', 'aimRange', 'weapon'];
 const ENEMY_TYPES = {
@@ -93,6 +97,7 @@ const ENEMY_TYPES = {
   spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
   stalker: { speed: 2.5, health: 3, aimRange: 1.0, weapon: 'slash',              damage: 12, creature: true },
   brood:   { speed: 0,   health: 20, aimRange: 0,  weapon: 'brood', mobile: false, creature: true },
+  manager: { speed: 1.6, health: 4,  aimRange: 0,  weapon: 'command',            creature: true, opensDoors: true },
   suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
   bloomer: { speed: 0,   health: 2, aimRange: 2.2, weapon: 'spores', charge: 0.9, mobile: false, creature: true },
 };
@@ -227,7 +232,7 @@ function stepTowards(enemy, targetX, targetY, dt) {
 // move, including when there's no route at all (say, a closed door between).
 // The path is kept on the robot so the debug map can draw it.
 function moveAlongPath(enemy, targetX, targetY, dt) {
-  enemy.path = findPath(enemy.x, enemy.y, targetX, targetY);
+  enemy.path = findPath(enemy.x, enemy.y, targetX, targetY, ENEMY_TYPES[enemy.type].opensDoors);
   if (enemy.path === null) return false;
   if (enemy.path.length === 0) return stepTowards(enemy, targetX, targetY, dt);
   return stepTowards(enemy, enemy.path[0].x + 0.5, enemy.path[0].y + 0.5, dt);
@@ -360,11 +365,13 @@ function callForHelp(enemy) {
 function updateWalker(enemy, dt) {
   const type = ENEMY_TYPES[enemy.type];
   if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
+  if (type.weapon === 'command') { updateManager(enemy, dt); return; } // manager.js: it thinks for itself
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
   if (type.weapon === 'slash' && updateStalker(enemy, dt)) return;      // slashing, running, lurking (stalker.js)
   if (updateInfected(enemy, dt)) return; // grabbing, staggering or getting up (infected.js)
   if (updateRepairing(enemy, dt)) return; // smart, and badly hurt: off to a repair bay (repair.js)
   if (updateFeeding(enemy, dt)) return;   // a wounded lurcher, off to eat the dead (feeding.js)
+  if (followOrder(enemy, dt)) return;     // a suit doing what the Manager said (manager.js)
   const sees = canSee(enemy);
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
@@ -502,6 +509,7 @@ function enemyTexture(enemy, viewer) {
   let pose = 'stand';
   if (enemy.state === 'dormant' || enemy.state === 'offline') pose = 'dormant';
   else if (enemy.state === 'feed') pose = 'feed'; // hunched over a body (feeding.js)
+  else if (enemy.state === 'root') pose = 'root'; // the Manager, rooted in a planter (manager.js)
   else if (enemy.moving) pose = Math.floor(enemy.walkTime * WALK_FPS) % 2 === 0 ? 'walk1' : 'walk2';
   return frames[view][pose] || frames[view].stand; // a creature asleep in its tank just stands
 }

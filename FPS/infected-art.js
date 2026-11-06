@@ -418,8 +418,170 @@ function makeMoth(up) {
 }
 const MOTH_FRAMES = [makeMoth(true), makeMoth(false)];
 
+// THE MANAGER (manager.js): the one the plant took whole, mind and all.
+// Upright where the suits slump: a pale grey three-piece suit, a purple
+// tie, slicked hair, a PA headset with its microphone at its mouth. Its eyes
+// GLOW (it's paying attention), and instead of mushrooms a crown of white
+// lilies blooms from the back of its skull, their hearts glowing. Poses:
+// stand, walk1, walk2, and 'root' (re-rooting in a planter: its legs gone
+// to roots, spreading across the floor).
+const MANAGER_CLOTH = [118, 122, 134];
+const MANAGER_DARK = [74, 76, 88];
+const MANAGER_TIE = [96, 50, 130];
+const LILY = [236, 232, 220];
+const HEADSET = [26, 26, 30];
+const MANAGER_EYE = [180, 255, 140];
+const MANAGER_ROOT = [86, 64, 40];
+
+function managerLimb(x, y, dx, a, b, w, shade, seed) {
+  return suitLimb(x, y, dx, a, b, w, MANAGER_CLOTH, shade, seed);
+}
+
+// The lilies: petals in a fan above and behind the head, each a narrow
+// ellipse pointing out from a glowing heart.
+function lilyCrown(dx, y, cx, cy) {
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + (k - 2) * 0.55;
+    const px = cx + Math.cos(a) * 4, py = cy + Math.sin(a) * 4;
+    const u = ((dx - px) * Math.cos(a) + (y + 0.5 - py) * Math.sin(a)) / 3.4;
+    const v = (-(dx - px) * Math.sin(a) + (y + 0.5 - py) * Math.cos(a)) / 1.4;
+    if (u * u + v * v < 1) return brighten(LILY, 1.05 - 0.25 * Math.abs(u));
+  }
+  if (Math.hypot(dx - cx, y + 0.5 - cy) < 1.6) return glowing(SPORE_GLOW);
+  return null;
+}
+
+// Roots instead of legs: tendrils from the hips, out across the floor.
+function managerRoots(x, y, dx) {
+  for (let k = -2; k <= 2; k++) {
+    if (segmentDistance(dx, y, k * 1.5, 41, k * 7 + 2 * Math.sin(k), 62) < 1.4 - 0.15 * Math.abs(k)) {
+      return brighten(MANAGER_ROOT, 0.8 + 0.3 * noise(x, y, 420));
+    }
+  }
+  if (y >= 60 && Math.abs(dx) < 20 && noise(x, y, 421) < 0.4) return brighten(MOSS, 0.8); // the moss they spread into
+  return null;
+}
+
+function managerFrontBackShape(view, pose) {
+  const front = view === 'front';
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    const crown = lilyCrown(dx, y, 0, 6);
+    if (crown && (!front || y < 8)) return crown; // from the front, only the petals over the top of its head show
+    const head = inEllipse(dx, y, 0, 12, 4.4, 5.2);
+    if (head !== null) {
+      if (Math.abs(Math.abs(dx) - 4.4) < 0.9 && y >= 10 && y < 14) return HEADSET; // the earpieces
+      if (y < 9.5 || (!front && y < 15)) return brighten(HAIR, 0.6 + 0.2 * noise(x, y, 422)); // slicked back
+      if (front) {
+        if (y >= 11 && y < 12.5 && Math.abs(dx) > 0.8 && Math.abs(dx) < 3) return glowing(MANAGER_EYE);
+        if (y >= 14.5 && y < 15.5 && Math.abs(dx) < 1.6) return [70, 40, 44];   // a thin, set mouth
+        if (segmentDistance(dx, y, 4, 13, 1.5, 15.5) < 0.5) return HEADSET;     // the microphone boom
+      }
+      return pallor(x, y, 1.1 - 0.35 * head);
+    }
+    if (y >= 16 && y < 19 && Math.abs(dx) < 2) return pallor(x, y, 0.8);
+    // Arms, hanging straight: it stands up properly.
+    for (const side of [-1, 1]) {
+      const sway = pose === 'walk1' ? side * 1.5 : pose === 'walk2' ? -side * 1.5 : 0;
+      const hand = [side * 11 + sway * 0.3, 42];
+      const h = inEllipse(dx, y, hand[0], hand[1], 2.1, 2.1);
+      if (h !== null) return pallor(x, y, 1.05 - 0.4 * h);
+      if (segmentDistance(dx, y, hand[0], hand[1] - 1, side * 11, 39) < 2) return brighten(SHIRT, 0.95);
+      const arm = managerLimb(x, y, dx, [side * 9.5, 20], [side * 11, 30], 2.7, 0.95, 423) || managerLimb(x, y, dx, [side * 11, 30], [side * 11, 39], 2.5, 0.95, 424);
+      if (arm) return arm;
+    }
+    if (y >= 18 && y < 42) {
+      const halfW = y < 21 ? 6 + (y - 18) * 1.1 : 9;
+      if (Math.abs(dx) < halfW) {
+        if (front) {
+          if (y >= 19 && y < 36 && Math.abs(dx) < 0.9 + (y - 19) * 0.05) return brighten(MANAGER_TIE, Math.abs(dx) < 0.4 ? 1.2 : 0.95);
+          if (y < 27 && Math.abs(dx) < (y - 18) * 0.5) return brighten(SHIRT, 1);
+          if (y < 37 && Math.abs(dx) < 5) return brighten(MANAGER_DARK, 0.95 + 0.1 * noise(x, y, 425)); // the waistcoat
+          if (y < 37 && Math.abs(dx) < 6) return brighten(MANAGER_DARK, 0.7);                           // its edge, under the jacket
+          if (dx > 4 && dx < 7 && y >= 24 && y < 26) return glowing(SPORE_GLOW);                         // a pocket square, gone to flower
+        } else if (Math.abs(dx) < 3 && y > 22 && y < 38 && noise(x >> 1, y >> 1, 426) < 0.3) {
+          return glowing(brighten(SPORE_GLOW, 0.7)); // the plant shows through the seam, faintly
+        }
+        return cloth(MANAGER_CLOTH, x, y, roundShade(dx / halfW), 427);
+      }
+    }
+    if (pose === 'root') return managerRoots(x, y, dx);
+    for (const side of [-1, 1]) {
+      const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 3 : 0;
+      if (y >= 59 - lift && y < 62 - lift && Math.abs(dx - side * 4.5) < 2.6) return brighten(SHOE, y === 59 - lift ? 2.2 : 1);
+      const leg = managerLimb(x, y, dx, [side * 4.5, 41], [side * 4.6, 50 - lift], 3, 0.9, 428) ||
+                  managerLimb(x, y, dx, [side * 4.6, 50 - lift], [side * 4.5, 59 - lift], 2.8, 0.9, 429);
+      if (leg) return leg;
+    }
+    return null;
+  };
+}
+
+// Side on, facing right: straight-backed, chin up.
+function managerSideShape(pose) {
+  const swing = pose === 'walk1' ? 3 : pose === 'walk2' ? -3 : 0;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    const crown = lilyCrown(dx, y, -3, 7);
+    if (crown) return crown;
+    const head = inEllipse(dx, y, 1.5, 12, 4.4, 5);
+    if (head !== null) {
+      if (dx < 0.5 && y < 15) return brighten(HAIR, 0.6 + 0.2 * noise(x, y, 422));
+      if (Math.abs(dx - 1) < 1 && y >= 11 && y < 14) return HEADSET;
+      if (dx >= 3.5 && dx < 5 && y >= 11 && y < 12.5) return glowing(MANAGER_EYE);
+      if (segmentDistance(dx, y, 1.5, 13, 5.5, 15.5) < 0.5) return HEADSET;
+      return pallor(x, y, 1.1 - 0.35 * head);
+    }
+    if (y >= 16 && y < 19 && dx > -1 && dx < 3) return pallor(x, y, 0.8);
+    const near = managerLimb(x, y, dx, [1, 21], [2 + swing * 0.3, 31], 2.6, 1, 423) || managerLimb(x, y, dx, [2 + swing * 0.3, 31], [3 + swing * 0.6, 40], 2.4, 1, 424);
+    if (near) return near;
+    if (inEllipse(dx, y, 3 + swing * 0.6, 42, 2, 2) !== null) return pallor(x, y, 1);
+    const torso = inEllipse(dx, y, 0.5, 30, 5.5, 12);
+    if (torso !== null) {
+      if (dx > 3 && y < 25) return brighten(SHIRT, 0.95);
+      if (dx > 3.5 && y < 36) return brighten(MANAGER_TIE, 0.9);
+      return cloth(MANAGER_CLOTH, x, y, 1.1 - 0.4 * torso, 427);
+    }
+    if (pose === 'root') return managerRoots(x, y, dx);
+    for (const [s, shade] of [[swing, 1], [-swing, 0.65]]) {
+      if (y >= 59 && y < 62 && dx > s * 1.2 - 1.5 && dx < s * 1.2 + 4.5) return brighten(SHOE, y === 59 ? 2.2 : 1);
+      const leg = managerLimb(x, y, dx, [0, 41], [s * 0.6, 50], 3, shade * 0.9, 428) || managerLimb(x, y, dx, [s * 0.6, 50], [s * 1.2, 59], 2.8, shade * 0.9, 429);
+      if (leg) return leg;
+    }
+    return null;
+  };
+}
+
+function makeManagerFrames() {
+  const bake = (shape) => makeTexture(MANAGER_CLOTH, shape);
+  const poses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2'), root: make('root') });
+  return {
+    front: poses((pose) => bake(managerFrontBackShape('front', pose))),
+    back:  poses((pose) => bake(managerFrontBackShape('back', pose))),
+    right: poses((pose) => bake(managerSideShape(pose))),
+    left:  poses((pose) => bake(mirroredShape(managerSideShape(pose), true))),
+  };
+}
+
+// Dead: face down, the lilies crushed and gone brown, the headset knocked off.
+function makeManagerCorpse() {
+  return makeTexture(MANAGER_CLOTH, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (Math.hypot(dx - 24, y + 0.5 - 60) < 2 && Math.hypot(dx - 24, y + 0.5 - 60) > 1.2) return HEADSET; // the headset, on the floor
+    const head = inEllipse(dx, y, -16, 56, 4, 3.5);
+    if (head !== null) return y < 56 ? brighten(HAIR, 0.6) : pallor(x, y, 0.8);
+    for (let k = 0; k < 3; k++) if (inEllipse(dx, y, -22 + k * 2, 52 + k, 2.5, 1.2) !== null) return brighten([150, 120, 80], 0.9); // brown petals
+    const body = inEllipse(dx, y, 2, 58, 15, 4);
+    if (body !== null) return cloth(MANAGER_CLOTH, x, y, 0.8 - 0.25 * body, 430);
+    if (segmentDistance(dx, y, 16, 58, 26, 61) < 2.4) return cloth(MANAGER_CLOTH, x, y, 0.7, 431); // legs
+    return null;
+  });
+}
+
 ROBOT_FRAMES.suit = makeSuitFrames();
 ROBOT_FRAMES.bloomer = makeBloomerFrames();
+ROBOT_FRAMES.manager = makeManagerFrames();
 const DOWNED_TEXTURES = { suit: { down: makeSuitDown('down'), twitch: makeSuitDown('twitch') } };
 CORPSE_TEXTURES.suit = makeSuitDown('finished');
 CORPSE_TEXTURES.bloomer = makeTexture(BUD, bloomerShape('stand', true));
+CORPSE_TEXTURES.manager = makeManagerCorpse();

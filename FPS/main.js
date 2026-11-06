@@ -142,6 +142,7 @@ function frame(now) {
       updateCharge(dt);   // charge.js: setting the demolition charge, and its fuse
       updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
       updateRepairBays(); // repair.js: free the bay of a robot that died on its way
+      updateManagers(dt); // manager.js: the PA, the badge, cut lights and sealed doors running down
     }
     updateCombat(dt);
     updateWeapons(dt);

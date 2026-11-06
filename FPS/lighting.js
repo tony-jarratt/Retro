@@ -188,7 +188,11 @@ function updateLighting() {
   const pulse = 0.55 + 0.45 * Math.sin(animTime * ALARM_PULSE_SPEED);
   LIGHTS.forEach((light, n) => {
     light.level = light.flicker ? flickerLevel(n, animTime) : 1;
-    light.alarm = light.kind === 'ceiling' && zoneAlarmedAt(light.x, light.y);
+    // Cut by the Manager (manager.js: `cut` seconds left): off, and for the
+    // last second it stutters back on.
+    if (light.cut > 1) light.level = 0;
+    else if (light.cut > 0) light.level = flickerLevel(n, animTime);
+    light.alarm = light.kind === 'ceiling' && !(light.cut > 0) && zoneAlarmedAt(light.x, light.y);
     // How much of each channel to add: the light's level, tinted red if alarmed.
     const scale = light.alarm
       ? ALARM_COLOUR.map((a, c) => pulse * a / light.colour[c])

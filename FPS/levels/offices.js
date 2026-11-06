@@ -18,6 +18,9 @@
 //   - The first meeting room has a bloomer just inside the door, and a
 //     repair kit beside it.
 //   - The archive: one bloomer, two drums, a sprinkler over it.
+//   - THE MANAGER, in meeting room 2: once it's awake it runs the floor
+//     over the PA (surround, ambush, fire drill, lights out, sealed doors)
+//     and keeps out of your sight. Hunt it down and the suits fall apart.
 //
 // THE RACE BACK: taking the lift key sets every suit on the floor hunting
 // you. Back up through the meeting rooms (the bloomer by the door), or the
@@ -98,6 +101,10 @@ LEVELS.push({
     { type: 'suit', x: 18.5, y: 9.5,  angle: Math.PI },
     { type: 'suit', x: 15.5, y: 7.5,  angle: Math.PI / 2 },
     { type: 'suit', x: 24.5, y: 11.5, angle: -Math.PI / 2 }, // meeting room 2
+    // THE MANAGER (manager.js): in meeting room 2, running the floor. It
+    // never fights; it keeps out of sight, orders the suits about over the
+    // PA, and re-roots in the open plan's planter (or a pot plant) to heal.
+    { type: 'manager', x: 22.5, y: 10.5, angle: 0, badge: ['D. HARLOW', 'REGIONAL OPERATIONS MANAGER'] },
     { type: 'suit', x: 2.5,  y: 10.5, angle: Math.PI / 2 },  // the print room
     { type: 'suit', x: 4.5,  y: 15.5, angle: 0 },            // the kitchen
     { type: 'suit', x: 7.5,  y: 17.5, angle: Math.PI },

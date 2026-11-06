@@ -426,6 +426,39 @@ Infected only: no robots (owner, 2026-11-05).
   still: about 39 armour in 4s. Blasts kill them; burning the mother plant
   sets them all loose. HQ: 4 over the open-plan desks, 7 in the atrium
   (where the automatic module is), 5 over the boardroom.
+- **The Manager** (`manager.js`, art in `infected-art.js`; owner
+  2026-11-06: the HQ's thinking enemy, so the infected feel less like
+  cannon fodder). HQ only (elsewhere it's a load error). The one the plant
+  took whole: upright, pale three-piece suit, PA headset, glowing eyes, a
+  crown of white lilies. 4 hits, speed 1.6; never fights. Wakes if it sees
+  you, hears you, is shot, or any suit it runs (within 14 cells: one
+  network) goes after you. Then it:
+  - **keeps away**: out of your line of sight, 6-10 cells off; moves on
+    when you get close or can see it;
+  - **opens doors**: the only infected that can (`opensDoors`), and its
+    suits follow it through while they're open;
+  - **gives an order every 9 s**, cycling, skipping any it can't give, and
+    ANNOUNCES each over the PA (amber line on the visor, a chime, a flat
+    buzzing voice). What it says is what it does:
+    SURROUND "ALL STAFF TO THE <EAST> WING" (suits each sent to a point
+    round you; the compass word says where they're coming from);
+    FIRE DRILL (the sprinklers nearest you, so bloomers flower in your way);
+    AMBUSH "PLEASE RETURN TO YOUR DESKS" (suits out of sight stand still
+    until you're within 2.5, or 10 s pass and they all come);
+    LIGHTS OUT "ENERGY SAVING MEASURES..." (ceiling lights within 5 of you
+    off for 12 s, stuttering back; its suits are told where you are);
+    SEAL DOOR "THE MEETING WILL CONTINUE WITHOUT YOU" (nearest door to you
+    sealed 10 s: DOOR SEALED on the visor; an open one shuts when clear);
+  - **re-roots** at 2 hits: "I WILL BE OUT OF THE OFFICE..." and walks to
+    a planter ('v') or beside a pot plant, as far from you as it can;
+    rooted (legs gone to roots), it heals a hit every 2.5 s and gives no
+    orders: your window;
+  - **killed**: the PA howls and cuts out ("SIGNAL LOST"), every suit it
+    ran staggers (letting go of you) and their orders end.
+  Its ID BADGE shows on your visor the first time you get a lit look at it
+  within 9 cells (`badge: ['NAME', 'TITLE']` on its level entry). One in
+  the Offices: D. HARLOW, REGIONAL OPERATIONS MANAGER, in meeting room 2.
+  The armed security GUARD (pistol, cover) was agreed as a later addition.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of

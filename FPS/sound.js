@@ -441,6 +441,23 @@ function sfxBroodBirth(enemy) {
   noiseBurst(out, 'lowpass', 1800, 150, 0.5, 0.8);
   drumHit(out, 'sine', 90, 40, 0.06, 0.3, 0.6);
 }
+// THE PA (manager.js): the building's own chime, two notes down, then the
+// voice: a flat, clipped buzz for each word, like a cheap speaker.
+function sfxPA(text) {
+  tone(audio.master, 'sine', 659, 659, 0.35, 0.12);
+  tone(audio.master, 'sine', 523, 523, 0.5, 0.12, 0.3);
+  text.split(' ').filter((w) => /[A-Z]/.test(w)).forEach((word, n) => {
+    const t = 0.85 + n * 0.2;
+    const f = 140 + 25 * noise(n, word.length, 470);
+    tone(audio.master, 'square', f, f * 0.94, Math.min(0.17, 0.05 + word.length * 0.02), 0.035, t);
+    noiseBurst(audio.master, 'bandpass', 1400, 900, 0.06, 0.05, t);
+  });
+}
+// A manager killed: the PA howls with feedback, then cuts out.
+function sfxPAFeedback() {
+  tone(audio.master, 'sine', 1800, 2600, 0.9, 0.08);
+  noiseBurst(audio.master, 'bandpass', 2000, 400, 0.9, 0.2);
+}
 function sfxCreatureHit(enemy) {
   const out = placeAt(enemy.x, enemy.y);
   if (!out) return;
@@ -866,6 +883,7 @@ function rememberState() {
   for (const t of terminals) last.terminals.set(t, t.state);
   for (const b of bays) last.bays.set(b, b.health);
   last.lockedHint = lockedDoorHint;
+  last.sealedHint = sealedDoorHint;
   last.messageTime = securityMessageTime;
   last.coreHealth = core.health;
   last.coreState = core.state;
@@ -880,6 +898,12 @@ function watchTheGame() {
       if (d.state === 'opening' || d.state === 'closing') sfxDoorMove(d);
       if (d.state === 'open' || d.state === 'closed') sfxDoorClunk(d);
     }
+  }
+  if (paNew) { paNew = false; sfxPA(paMessage); }                 // manager.js: an announcement
+  if (paFeedback) { paFeedback = false; sfxPAFeedback(); }        // ...or the PA dying with it
+  if (sealedDoorHint && !last.sealedHint) {
+    const door = DOORS.find((d) => d.sealed > 0 && playerNearDoor(d));
+    if (door) sfxDenied(door);
   }
   if (lockedDoorHint && lockedDoorHint !== last.lockedHint) {
     const door = DOORS.find((d) => d.lock === lockedDoorHint && playerNearDoor(d));

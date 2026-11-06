@@ -19,6 +19,7 @@ const DOORS = findDoors();
 // The key colour of the locked door you're standing at without its card, or
 // null. The HUD shows "RED KEYCARD NEEDED" while this is set.
 let lockedDoorHint = null;
+let sealedDoorHint = false; // you're at a door the Manager has sealed (manager.js)
 
 function findDoors() {
   const isSolid = (x, y) => { const c = MAP[y]?.[x]; return c !== undefined && c !== 0 && c !== DOOR_CELL; };
@@ -87,10 +88,19 @@ function playerNearDoor(door) {
 // difference, one extra condition on the very first step.
 function updateDoors(dt) {
   lockedDoorHint = null;
+  sealedDoorHint = false;
   for (const door of DOORS) {
     const near = playerNearDoor(door);
+    // SEALED (manager.js: `sealed` seconds left): like locked, for a while,
+    // and an open one shuts as soon as the doorway's clear.
+    const sealed = door.sealed > 0;
     if (near && !playerCanOpen(door)) lockedDoorHint = door.lock;
-    if (near && playerCanOpen(door) && (door.state === 'closed' || door.state === 'closing')) door.state = 'opening';
+    if (near && sealed && playerCanOpen(door)) sealedDoorHint = true;
+    if (sealed && door.state === 'open' && !doorwayOccupied(door)) door.state = 'closing';
+    // The Manager (manager.js) opens doors too: the only one of them that can.
+    const opener = door.lock === null && enemies.some((e) => e.state !== 'dead' && ENEMY_TYPES[e.type].opensDoors &&
+      Math.hypot(e.x - (door.x + 0.5), e.y - (door.y + 0.5)) <= DOOR_TRIGGER_RANGE);
+    if (((near && playerCanOpen(door)) || opener) && !sealed && (door.state === 'closed' || door.state === 'closing')) door.state = 'opening';
 
     if (door.state === 'opening') {
       door.open = Math.min(1, door.open + DOOR_SPEED * dt);
@@ -101,7 +111,7 @@ function updateDoors(dt) {
     } else if (door.state === 'open') {
       // The countdown only runs once you've walked away; while you're near
       // it's held at full.
-      door.timer = near ? DOOR_OPEN_TIME : door.timer - dt;
+      door.timer = near || opener ? DOOR_OPEN_TIME : door.timer - dt;
       // Time's up, but never shut on anyone: wait until the doorway is clear.
       if (door.timer <= 0 && !doorwayOccupied(door)) door.state = 'closing';
     } else if (door.state === 'closing') {
