@@ -890,7 +890,7 @@ function updateSound(dt) {
     if (charging && !v) { v = makeVoice(creature ? 'sawtooth' : 'triangle'); robotWhines.set(e, v); }
     if (!charging && v) { stopVoice(v); robotWhines.delete(e); continue; }
     if (v) {
-      const f = e.charge / ENEMY_TYPES[e.type].charge;
+      const f = e.charge / chargeTime(e); // enemies.js: a walker's follow-up shots charge quicker
       // A spitter's sac swelling is a rising gurgle, lower and rougher than a robot's whine.
       if (creature) steerVoice(v, e.x, e.y, 0.1, 80 + 220 * f + 25 * Math.sin(animTime * 40));
       else steerVoice(v, e.x, e.y, 0.15, 300 + 900 * f);

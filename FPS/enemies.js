@@ -71,6 +71,9 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //              'pistol' (guard.js: the guard's, fired in bursts from cover)
 // and these only if it differs from ENEMY_DEFAULTS:
 //   charge     seconds of charging (visor brightening) before each shot
+//   followUp   if set, the charge for each shot AFTER the first, for as long
+//              as it keeps you in its sights: the first shot is your warning,
+//              the rest come quicker (owner, 2026-11-06: the walker)
 //   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
 //   hitNear, hitFar   for 'gun' weapons: the chance to hit at 1 cell, falling
 //              in a straight line to hitFar at aimRange
@@ -87,12 +90,12 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   feeds      wounded, it eats the dead to heal (feeding.js)
 //   opensDoors it can open (unlocked, unsealed) doors, like you: the Manager only
 const ENEMY_DEFAULTS = {
-  charge: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
+  charge: 0, followUp: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
   strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false, feeds: false, opensDoors: false,
 };
 const ENEMY_REQUIRED = ['speed', 'health', 'aimRange', 'weapon'];
 const ENEMY_TYPES = {
-  walker:  { speed: 1.5, health: 4, aimRange: 3,   weapon: 'gun',    charge: 1.0, damage: 15, hitNear: 0.8,  hitFar: 0.3,  strafe: true },
+  walker:  { speed: 1.5, health: 4, aimRange: 6,   weapon: 'gun',    charge: 1.0, followUp: 0.6, damage: 15, hitNear: 0.8,  hitFar: 0.1,  strafe: true },
   scout:   { speed: 3.0, health: 2, aimRange: 1.6, weapon: 'gun',    charge: 0.5, damage: 8,  hitNear: 0.7,  hitFar: 0.45, strafe: true, weave: true },
   heavy:   { speed: 0.8, health: 6, aimRange: 6,   weapon: 'rocket', charge: 1.8, backHits: 2 },
   turret:  { speed: 0,   health: 4, aimRange: 8,   weapon: 'gun',    charge: 1.2, damage: 6,  hitNear: 0.75, hitFar: 0.35, mobile: false, volley: 5, volleyGap: 0.12 },
@@ -168,6 +171,7 @@ const enemies = ENEMIES.map((start) => ({
   pair: start.pair || null, // lurchers that hunt together share a tag (creatures.js)
   pairCalled: false, pairCaller: false,
   repairTime: 0, // seconds of welding towards the next hit restored
+  onTarget: false, // it's fired and still has you in its sights: its next charge is its followUp
   burn: 0,       // seconds of burning left, from an incendiary round (ammo.js); 0 = not alight
 }));
 
@@ -294,11 +298,19 @@ function aimAndFire(enemy, dt) {
   enemy.angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
   if (enemy.volleyLeft > 0) return; // still firing the last one
   enemy.charge += dt;
-  if (enemy.charge >= ENEMY_TYPES[enemy.type].charge) {
+  if (enemy.charge >= chargeTime(enemy)) {
     enemy.charge = 0;
+    enemy.onTarget = true; // the next one comes quicker, if its type's does (followUp)
     enemy.volleyLeft = ENEMY_TYPES[enemy.type].volley;
     enemy.volleyTimer = 0; // the first round goes this frame
   }
+}
+
+// How long this one's next shot takes to charge: its type's charge, or its
+// followUp once it has fired and still has you in its sights.
+function chargeTime(enemy) {
+  const type = ENEMY_TYPES[enemy.type];
+  return enemy.onTarget && type.followUp > 0 ? type.followUp : type.charge;
 }
 
 // The rounds of a volley, one each time the gap runs out. Each is its own
@@ -465,7 +477,7 @@ function updateEnemy(enemy, dt) {
 
   // Charging only happens while aiming. Leaving 'aim' (you duck out of sight,
   // or back off out of range) throws the charge away: that's your counterplay.
-  if (enemy.state !== 'aim') enemy.charge = 0;
+  if (enemy.state !== 'aim') { enemy.charge = 0; enemy.onTarget = false; } // and its next first shot is slow again
   if (enemy.moving) enemy.walkTime += dt;
 }
 

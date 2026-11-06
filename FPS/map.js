@@ -63,6 +63,7 @@ const PODS           = CURRENT_LEVEL.pods          || [];
 const SPRINKLERS     = CURRENT_LEVEL.sprinklers    || [];
 const MOTH_PACKS     = CURRENT_LEVEL.moths         || [];
 const DECALS         = CURRENT_LEVEL.decals        || [];
+const PLANS          = CURRENT_LEVEL.plans         || []; // floor plans on the wall (plans.js)
 const PLAYER_START   = CURRENT_LEVEL.playerStart;
 if (!PLAYER_START) throw new Error(`Level "${CURRENT_LEVEL.id}" has no playerStart.`);
 

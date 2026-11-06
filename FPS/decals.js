@@ -326,6 +326,36 @@ function makeInsignia() {
   });
 }
 
+// THE FLOOR PLANS on the wall (plans.js), one look per setting. Each is a
+// little framed picture of a plan in the middle of the wall face: you can
+// tell what it is from across a room, and walk up to read it.
+//   screen      the industrial sector's: a wall monitor, green lines on black
+//   whiteboard  the lab's: a whiteboard with the layout sketched in blue marker
+//   evacuation  the HQ's: a FIRE EVACUATION PLAN, a red band over a printed plan
+function makePlanSign(kind) {
+  const look = {
+    screen:     { frame: [58, 62, 68], face: [8, 20, 12], ink: [70, 210, 110], band: null, glow: true },
+    whiteboard: { frame: [170, 174, 180], face: [228, 230, 226], ink: [40, 70, 170], band: null, glow: false },
+    evacuation: { frame: [40, 40, 44], face: [236, 232, 218], ink: [30, 30, 34], band: [200, 40, 30], glow: false },
+  }[kind];
+  // A made-up plan: a few rooms' worth of lines, the same on every sign.
+  const lines = (x, y) => (x === 22 || x === 41 || y === 30 || y === 44 || (x === 31 && y < 37) || (y === 37 && x > 31)) &&
+    !(x === 31 && y > 32 && y < 35) && !(y === 37 && x > 35 && x < 38);
+  return makeTexture(look.face, (x, y) => {
+    if (x < 16 || x > 47 || y < 20 || y > 49) return null;
+    if (x < 18 || x > 45 || y < 22 || y > 47) return brighten(look.frame, 0.9 + 0.2 * noise(x, y, 120)); // the frame
+    if (look.band && y < 27) return y === 24 && x > 20 && x < 43 && x % 2 === 0 ? [245, 240, 230] : look.band; // red band, a line of 'text'
+    if (kind === 'whiteboard' && y > 45 && x > 36) return [200, 50, 40];         // a red marker on its ledge
+    if (x >= 22 && x <= 41 && y >= 30 && y <= 44 && lines(x, y)) {
+      if (kind === 'whiteboard' && noise(x, y, 121) < 0.15) return look.face;     // marker skips
+      return look.glow ? glowing(look.ink) : look.ink;
+    }
+    if (kind === 'evacuation' && Math.hypot(x - 27, y - 40) < 1.6) return [200, 40, 30]; // YOU ARE HERE
+    if (kind === 'screen' && y === 25 && x > 20 && x < 34) return glowing(look.ink);     // its title line
+    return look.glow ? glowing(brighten(look.face, 1 + 0.3 * (y % 2))) : brighten(look.face, 0.95 + 0.08 * noise(x, y, 122));
+  });
+}
+
 const STENCIL_WHITE = [205, 200, 185];
 const STENCIL_YELLOW = [215, 175, 40];
 const STENCIL_RED = [190, 50, 35];
@@ -348,6 +378,9 @@ const DECAL_TYPES = {
   rust:       { surfaces: ['wall'],             frames: [0, 1].map(makeRustRun) },
   damp:       { surfaces: ['wall'],             frames: [0, 1].map(makeDamp) },
   insignia:   { surfaces: ['wall'],             frames: [makeInsignia()], text: true },
+  planScreen:     { surfaces: ['wall'], text: true, frames: [makePlanSign('screen')] },     // plans.js
+  planWhiteboard: { surfaces: ['wall'], text: true, frames: [makePlanSign('whiteboard')] },
+  planEvacuation: { surfaces: ['wall'], text: true, frames: [makePlanSign('evacuation')] },
   // Signs (text: true means never mirrored, or they'd read backwards).
   bay1:       { surfaces: ['floor'], text: true, frames: [makeStencil([['BAY', 3, 9], ['1', 5, 30]], STENCIL_YELLOW, true)] },
   bay2:       { surfaces: ['floor'], text: true, frames: [makeStencil([['BAY', 3, 9], ['2', 5, 30]], STENCIL_YELLOW, true)] },

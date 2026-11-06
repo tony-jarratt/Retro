@@ -128,6 +128,11 @@ LEVELS.push({
     { x: 16, y: 5, delay: 0.5 },
   ],
 
+  // The floor plan (plans.js): a whiteboard in the specimen hall, before the way down.
+  plans: [
+    { x: 23, y: 5, face: 'W' },
+  ],
+
   // Signs, and a trail of slime from the tanks down to the chamber. (More
   // slime and damp are scattered by the rules in decals.js.)
   decals: [

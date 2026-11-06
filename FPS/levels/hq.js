@@ -183,6 +183,11 @@ LEVELS.push({
     { type: 'piercing',   x: 22.5, y: 1.5 },  // exec lounge
   ],
 
+  // The floor plan (plans.js): the fire evacuation plan, by the lift in reception.
+  plans: [
+    { x: 3, y: 0, face: 'S' },
+  ],
+
   // Signs, and fallen leaves drifting through the atrium. (More leaves and
   // damp are scattered by the rules in decals.js.)
   decals: [

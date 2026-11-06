@@ -161,6 +161,12 @@ LEVELS.push({
     { x: 19, y: 18, delay: 3.0 }, // the loading bay
   ],
 
+  // The floor plan (plans.js): a wall monitor in the foreman's office, by the red
+  // keycard: look before you plan the way home.
+  plans: [
+    { x: 31, y: 4, face: 'W' },
+  ],
+
   decals: [
     { surface: 'wall', type: 'insignia',  x: 3,  y: 0,  face: 'S' },  // over the lift bay
     { surface: 'wall', type: 'spares',    x: 7,  y: 5,  face: 'E' },  // inside the shop door

@@ -149,6 +149,11 @@ LEVELS.push({
     { type: 'incendiary', x: 19.5, y: 11.5 }, // the open plan
   ],
 
+  // The floor plan (plans.js): the fire evacuation plan, on the kitchen wall.
+  plans: [
+    { x: 0, y: 16, face: 'E' },
+  ],
+
   decals: [
     { surface: 'wall', type: 'company',    x: 27, y: 2,  face: 'W' },  // the end of the corridor
     { surface: 'wall', type: 'growWithUs', x: 6,  y: 9,  face: 'E' },  // the open plan's west wall

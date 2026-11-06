@@ -70,6 +70,17 @@ burst needs 3, auto needs 8 (of the loaded type). Walking widens every cone.
 Lit coils on the barrel show the stage by their count; their colour is the
 ammo loaded.
 
+### Floor plans (`plans.js`, owner 2026-11-06)
+
+Stand at a plan, facing it, and the whole level's layout shows over the
+view; walk away and it's gone, so you look and remember. One per setting:
+the industrial sector's **security terminals** (green on black; a level with
+none has a wall monitor), the lab's **whiteboard** (blue marker, skips and
+all), the HQ's **fire evacuation plan** (red band, printed). A level lists its
+signs in `plans` ({x, y, face}, like a wall decal). **Rooms only**: walls and
+doorways, no items, props or enemies (owner: details TBD). The one mark is
+YOU ARE HERE, where the plan hangs.
+
 ### Ammo types (`ammo.js`, owner 2026-11-06)
 
 Three kinds of round; keys **1 2 3** load them. The coils and the muzzle
@@ -95,7 +106,7 @@ up in the lift with the loadout.
 
 | Type | Hits | Speed | Fights by | Notes |
 |---|---|---|---|---|
-| Walker | 4 | 1.5 | Stops within 3 cells, charges 1 s, 15 damage | The all-rounder |
+| Walker | 4 | 1.5 | Stops within 6 cells, charges 1 s for its first shot, then 0.6 s for each one after while it keeps you in sight; 15 damage | The all-rounder |
 | Scout | 2 | 3.0 | Rushes to 1.6 cells, quick 8-damage shots | |
 | Heavy | 6 | 0.8 | Rockets from 6 cells (dodge sideways) | Shots in the back count double |
 | Turret | 4 | — | 5-round volley, 6 damage each, 8-cell reach | Sleeps until a tripwire or a shot wakes it. Always dumb. |
@@ -106,7 +117,9 @@ up in the lift with the loadout.
   sidestep while charging, scouts zig-zag in, and **seeing you raises their
   zone's alarm** — they're walking cameras, so kill them first.
 - Hit chance for robot guns falls with distance (e.g. a walker: 80% at 1
-  cell, 30% at 3).
+  cell, 52% at 3, 10% at 6). After play-testing (owner, 2026-11-06: one or
+  two robots were too easy) a walker that keeps you in sight does about
+  19 armour/s at 2 cells, 13 at 3, 8 at 4, 2 at 6.
 - **Smart robots retreat and repair** (`repair.js`, owner 2026-11-06): at
   half health or less (walker 2, scout 1, heavy 3 hits left) a smart robot
   breaks off for the nearest **repair bay** (`R`) it can reach by path,
@@ -136,7 +149,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | `.` | Floor | |
 | `#` `H` `P` | Walls: steel, hazard bulkhead, pipes | |
 | `C` | Computer bank | Animated, green light |
-| `T` | Security terminal | Walk up to it: its zone's **cameras** shut down for good (not tripwires or turrets) |
+| `T` | Security terminal | Walk up to it: its zone's **cameras** shut down for good (not tripwires or turrets), and while you stand there it shows the **site plan** (plans.js) |
 | `o`, `v` | HQ walls | Office wall; overgrown wall (the HQ's own pieces) |
 | `K` | Security core | The objective. Several `K` cells are one core, 18 hits (blasts count), or one **demolition charge**. Doesn't fight back |
 | `R` | Repair bay | Damaged smart robots dock here to be welded back to full. 3 repairs (amber lamps), 4 hits to wreck (it blows up: bad news for a robot docked in it). Needs floor on exactly one side |

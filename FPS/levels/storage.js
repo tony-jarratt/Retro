@@ -115,6 +115,11 @@ LEVELS.push({
     { x: 23, y: 16, delay: 1.0 }, // the cold store: gas, which burns but hides nobody
   ],
 
+  // The floor plan (plans.js): a whiteboard along the long corridor.
+  plans: [
+    { x: 14, y: 1, face: 'S' },
+  ],
+
   decals: [
     { surface: 'wall', type: 'specimens', x: 27, y: 3,  face: 'W' },  // the end of the corridor
     { surface: 'wall', type: 'keepOut',   x: 16, y: 5,  face: 'N' },  // either side of the way down
