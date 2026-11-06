@@ -135,6 +135,12 @@ LEVELS.push({
     { x: 16, y: 5, delay: 0.5 },
   ],
 
+  // POWER (power.js): it goes with the lockdown; the breaker is in the side
+  // room, on the way home.
+  breakers: [
+    { x: 0, y: 10, face: 'E' },
+  ],
+
   // The floor plan (plans.js): a whiteboard in the specimen hall, before the way down.
   plans: [
     { x: 23, y: 5, face: 'W' },

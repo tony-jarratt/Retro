@@ -151,6 +151,13 @@ LEVELS.push({
     { type: 'incendiary', x: 19.5, y: 11.5 }, // the open plan
   ],
 
+  // POWER (power.js): the lights die as you step into the archive; the
+  // breaker is in the kitchen beyond it.
+  powerCut: { x: 14.5, y: 14.5, radius: 1.2 },
+  breakers: [
+    { x: 0, y: 14, face: 'E' },
+  ],
+
   // The floor plan (plans.js): the fire evacuation plan, on the kitchen wall.
   plans: [
     { x: 0, y: 16, face: 'E' },

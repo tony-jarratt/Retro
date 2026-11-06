@@ -431,6 +431,26 @@ function sfxScanTick() {
   tone(audio.master, 'sine', 2600, 2400, 0.03, 0.035);
 }
 
+// THE POWER (power.js). Failing: an electrical buzz stuttering for the two
+// seconds of flicker. Down: a deep clunk and a falling whine, the building
+// powering off. A breaker thrown: a heavy lever, and the power humming back up.
+function sfxPowerFailing() {
+  if (!audioReady()) return;
+  for (let i = 0; i < 9; i++) tone(audio.master, 'square', 100, 100, 0.06 + 0.05 * Math.random(), 0.05, i * 0.21);
+}
+function sfxPowerDown() {
+  if (!audioReady()) return;
+  drumHit(audio.master, 'sine', 90, 30, 0.1, 0.8, 0.8);
+  tone(audio.master, 'sawtooth', 420, 40, 1.6, 0.08);
+  noiseBurst(audio.master, 'lowpass', 1200, 100, 0.5, 0.3);
+}
+function sfxBreaker(x, y) {
+  if (!audioReady()) return;
+  metalClack(500, 0.5, 0);
+  drumHit(audio.master, 'sine', 120, 50, 0.06, 0.4, 0.6, 0.05);
+  tone(audio.master, 'sawtooth', 40, 120, 1.0, 0.06, 0.15);
+}
+
 // A BULKHEAD slamming shut (lockdown.js): a huge low boom, the steel ringing, a hiss of air.
 function sfxBulkheadSlam(door) {
   if (!audioReady()) return; // called from the game, not the watcher: the sound may not be on yet
@@ -909,6 +929,7 @@ const mothBuzzes = new Map();    // moth -> voice, while it's swarming
 let spinWhine = null;            // your gun winding up
 let breachHiss = null;           // air escaping a breached suit
 let scanHum = null;              // the scanner, running
+let emergencyHum = null;         // the emergency circuit, while the power's off
 let lastLit = 1;                 // coils lit last frame, to hear one lock on
 let breachTimer = 0;             // seconds to the next breach beep
 let gameOver = false;             // set once the game has ended and the loops have faded (R reloads the page)
@@ -1010,7 +1031,7 @@ function updateSound(dt) {
 const LOOP_FADE = 0.6;
 function fadeOutLoops() {
   const t = audio.ctx.currentTime;
-  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...mothBuzzes.values(), ...ventHisses.values(), spinWhine, breachHiss, scanHum, siren, ...(ambience || [])];
+  const all = [...robotWhines.values(), ...droneBuzzes.values(), ...mothBuzzes.values(), ...ventHisses.values(), spinWhine, breachHiss, scanHum, emergencyHum, siren, ...(ambience || [])];
   for (const v of all) {
     if (!v) continue;
     v.gain.gain.cancelScheduledValues(t);
@@ -1021,7 +1042,7 @@ function fadeOutLoops() {
   droneBuzzes.clear();
   mothBuzzes.clear();
   ventHisses.clear();
-  spinWhine = breachHiss = scanHum = siren = ambience = null;
+  spinWhine = breachHiss = scanHum = emergencyHum = siren = ambience = null;
 }
 
 // Note how everything is now, to compare against next frame.
@@ -1129,6 +1150,9 @@ function updateWorldLoops() {
   // THE SCANNER's hum, while it's on (scanner.js).
   if (!scanHum) { scanHum = makeVoice('sine'); scanHum.osc.frequency.value = 96; scanHum.filter.frequency.value = 600; }
   scanHum.gain.gain.setTargetAtTime(player.scanning && game.state === 'playing' ? 0.03 : 0, t, 0.1);
+  // THE EMERGENCY CIRCUIT: a low mains hum while the power's off (power.js).
+  if (!emergencyHum) { emergencyHum = makeVoice('sawtooth'); emergencyHum.osc.frequency.value = 50; emergencyHum.filter.frequency.value = 300; }
+  emergencyHum.gain.gain.setTargetAtTime(power.state === 'off' && game.state === 'playing' ? 0.025 : 0, t, 0.3);
   // A BREACHED SUIT: a thin hiss of air, all the time it's open.
   if (!breachHiss) breachHiss = makeNoiseVoice(6500);
   breachHiss.gain.gain.setTargetAtTime(game.state === 'playing' && player.armour === 0 ? 0.03 : 0, t, 0.2);

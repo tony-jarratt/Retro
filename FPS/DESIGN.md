@@ -147,6 +147,24 @@ the climb ends in a real dawn).
   shutter, red lamp, BULKHEAD SEALED). The way you came is cut, the plans show
   them in red, and a load-time check makes sure the lift is still reachable.
 
+### Power failure (`power.js`, owner 2026-11-06)
+
+The lights flicker and buzz for 2 s, a deep clunk, then the strips drop to a
+faint steady RED emergency glow, lamps die, and ambient falls to 30%. What
+glows by itself still does (screens, terminals, the core, fire, spores, your
+muzzle flash). A low mains hum while it's out. Creatures see by light, so
+the dark hides you (but your shots light you up); robots don't care; the
+scanner is how you see. It comes back only when you THROW A BREAKER (a
+grey box, lever down and a red lamp; walk up and face it): the lights
+stutter back on, POWER RESTORED.
+- With the LOCKDOWN (Hangar, Genetics, Atrium): the escape is in the dark;
+  the breaker is on the way home.
+- One SCRIPTED CUT per setting (level `powerCut` {x, y, radius}): the
+  Workshops' service corridor (breaker across the loading bay, past the
+  turret), Storage's way down into the tank hall (breaker on its far wall),
+  the Offices' archive (breaker in the kitchen).
+A level that can lose power must have a breaker (`breakers`), checked at load.
+
 ### Ammo types (`ammo.js`, owner 2026-11-06)
 
 Three kinds of round; keys **1 2 3** load them. The coils and the muzzle

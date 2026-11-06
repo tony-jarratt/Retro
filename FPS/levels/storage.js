@@ -115,6 +115,13 @@ LEVELS.push({
     { x: 23, y: 16, delay: 1.0 }, // the cold store: gas, which burns but hides nobody
   ],
 
+  // POWER (power.js): the lights die as you go down into the tank hall; the
+  // breaker is on its far wall, past the tanks.
+  powerCut: { x: 17.5, y: 6.5, radius: 1.2 },
+  breakers: [
+    { x: 27, y: 10, face: 'W' },
+  ],
+
   // The floor plan (plans.js): a whiteboard along the long corridor.
   plans: [
     { x: 14, y: 1, face: 'S' },

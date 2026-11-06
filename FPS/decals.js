@@ -356,6 +356,26 @@ function makePlanSign(kind) {
   });
 }
 
+// A BREAKER box on the wall (power.js): a grey steel box with a big lever,
+// DOWN with a red lamp while the power's off, UP with a green one once it's
+// thrown. A yellow-and-black band says what it is from across a dark room.
+function makeBreaker(on) {
+  const box = [118, 122, 128];
+  return makeTexture(box, (x, y) => {
+    if (x < 20 || x > 43 || y < 14 || y > 50) return null;
+    if (x < 21 || x > 42 || y < 15 || y > 49) return DARK_STEEL;               // its edge
+    if (y >= 17 && y < 21) return hazard(x, y, false);                         // the warning band
+    const lamp = Math.hypot(x + 0.5 - 37, y + 0.5 - 26);
+    if (lamp < 2.2) return glowing(on ? [60, 255, 90] : [255, 40, 30]);
+    if (x >= 26 && x <= 29) {                                                  // the lever: in its slot...
+      const top = on ? 25 : 36, bottom = on ? 34 : 45;
+      if (y >= top && y <= bottom) return brighten([200, 40, 30], y === top ? 1.4 : 1);
+      if (y >= 24 && y <= 46) return [26, 26, 30];
+    }
+    return brighten(box, 0.9 + 0.12 * noise(x, y, 123));
+  });
+}
+
 const STENCIL_WHITE = [205, 200, 185];
 const STENCIL_YELLOW = [215, 175, 40];
 const STENCIL_RED = [190, 50, 35];
@@ -378,6 +398,8 @@ const DECAL_TYPES = {
   rust:       { surfaces: ['wall'],             frames: [0, 1].map(makeRustRun) },
   damp:       { surfaces: ['wall'],             frames: [0, 1].map(makeDamp) },
   insignia:   { surfaces: ['wall'],             frames: [makeInsignia()], text: true },
+  breakerOff:     { surfaces: ['wall'], text: true, frames: [makeBreaker(false)] },         // power.js
+  breakerOn:      { surfaces: ['wall'], text: true, frames: [makeBreaker(true)] },
   planScreen:     { surfaces: ['wall'], text: true, frames: [makePlanSign('screen')] },     // plans.js
   planWhiteboard: { surfaces: ['wall'], text: true, frames: [makePlanSign('whiteboard')] },
   planEvacuation: { surfaces: ['wall'], text: true, frames: [makePlanSign('evacuation')] },
@@ -449,6 +471,7 @@ function placeDecal(surface, x, y, face, type, pick, rot, mirror) {
   if (surface === 'floor') floorDecals[i] = decal;
   else if (surface === 'ceiling') ceilingDecals[i] = decal;
   else wallDecals[face][i] = decal;
+  return decal; // (power.js swaps a breaker's picture when it's thrown)
 }
 
 // 1. THE RULES. noise(x, y, seed) is a repeatable "random" number for each

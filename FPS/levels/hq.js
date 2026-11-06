@@ -203,6 +203,12 @@ LEVELS.push({
     { type: 'piercing',   x: 22.5, y: 1.5 },  // exec lounge
   ],
 
+  // POWER (power.js): it goes with the lockdown; the breaker is in the
+  // open-plan office, on the way home.
+  breakers: [
+    { x: 17, y: 4, face: 'W' },
+  ],
+
   // The floor plan (plans.js): the fire evacuation plan, by the lift in reception.
   plans: [
     { x: 3, y: 0, face: 'S' },

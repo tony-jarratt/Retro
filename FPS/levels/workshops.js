@@ -165,6 +165,13 @@ LEVELS.push({
     { x: 19, y: 18, delay: 3.0 }, // the loading bay
   ],
 
+  // POWER (power.js): the lights die as you reach the service corridor; the
+  // breaker is across the loading bay, past the turret, in the dark.
+  powerCut: { x: 26.5, y: 9.5, radius: 1.2 },
+  breakers: [
+    { x: 31, y: 20, face: 'W' },
+  ],
+
   // The floor plan (plans.js): a wall monitor in the foreman's office, by the red
   // keycard: look before you plan the way home.
   plans: [

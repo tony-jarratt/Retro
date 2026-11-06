@@ -204,10 +204,11 @@ const lightGrid = newLightGrid();
 function updateLighting() {
   updateDoorLights();
 
+  const ambient = ambientLight(); // power.js: much darker with the power off
   for (let i = 0; i < lightGrid.length; i += 3) {
-    lightGrid[i] = AMBIENT[0];
-    lightGrid[i + 1] = AMBIENT[1];
-    lightGrid[i + 2] = AMBIENT[2];
+    lightGrid[i] = ambient[0];
+    lightGrid[i + 1] = ambient[1];
+    lightGrid[i + 2] = ambient[2];
   }
   const pulse = 0.55 + 0.45 * Math.sin(animTime * ALARM_PULSE_SPEED);
   LIGHTS.forEach((light, n) => {
@@ -218,9 +219,18 @@ function updateLighting() {
     else if (light.cut > 0) light.level = flickerLevel(n, animTime);
     light.alarm = light.kind === 'ceiling' && !(light.cut > 0) && zoneAlarmedAt(light.x, light.y);
     // How much of each channel to add: the light's level, tinted red if alarmed.
-    const scale = light.alarm
+    let scale = light.alarm
       ? ALARM_COLOUR.map((a, c) => pulse * a / light.colour[c])
       : [light.level, light.level, light.level];
+    // A POWER FAILURE overrides all that (power.js): flickering as it goes or
+    // comes back; off, a strip light is a faint red emergency strip (drawn as
+    // a red tube) and a lamp is dark.
+    const failure = powerLightScale(light, n);
+    if (failure) {
+      scale = failure.scale;
+      light.level = failure.scale[0];
+      light.alarm = light.kind === 'ceiling' && power.state === 'off';
+    }
     // Only the samples inside the light's reach: on a big level, adding every
     // light across the whole grid every frame would be mostly adding zeros.
     const { sx0, sx1, sy0, sy1 } = light.box;

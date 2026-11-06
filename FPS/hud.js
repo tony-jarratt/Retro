@@ -346,7 +346,7 @@ function drawHud(pixels) {
       if (weaponMessageLine) drawTextCentred(pixels, weaponMessageLine, 78, HUD_GREEN, 1);
     }
     if (securityMessageTime > 0) {
-      const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === OBJECTIVE_LOOK.goal;
+      const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === 'POWER RESTORED' || securityMessage === OBJECTIVE_LOOK.goal;
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);
     }
     // Standing at a floor plan, you see it (plans.js), over any message.

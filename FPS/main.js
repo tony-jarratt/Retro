@@ -154,6 +154,7 @@ function frame(now) {
       updateTraps(dt);    // traps.js: trapped terminals you've come too close to
       updateBurning(dt);  // ammo.js: creatures alight from incendiary rounds
       updateLockdown(dt); // lockdown.js: bulkheads coming down
+      updatePower(dt);    // power.js: power cuts, and the breakers
       updateAtmosphere(dt); // atmosphere.js: your breathing, the building, the old PA, the visor's grime
     }
     updateCombat(dt);

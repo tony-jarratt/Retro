@@ -190,6 +190,12 @@ LEVELS.push({
     { x: 0,  y: 20, zone: 'hangar' },    // deep in the hangar, far left
   ],
 
+  // POWER (power.js): it goes with the lockdown; the breaker is in the
+  // workshop, on the long way home.
+  breakers: [
+    { x: 31, y: 11, face: 'W' },
+  ],
+
   // LOCKDOWN (lockdown.js): the core down, bulkheads seal the hangar's west blue
   // door and the corridor's way up into the depot. The way home is the long one:
   // corridor -> workshop -> pipe works -> depot -> the start bay.
