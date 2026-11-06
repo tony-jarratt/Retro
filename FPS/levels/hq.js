@@ -9,6 +9,9 @@
 // (sprinklers.js); and the pollinators, packs of infected moths circling the
 // skylights, that your muzzle flash brings down on you (pollinators.js).
 //
+// One desk terminal, picked at random each time, is BOOBY-TRAPPED
+// (traps.js): its screen is amber. Not the front desk's: it's too near the start.
+//
 // The route: the lift and the front desk (top left) -> the open-plan office
 // -> through the atrium garden -> the boardroom at the back, where the
 // mother plant has taken root. The executive suite (top right) is optional:

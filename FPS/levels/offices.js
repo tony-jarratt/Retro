@@ -21,6 +21,8 @@
 //   - THE MANAGER, in meeting room 2: once it's awake it runs the floor
 //     over the PA (surround, ambush, fire drill, lights out, sealed doors)
 //     and keeps out of your sight. Hunt it down and the suits fall apart.
+//   - One desk terminal, picked at random, is BOOBY-TRAPPED (traps.js):
+//     its screen is amber, not green. Come close and it blows.
 //   - A SECURITY GUARD minds the lift key in facilities, behind the desk,
 //     its torch sweeping the room: it takes cover and shoots back. See its
 //     beam through the door first.

@@ -143,6 +143,7 @@ function frame(now) {
       updateCore();       // the objective: has the core gone, are you at the lift? (core.js)
       updateRepairBays(); // repair.js: free the bay of a robot that died on its way
       updateManagers(dt); // manager.js: the PA, the badge, cut lights and sealed doors running down
+      updateTraps(dt);    // traps.js: trapped terminals you've come too close to
     }
     updateCombat(dt);
     updateWeapons(dt);

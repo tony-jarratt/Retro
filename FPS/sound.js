@@ -312,6 +312,17 @@ function sfxGuardReload(enemy, time) {
   noiseBurst(out, 'bandpass', 2400, 1400, 0.09, 0.5, time - 0.12);   // ...and the slide, back and forward
   tone(out, 'square', 1500, 900, 0.03, 0.15, time - 0.05);
 }
+// A trapped terminal (traps.js) about to go: a shrill alarm, pips rising
+// faster and higher over its fuse.
+function sfxTrapAlarm(p) {
+  if (!audioReady()) return;
+  const out = placeAt(p.x, p.y);
+  if (!out) return;
+  for (let n = 0; n < 8; n++) {
+    const t = TRAP_FUSE * (1 - Math.pow(0.78, n + 1)) / (1 - Math.pow(0.78, 8)); // closer together as it goes
+    tone(out, 'square', 1400 + n * 160, 1400 + n * 160, 0.05, 0.14, t - 0.05);
+  }
+}
 // Its torch shot out: a tink of glass and a pop.
 function sfxTorchBreak(enemy) {
   const out = placeAt(enemy.x, enemy.y);

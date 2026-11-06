@@ -110,7 +110,7 @@ function countShot(hit) {
 function countsAsHit(target) {
   if (!target) return false;
   if (target.enemy) return target.enemy.state !== 'dead' || target.enemy.downTime > 0; // a downed suit, finished off
-  if (target.prop) return Boolean(SPRITE_TYPES[target.prop.type].explosive) && target.prop.state !== 'exploded';
+  if (target.prop) return (Boolean(SPRITE_TYPES[target.prop.type].explosive) || liveTrap(target.prop)) && target.prop.state !== 'exploded'; // a drum, or a trapped desk (traps.js)
   if (target.bay) return target.bay.health > 0;
   return Boolean(target.camera || target.drone || target.larva || target.moth || target.core);
 }

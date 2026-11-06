@@ -1055,16 +1055,38 @@ function makePottedPlant() {
   });
 }
 
-function makeDesk() {
+// What's on a desk terminal's screen (sx, sy: from the screen's top left,
+// 0-13 across and 0-11 down):
+//   'work'    green, lines of left-aligned text: every ordinary desk
+//   'trap'    AMBER, a centred, boxed lock screen and a cursor (`cursor`:
+//             lit or not, so it blinks): the data-security trap (traps.js)
+//   'alarm'   RED, flashing (`cursor` lit or not): it's about to go
+function deskScreen(kind, cursor, sx, sy, dx, y) {
+  if (kind === 'work') {
+    const text = (y - 22) % 3 === 0 && dx < -4 + 8 * noise(y, 0, 353) && dx > -11;
+    return glowing(text ? [120, 255, 140] : [20, 70, 36]);
+  }
+  if (kind === 'alarm') {
+    if (!cursor) return glowing([90, 10, 8]);
+    const bang = sx >= 6 && sx < 8 && (sy < 7 || (sy >= 8 && sy < 10)); // a "!"
+    return glowing(bang ? [255, 230, 210] : [255, 40, 28]);
+  }
+  const AMBER = [255, 176, 40], DIM = [64, 36, 6];
+  const box = sx >= 2 && sx <= 11 && sy >= 1 && sy <= 8;
+  const edge = box && (sx === 2 || sx === 11 || sy === 1 || sy === 8);
+  if (edge) return glowing(AMBER);
+  if (box && (sy === 3 || sy === 6) && sx >= 4 && sx <= 9 - (sy === 6 ? 1 : 0)) return glowing(AMBER); // two lines of warning, centred
+  if (cursor && sy === 10 && sx >= 6 && sx < 8) return glowing(AMBER);                               // the cursor, blinking under it
+  return glowing(DIM);
+}
+
+function makeDesk(kind = 'work', cursor = false) {
   const laminate = [150, 122, 84], beige = [184, 176, 150];
   return makeTexture(laminate, (x, y) => {
     const dx = x + 0.5 - 32;
-    // The terminal on it: a beige box and its green screen.
+    // The terminal on it: a beige box and its screen.
     if (dx > -14 && dx < 4 && y >= 19 && y < 37) {
-      if (dx > -12 && dx < 2 && y >= 21 && y < 33) {
-        const text = (y - 22) % 3 === 0 && dx < -4 + 8 * noise(y, 0, 353) && dx > -11;
-        return glowing(text ? [120, 255, 140] : [20, 70, 36]);
-      }
+      if (dx > -12 && dx < 2 && y >= 21 && y < 33) return deskScreen(kind, cursor, Math.floor(dx + 12), y - 21, dx, y);
       return brighten(beige, y === 19 ? 1.25 : 0.85 + 0.1 * noise(x, y, 354));
     }
     if (dx > -8 && dx < -2 && y >= 37 && y < 40) return brighten(beige, 0.7);     // its stand
@@ -1076,6 +1098,28 @@ function makeDesk() {
     }
     // Ivy up one leg.
     if (y >= 43 && dx > 20) { const leaf = leafAt(x, y, 356, () => 0.8); if (leaf) return leaf; }
+    return null;
+  });
+}
+
+// A desk after its terminal blew up: the top split and charred, the monitor
+// gone, a few embers.
+function makeDeskWreck() {
+  const char = [58, 44, 34];
+  return makeTexture(char, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (Math.abs(dx) > 26) return null;
+    if (y >= 40 && y < 44) {                                           // the desktop, split in the middle
+      const sag = Math.abs(dx) < 4 ? 3 + (4 - Math.abs(dx)) * 0.5 : 0;
+      if (y < 40 + sag * 0.6 && Math.abs(dx) < 4) return null;
+      if (Math.abs(dx) < 1.5) return null;
+      return brighten(char, 0.9 + 0.4 * noise(x, y, 357));
+    }
+    if (y >= 44 && y < 62 && Math.abs(dx) > 22) return brighten(char, 0.6);   // the ends, still standing
+    if (y >= 44 && y < 56 && Math.abs(dx) <= 22 && noise(x >> 1, y >> 1, 358) < 0.7) return brighten(char, 0.4); // the panel, holed
+    if (y >= 59 && y < 63 && Math.abs(dx) < 18 && noise(x, y, 359) < 0.5) {    // the monitor's remains on the floor
+      return noise(x, y, 360) > 0.85 ? glowing(SODIUM) : brighten([70, 66, 58], 0.6 + 0.3 * noise(x, y, 361));
+    }
     return null;
   });
 }
@@ -1316,6 +1360,13 @@ const STRUT_TEXTURE = makeStrut();
 const LAMP_TEXTURE = makeCagedLamp();
 const POTTED_PLANT_TEXTURE = makePottedPlant();
 const DESK_TEXTURE = makeDesk();
+// A trapped desk (traps.js): its amber lock screen, cursor on and off; then
+// the red alarm, flashing. And what's left after it goes off.
+const TRAP_DESK_TEXTURES = {
+  armed: [makeDesk('trap', true), makeDesk('trap', false)],
+  alarm: [makeDesk('alarm', true), makeDesk('alarm', false)],
+};
+const DESK_WRECK_TEXTURE = makeDeskWreck();
 
 // The floor and ceiling come with the level's theme (map.js: THEMES): the
 // ceiling three times, with its lights on, off, and red for an alarm.

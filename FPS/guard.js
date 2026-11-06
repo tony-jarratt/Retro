@@ -91,7 +91,8 @@ function coverSpot(g, tx, ty, avoid) {
   const reach = ENEMY_TYPES.guard.aimRange;
   let best = null, bestDist = Infinity;
   for (const p of props) {
-    if (!COVER_TYPES.includes(p.type) || p === avoid) continue;
+    if (!COVER_TYPES.includes(p.type) || p === avoid || p.state === 'exploded') continue;
+    if (liveTrap(p)) continue; // it knows which desks are rigged (traps.js)
     if (Math.hypot(p.x - g.x, p.y - g.y) > COVER_REACH) continue;
     if (aliveGuards().some((o) => o !== g && o.cover && o.cover.prop === p)) continue; // another guard's
     const d = Math.hypot(p.x - tx, p.y - ty);

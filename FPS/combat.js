@@ -139,6 +139,7 @@ function shotHits(target) {
   if (target.drone) destroyDrone(target.drone);   // drones.js
   if (target.larva) destroyLarva(target.larva);   // larvae.js
   if (target.moth) destroyMoth(target.moth);      // pollinators.js
+  if (target.prop && liveTrap(target.prop)) { blowTrap(target.prop); return; } // traps.js: a round in a trapped screen sets it off
   // A fuel drum goes up (explosions.js); a strut just soaks up the shot.
   if (target.prop && SPRITE_TYPES[target.prop.type].explosive && target.prop.state !== 'exploded') {
     explodeDrum(target.prop);

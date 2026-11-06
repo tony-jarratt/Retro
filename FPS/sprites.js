@@ -50,7 +50,9 @@ function hitsSolidSprite(x, y, r) {
 function spriteThings(viewer) {
   const thing = (x, y, tex, extra) => ({ x, y, tex, shade: 1, glowShade: 1, enemy: null, prop: null, camera: null, drone: null, larva: null, moth: null, effect: false, lift: 0, aimRow: null, ...extra });
   return [
-    ...props.map((p) => thing(p.x, p.y, p.state === 'exploded' ? DRUM_WRECK_TEXTURE : SPRITE_TYPES[p.type].texture,
+    ...props.map((p) => thing(p.x, p.y,
+      p.state === 'exploded' ? (p.type === 'desk' ? DESK_WRECK_TEXTURE : DRUM_WRECK_TEXTURE)
+        : trapTexture(p) || SPRITE_TYPES[p.type].texture, // traps.js: a trapped desk's amber screen
       { glowShade: spriteGlow(p), prop: p })),
     ...enemies.map((e) => thing(e.x, e.y, enemyTexture(e, viewer), {
       shade: e.hurtTime > 0 ? 3 : 1,

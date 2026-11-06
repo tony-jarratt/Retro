@@ -494,6 +494,27 @@ Infected only: no robots (owner, 2026-11-05).
   Not done from the pitch: accuracy that improves the longer it holds you
   in its sights (dropped for simplicity), and searching cover-to-cover
   (it searches like any creature, torch first).
+- **Booby-trapped terminals** (`traps.js`; owner 2026-11-06: proximity
+  mines with a visual tell). The fiction: a security guard set off the
+  company's DATA-SECURITY PROTOCOL before the virus took him; some desk
+  terminals were rigged to destroy themselves. The two HQ levels only.
+  - **The tell**: a trapped screen is AMBER with a boxed, centred lock
+    screen and a blinking cursor, among the green screens of work
+    (`deskScreen`, textures.js). It glows, so it shows in the dark.
+  - **Only you set it off**: within 1.5 cells with a clear line. The
+    screen flashes red with a "!", an alarm of rising pips, and TERMINAL
+    SELF-DESTRUCT on the visor; 0.8 s later it blows with a drum's blast
+    (radius 2, 60 at the centre), leaving a charred wreck. Back off at
+    once and you're clear; stand there and it costs about 20.
+  - **Use it**: a round in its screen, or a blast reaching it, sets it off
+    at once: clear it from range, or wait for the suits to pass it. It
+    chains with drums. Guards never take cover behind a live one.
+  - **The objective done** (the lift key, the mother plant) disarms every
+    armed one: the screen goes back to green.
+  - **Which**: 10% of a level's desks (at least one), picked at random
+    each time the level starts, none within 4 cells of your start: you
+    can't learn where they are, only how to spot them. Today that's one
+    per HQ level.
 
 Levers for difficulty: how many robots, which types, how many smart; where
 the cameras look; where repair kits sit (a kit just past a turret's line of

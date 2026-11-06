@@ -73,7 +73,7 @@ function explodeAt(x, y, blast) {
   // CHAIN REACTION: drums in the blast are lit, and go off after a short
   // delay, so a row of drums goes up one after another.
   for (const other of props) {
-    if (other.state !== 'intact' || !SPRITE_TYPES[other.type].explosive) continue;
+    if (other.state !== 'intact' || !(SPRITE_TYPES[other.type].explosive || liveTrap(other))) continue; // drums, and trapped desks (traps.js)
     const od = Math.hypot(other.x - x, other.y - y);
     if (od < blast.radius && clearLine(x, y, other.x, other.y)) {
       other.state = 'fuse';
@@ -84,6 +84,7 @@ function explodeAt(x, y, blast) {
 
 function explodeDrum(drum) {
   drum.state = 'exploded';
+  if (drum.trap) drum.trap.state = 'blown'; // a trapped desk (traps.js) goes up just like a drum
   explodeAt(drum.x, drum.y, DRUM_BLAST);
 }
 

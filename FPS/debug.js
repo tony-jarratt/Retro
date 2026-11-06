@@ -58,7 +58,7 @@ function drawDebug(ctx, player, hits) {
   // Explosive drums are orange until they blow, then a dim ring.
   for (const p of props) {
     const solid = SPRITE_TYPES[p.type].solid && p.state !== 'exploded';
-    ctx.strokeStyle = ctx.fillStyle = p.state === 'exploded' ? '#666' : SPRITE_TYPES[p.type].explosive ? '#f84' : '#eee';
+    ctx.strokeStyle = ctx.fillStyle = p.state === 'exploded' ? '#666' : SPRITE_TYPES[p.type].explosive || liveTrap(p) ? '#f84' : '#eee';
     ctx.beginPath();
     ctx.arc(p.x * s, p.y * s, SOLID_SPRITE_RADIUS * s, 0, Math.PI * 2);
     if (solid) ctx.fill();
