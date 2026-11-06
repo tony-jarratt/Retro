@@ -53,6 +53,7 @@ const FONT = {
   ',': ['...', '...', '...', '.#.', '#..'],
   ':': ['...', '.#.', '...', '.#.', '...'],
   '-': ['...', '...', '###', '...', '...'],
+  '%': ['#.#', '..#', '.#.', '#..', '#.#'],
   "'": ['.#.', '.#.', '...', '...', '...'],
   '!': ['.#.', '.#.', '.#.', '...', '.#.'],
   '?': ['##.', '..#', '.#.', '...', '.#.'],
@@ -281,7 +282,7 @@ function drawHud(pixels) {
   if (game.state === 'title' || game.state === 'briefing') { drawCampaignScreen(pixels); return; } // campaign.js
   if (game.state !== 'dead' && !paused) {
     drawGun(pixels);
-    drawCrosshair(pixels);
+    if (game.state !== 'clear') drawCrosshair(pixels); // it'd sit on the tally
   }
 
   // Red damage flash, fading out over PLAYER_HURT_FLASH seconds.
@@ -321,8 +322,16 @@ function drawHud(pixels) {
     drawTextCentred(pixels, 'TERMINATED', 70, HUD_WARN, 4);
     if (game.endTime > SHUTDOWN_TIME + 1) drawTextCentred(pixels, 'PRESS R TO RESTART', 110, HUD_GREEN, 2);
   } else if (game.state === 'clear') {
-    drawTextCentred(pixels, 'LEVEL COMPLETE', 70, HUD_GREEN, 4);
+    drawTextCentred(pixels, 'LEVEL COMPLETE', 60, HUD_GREEN, 4);
+    // This attempt's tally (campaign.js); the whole run's waits for the roof.
+    const tally = [
+      `TIME      ${clockText(game.playTime)}`,
+      `DESTROYED ${levelKills()}`,
+      `ACCURACY  ${accuracyText(attempt.shots, attempt.hits)}`,
+    ];
+    fillRect(pixels, 116, 88, 88, 31, [8, 12, 10]); // a dark panel, so it reads over the room
+    tally.forEach((line, n) => drawText(pixels, line, 124, 92 + n * 9, HUD_GREEN, 1));
     // The lift goes up: to the next level, or after the last, to the roof (campaign.js).
-    drawTextCentred(pixels, nextLevel() ? 'PRESS ENTER TO GO UP' : 'PRESS ENTER FOR THE ROOF', 110, HUD_GREEN, 2);
+    drawTextCentred(pixels, nextLevel() ? 'PRESS ENTER TO GO UP' : 'PRESS ENTER FOR THE ROOF', 126, HUD_GREEN, 2);
   }
 }

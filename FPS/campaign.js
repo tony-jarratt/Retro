@@ -13,7 +13,7 @@
 //             over the complex, the ending, and what your run took.
 //
 // Each level is its own page load (map.js reads ?level= once, at the start),
-// so the RUN (time, kills, rounds, failures) is kept between them in the
+// so the RUN (time, kills, rounds, hits, failures) is kept between them in the
 // browser's sessionStorage, which lasts as long as the tab. So is your
 // LOADOUT: the armour, ammo and gun modules you take up in the lift go with
 // you into the next level (keycards and the charge belong to their level).
@@ -43,10 +43,12 @@ const ENDING_LINE_GAP = 2.2;     // seconds between the ending's lines appearing
 const RUN_KEY = 'veridian-run';
 
 // THE RUN so far: time (seconds playing), kills, shots (rounds fired),
-// failures (times terminated), and loadout: what you took into the lift, as
+// hits (rounds that struck something hostile: see countsAsHit), failures
+// (times terminated), cleared (levels finished, for the rating's par time),
+// and loadout: what you took into the lift, as
 // { level (the id of the level it's for), armour, ammo, modes }, or null.
 function freshRun() {
-  return { time: 0, kills: 0, shots: 0, failures: 0, loadout: null };
+  return { time: 0, kills: 0, shots: 0, hits: 0, failures: 0, cleared: 0, loadout: null };
 }
 function loadRun() {
   try {
@@ -88,9 +90,71 @@ function levelKills() {
   return enemies.filter((e) => e.state === 'dead' && !(e.downTime > 0)).length + dead(drones) + dead(larvae) + dead(moths);
 }
 
-// combat.js, each round fired.
-function countShot() {
+// THIS ATTEMPT at this level, for the LEVEL COMPLETE tally. (Its time is
+// game.playTime, its kills levelKills(); the page reloads for each level and
+// each restart, so these start at zero every time.)
+const attempt = { shots: 0, hits: 0 };
+
+// combat.js, each round fired, and whether it struck something hostile.
+function countShot(hit) {
   run.shots += 1;
+  attempt.shots += 1;
+  if (!hit) return;
+  run.hits += 1;
+  attempt.hits += 1;
+}
+
+// What counts as a HIT for accuracy: anything that's fighting you, or a
+// target you'd mean to shoot (a camera, the core, a fuel drum that's still
+// whole). Not windows, struts, walls, or a corpse that's staying down.
+function countsAsHit(target) {
+  if (!target) return false;
+  if (target.enemy) return target.enemy.state !== 'dead' || target.enemy.downTime > 0; // a downed suit, finished off
+  if (target.prop) return Boolean(SPRITE_TYPES[target.prop.type].explosive) && target.prop.state !== 'exploded';
+  return Boolean(target.camera || target.drone || target.larva || target.moth || target.core);
+}
+
+// Accuracy as a whole percentage, or null if nothing was fired (shown as --).
+function accuracy(shots, hits) {
+  return shots > 0 ? Math.round(100 * hits / shots) : null;
+}
+function accuracyText(shots, hits) {
+  const pct = accuracy(shots, hits);
+  return pct === null ? '--' : `${pct}%`;
+}
+function clockText(seconds) {
+  const mins = Math.floor(seconds / 60), secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// THE RATING at the end. Deliberately not shown on screen, only the grade:
+// out of 100,
+//   accuracy  40 points, in full at RATING_FULL_ACCURACY (spraying on auto
+//             has to cost you, but nobody hits every round)
+//   speed     35 points, in full at or under par (RATING_PAR_PER_LEVEL for
+//             each level cleared), falling off as par / time beyond it
+//   survival  25 points, less RATING_FAILURE_COST for each suit failure
+const RATING_FULL_ACCURACY = 0.5;
+const RATING_PAR_PER_LEVEL = 6 * 60; // seconds: a guess, to tune after play-testing
+const RATING_FAILURE_COST = 6;
+const RATING_GRADES = [ // from the top: the first whose score you reach
+  { min: 90, grade: 'S', title: 'UNSTOPPABLE' },
+  { min: 75, grade: 'A', title: 'VETERAN' },
+  { min: 60, grade: 'B', title: 'OPERATIVE' },
+  { min: 40, grade: 'C', title: 'SURVIVOR' },
+  { min: 0, grade: 'D', title: 'SALVAGE' },
+];
+function runScore() {
+  const acc = run.shots > 0 ? run.hits / run.shots : 0;
+  const par = Math.max(1, run.cleared) * RATING_PAR_PER_LEVEL;
+  const accuracyPoints = 40 * Math.min(1, acc / RATING_FULL_ACCURACY);
+  const speedPoints = 35 * Math.min(1, par / Math.max(1, run.time));
+  const survivalPoints = Math.max(0, 25 - RATING_FAILURE_COST * run.failures);
+  return accuracyPoints + speedPoints + survivalPoints;
+}
+function runRating() {
+  const score = runScore();
+  return RATING_GRADES.find((g) => score >= g.min);
 }
 
 // How the page opens: the title if no level was asked for, else that level's briefing.
@@ -119,6 +183,7 @@ function handleEnter() {
   } else if (game.state === 'clear') {
     const next = nextLevel();
     run.kills += levelKills();
+    run.cleared += 1;
     run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes] } : null;
     saveRun();
     game.state = 'lift';
@@ -246,15 +311,22 @@ function drawFinale(pixels) {
   const shown = Math.min(ENDING.length, Math.floor(finaleTime / ENDING_LINE_GAP) + 1);
   for (let n = 0; n < shown; n++) drawTextCentred(pixels, ENDING[n], 14 + n * 10, n === ENDING.length - 1 ? HUD_GREEN : [235, 225, 210], 1);
   if (finaleTime > ENDING.length * ENDING_LINE_GAP) {
-    const mins = Math.floor(run.time / 60), secs = Math.floor(run.time % 60);
     const stats = [
-      `TIME          ${mins}:${String(secs).padStart(2, '0')}`,
+      `TIME          ${clockText(run.time)}`,
       `DESTROYED     ${run.kills}`,
       `ROUNDS FIRED  ${run.shots}`,
+      `ACCURACY      ${accuracyText(run.shots, run.hits)}`,
       `SUIT FAILURES ${run.failures}`,
     ];
-    stats.forEach((line, n) => drawText(pixels, line, 100, 82 + n * 10, HUD_GREEN, 1));
-    drawTextCentred(pixels, 'THE END', 130, TITLE_GOLD, 3);
+    stats.forEach((line, n) => drawText(pixels, line, 100, 78 + n * 9, HUD_GREEN, 1));
+  }
+  // A beat later, the grade: the letter big, and what it makes you.
+  if (finaleTime > ENDING.length * ENDING_LINE_GAP + 1) {
+    const rating = runRating();
+    drawText(pixels, 'RATING', 100, 131, HUD_GREEN, 1);
+    drawText(pixels, rating.grade, 156, 125, TITLE_GOLD, 3);
+    drawText(pixels, rating.title, 172, 131, TITLE_GOLD, 1);
+    drawTextCentred(pixels, 'THE END', 150, TITLE_GOLD, 2);
   }
   if (finaleTime > ENDING.length * ENDING_LINE_GAP + 2 && Math.floor(performance.now() / 600) % 2 === 0) {
     drawTextCentred(pixels, 'PRESS ENTER', 182, HUD_GREEN, 1);

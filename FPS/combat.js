@@ -105,7 +105,6 @@ function fireRound() {
   sfxPlayerShot(gun.pullMode); // sound.js
   makeNoise(player.x, player.y, SHOT_NOISE[gun.pullMode]); // the lab's creatures hear it (creatures.js)
   mothsSeeFlash(player.x, player.y);                        // and the HQ's moths see the flash (pollinators.js)
-  countShot();                                              // campaign.js: the run's numbers
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
@@ -113,6 +112,7 @@ function fireRound() {
   const cone = mode.cone + mode.climb * gun.burstRound + (player.moving ? MOVING_CONE : 0);
   gun.burstRound += 1;
   const target = shotTarget(player.angle + (Math.random() * 2 - 1) * cone);
+  countShot(countsAsHit(target)); // campaign.js: the run's numbers (before the hit, which may kill it)
   if (target) shotHits(target);
 }
 

@@ -182,10 +182,25 @@ of the Veridian Group complex and fight your way UP: industrial sector
   on to the ROOF.
 - **Finale**: dawn over the complex from its roof, the ending a line at a
   time ("...something is still growing"), and the run's numbers: time,
-  destroyed, rounds fired, suit failures. Enter: back to the title.
+  destroyed, rounds fired, accuracy, suit failures, then a beat later a
+  RATING: a grade and a title (S UNSTOPPABLE, A VETERAN, B OPERATIVE,
+  C SURVIVOR, D SALVAGE). Enter: back to the title.
+- **LEVEL COMPLETE** shows that attempt's tally: time, destroyed, accuracy.
+- **Accuracy** = hits / rounds fired. A hit is a round that strikes something
+  hostile or meant to be shot: a live enemy, a downed suit (finishing it),
+  a camera, drone, larva, moth, the core, or a whole fuel drum. Windows,
+  struts, walls and corpses don't count.
+- **The rating** is kept HIDDEN on screen (owner's choice); only the grade
+  shows. Out of 100: accuracy 40 (full at 50%), speed 35 (full at or under
+  par = 6 min per level cleared, else par/time), survival 25 (−6 per suit
+  failure). S ≥ 90, A ≥ 75, B ≥ 60, C ≥ 40, else D. Constants at the top of
+  the rating in `campaign.js`; par is a guess to tune after play-testing.
 - **The run's numbers** are kept between levels (each level is a page load)
   in sessionStorage. R after dying replays that level from its briefing,
-  and counts a suit failure.
+  and counts a suit failure. Time, rounds and hits from a failed attempt
+  stay in the run; kills only count when a level is cleared.
+- "Levels completed" was considered and dropped: a run can only end at the
+  finale, so it would always read 6/6.
 - **Music**: 80s synth, generated (`music.js`): a step sequencer with a saw
   bass, detuned pads, arps with echo, a lead, a drum machine. Tracks: title
   (A minor, heroic), industrial (E minor, driving), lab (cold, a heartbeat),
