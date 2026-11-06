@@ -212,6 +212,10 @@ LEVELS.push({
     { type: 'repair',  x: 1.5,  y: 22.5 }, // hangar
     { type: 'ammo',    x: 30.5, y: 22.5 }, // hangar
     { type: 'ammo',    x: 16.5, y: 22.5 }, // hangar, middle
+    // ARMOUR-PIERCING ROUNDS (ammo.js): first found here, through the depot door, in plain sight.
+    { type: 'piercing', x: 9.5,  y: 6.5 },  // fuel depot, by its door: where you find the type
+    { type: 'piercing', x: 29.5, y: 12.5 }, // workshop, by its repair bay
+    { type: 'piercing', x: 24.5, y: 21.5 }, // hangar, near the core
   ],
 
   // Steam vents (steam.js): floor cells that blow scalding, sight-blocking

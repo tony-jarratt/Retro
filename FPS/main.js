@@ -91,6 +91,7 @@ setupInput(screenCanvas, {
   enter: handleEnter, // campaign.js: on to whatever's next
   levelChooser: () => { if (PLAYTEST) location.search = '?playtest'; },
   togglePause, // pause.js
+  loadAmmo,    // ammo.js: keys 1-3
 });
 
 // THE PLAY-TEST LEVEL CHOOSER: with ?playtest and no level picked yet, show a
@@ -144,6 +145,7 @@ function frame(now) {
       updateRepairBays(); // repair.js: free the bay of a robot that died on its way
       updateManagers(dt); // manager.js: the PA, the badge, cut lights and sealed doors running down
       updateTraps(dt);    // traps.js: trapped terminals you've come too close to
+      updateBurning(dt);  // ammo.js: creatures alight from incendiary rounds
     }
     updateCombat(dt);
     updateWeapons(dt);

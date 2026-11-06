@@ -32,6 +32,15 @@ const PICKUP_TYPES = {
       return true;
     },
   },
+  // Boxes of special rounds (ammo.js): the first of each type is how you find it.
+  incendiary: {
+    texture: ROUNDS_BOX_TEXTURES.incendiary,
+    collect: () => { collectRounds('incendiary'); return true; },
+  },
+  piercing: {
+    texture: ROUNDS_BOX_TEXTURES.piercing,
+    collect: () => { collectRounds('piercing'); return true; },
+  },
   // Fire-mode upgrade modules for your gun (weapons.js): switched on at once.
   burstmod: {
     texture: BURST_MODULE_TEXTURE,

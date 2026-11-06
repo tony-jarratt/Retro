@@ -168,6 +168,7 @@ const enemies = ENEMIES.map((start) => ({
   pair: start.pair || null, // lurchers that hunt together share a tag (creatures.js)
   pairCalled: false, pairCaller: false,
   repairTime: 0, // seconds of welding towards the next hit restored
+  burn: 0,       // seconds of burning left, from an incendiary round (ammo.js); 0 = not alight
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°

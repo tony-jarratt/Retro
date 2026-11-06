@@ -1129,10 +1129,12 @@ function makeDeskWreck() {
 // It isn't drawn in the world: hud.js stamps it onto the bottom of the screen
 // at 2x size. `flash` draws it firing. The coils show the FIRE MODE
 // (weapons.js): `lit` of them glow, counting from the body: one is single
-// shot, two burst, three automatic. Only the count means anything; the coil
-// colour is kept free to mean something else later (an ammo type, say).
-const COIL_COLOUR = [90, 230, 255];
-function makeGun(flash, lit) {
+// shot, two burst, three automatic. Their COLOUR is the AMMO loaded
+// (ammo.js: cyan standard, orange incendiary, white armour-piercing), and
+// so is the muzzle flash's.
+const COIL_COLOUR = AMMO_TYPES.standard.coil;
+function makeGun(flash, lit, ammo) {
+  const { coil, star } = AMMO_TYPES[ammo];
   return makeTexture(DARK_STEEL, (x, y) => {
     const dx = x + 0.5 - 32;
     if (flash && y >= 0 && y < 14) {
@@ -1140,8 +1142,8 @@ function makeGun(flash, lit) {
       const fy = y + 0.5 - 7;
       const r = 4.5 + 3.5 * Math.abs(Math.cos(4 * Math.atan2(fy, dx)));
       const d = Math.hypot(dx, fy);
-      if (d <= r * 0.5) return [230, 255, 255];
-      if (d <= r) return [90, 210, 255];
+      if (d <= r * 0.5) return star[0];
+      if (d <= r) return star[1];
     }
     // Still a chunky block of pixels, but shaped rather than stacked boxes:
     // the barrel tapers to a flared muzzle, sloping shoulders join it to the
@@ -1158,7 +1160,7 @@ function makeGun(flash, lit) {
       const halfW = 3 + (y - 13) * 0.15;
       if (ax >= halfW) return null;
       const n = [24, 20, 16].indexOf(y);                                  // coil 0 nearest the body
-      if (n !== -1 && n < lit) return glowing(COIL_COLOUR);               // a lit coil
+      if (n !== -1 && n < lit) return glowing(coil);                      // a lit coil
       if (n !== -1) return [30, 34, 40];                                  // an unlit one
       if (y < 15) return brighten(DARK_STEEL, roundShade(dx / halfW));    // bare barrel tip
       return brighten(DARK_STEEL, roundShade(dx / halfW) * 1.3);
@@ -1220,6 +1222,40 @@ function makeAmmoBox() {
     if (Math.abs(dx) > 11 || y === 51) return brighten(olive, 0.55);  // edges
     if (y >= 55 && y < 58) return hazard(x, y, false);
     return brighten(olive, 0.9 + 0.15 * noise(x, y, 18));
+  });
+}
+
+// A box of SPECIAL ROUNDS (ammo.js): a small dark steel case, its lid open
+// on a row of rounds whose tips glow the type's colour, and a band of it
+// round the case. Smaller and darker than the olive ammo box, so it reads as different.
+function makeRoundsBox(ammo) {
+  const colour = AMMO_TYPES[ammo].coil;
+  return makeTexture(colour, (x, y) => {
+    const dx = x + 0.5 - 32;
+    const ax = Math.abs(dx);
+    if (y >= 48 && y < 51 && ax < 8 && Math.floor(dx + 8) % 3 !== 2) return y === 48 ? glowing(colour) : brighten(colour, 0.7); // the rounds' tips
+    if (y < 51 || ax > 9) return null;
+    if (ax > 8 || y === 51 || y === 62) return brighten(DARK_STEEL, 0.6);   // edges
+    if (y >= 55 && y < 58) return glowing(brighten(colour, 0.8));          // the band
+    return brighten(DARK_STEEL, 1.1 + 0.2 * noise(x, y, 21));
+  });
+}
+
+// FLAMES on a burning creature (ammo.js), drawn over it: tongues of fire
+// licking up from its middle, ragged and moving from frame to frame, with
+// gaps between them so the body shows through. Glowing, so they light the dark.
+function makeFlames(frame) {
+  return makeTexture(SODIUM, (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (y < 18 || y > 58 || Math.abs(dx) > 14) return null;
+    // Each column has its own tongue height, wobbling with the frame.
+    const top = 22 + 16 * noise(x >> 1, frame, 70) + 0.04 * dx * dx;
+    if (y < top) return null;
+    const n = noise(x, y + frame * 7, 71);
+    if (n < 0.45) return null; // gaps: you see the creature burning, not a wall of fire
+    const t = (y - top) / (58 - top); // 0 at the tongue's tip, 1 at its root
+    if (t > 0.6 && n > 0.8) return glowing([255, 240, 170]);
+    return glowing(t < 0.3 ? [220, 60, 20] : [255, 150, 40]);
   });
 }
 
@@ -1336,9 +1372,12 @@ const REPAIR_BAY_TEXTURES = [0, 1, 2, 3].map((charges) => [0, 1, 2].map((weld) =
 const REPAIR_BAY_WRECK = makeRepairBay(0, 0, true);
 const SPARK_TEXTURES = [0, 1, 2].map(makeSparks);
 // The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
-// GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
-const GUN_TEXTURES = [1, 2, 3].map((lit) => [makeGun(false, lit), makeGun(true, lit)]);
-GUN_TEXTURES.unshift(null); // so GUN_TEXTURES[1] is one coil, not GUN_TEXTURES[0]
+// GUN_TEXTURES[ammo][n] is the gun loaded with that ammo type (ammo.js), n
+// coils lit: [normal, firing]. ([ammo][0] is null, so [ammo][1] is one coil.)
+const GUN_TEXTURES = {};
+for (const ammo of AMMO_ORDER) GUN_TEXTURES[ammo] = [null, ...[1, 2, 3].map((lit) => [makeGun(false, lit, ammo), makeGun(true, lit, ammo)])];
+const ROUNDS_BOX_TEXTURES = { incendiary: makeRoundsBox('incendiary'), piercing: makeRoundsBox('piercing') };
+const FLAME_FRAMES = [0, 1, 2].map(makeFlames);
 const BURST_MODULE_TEXTURE = makeUpgradeModule(2);
 const AUTO_MODULE_TEXTURE = makeUpgradeModule(3);
 

@@ -177,6 +177,10 @@ LEVELS.push({
     { type: 'ammocrate', x: 26.5, y: 10.5 },
     { type: 'repair',    x: 13.5, y: 10.5 },
     { type: 'ammo',      x: 7.5,  y: 18.5 }, // boardroom
+    // Special rounds (ammo.js): fire counts double on the mother plant.
+    { type: 'incendiary', x: 3.5,  y: 1.5 },  // front desk
+    { type: 'incendiary', x: 24.5, y: 15.5 }, // atrium
+    { type: 'piercing',   x: 22.5, y: 1.5 },  // exec lounge
   ],
 
   // Signs, and fallen leaves drifting through the atrium. (More leaves and

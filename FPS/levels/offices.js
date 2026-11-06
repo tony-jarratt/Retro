@@ -144,6 +144,9 @@ LEVELS.push({
     { type: 'ammo',      x: 16.5, y: 18.5 }, // the archive
     { type: 'liftkey',   x: 25.5, y: 17.5 }, // facilities: the objective
     { type: 'ammo',      x: 18.5, y: 14.5 },
+    // Special rounds (ammo.js): piercing for the guard behind its desk, fire for the infected.
+    { type: 'piercing',   x: 12.5, y: 14.5 }, // the archive
+    { type: 'incendiary', x: 19.5, y: 11.5 }, // the open plan
   ],
 
   decals: [

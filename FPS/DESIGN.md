@@ -66,8 +66,28 @@ One pulse gun. You never switch it: it **spins up**.
 
 Letting go drops it back to single. **Modules** found in the level decide how
 far it can spin up (burst module, auto module). **Low ammo** holds it back:
-burst needs 3, auto needs 8. Walking widens every cone. Lit coils on the
-barrel show the stage (count only — colour is reserved for a future ammo type).
+burst needs 3, auto needs 8 (of the loaded type). Walking widens every cone.
+Lit coils on the barrel show the stage by their count; their colour is the
+ammo loaded.
+
+### Ammo types (`ammo.js`, owner 2026-11-06)
+
+Three kinds of round; keys **1 2 3** load them. The coils and the muzzle
+flash take the type's colour, the gun's red counter shows that type's rounds,
+and the visor's bottom rim names it (with the keys of the other types you've
+found beside it, dim). Run a special type dry and it drops back to standard.
+
+| Key | Type | For | Does |
+|---|---|---|---|
+| 1 | Standard (cyan) | everything | the bulk of your ammo |
+| 2 | Incendiary (orange) | the living | sets a creature alight: it lights up (the stalker too) and takes one more hit 1.5 s later (hitting it again restarts the burn: still one extra). Dies burning = burnt: a suit stays down, no food for lurchers, a bloomer doesn't burst. Double on the chamber and the mother plant. **Catch:** a big bright flash that lights you up for the creatures; moths see it from twice as far |
+| 3 | Armour-piercing (white) | machines, crowds | double on robots, bays and the security core (a heavy's back takes 4); goes through glass (cracking it) and through the first thing it hits into the next |
+
+Boxes of 6, placed only, never dropped. **Discovered as you climb**: you
+can't load a type until you've picked up its first box, which tells you its
+key. Piercing is first found in the industrial level (by the depot door),
+incendiary in storage (end of the long corridor). Rounds and found types go
+up in the lift with the loadout.
 
 ---
 
@@ -552,7 +572,8 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 - Spawn events beyond the brood mother (telegraphed scripted ambushes, an
   industrial fabricator) were proposed and NOT taken up (owner, 2026-11-06:
   spawning should feel like a lab-only thing).
-- Ammo types (the gun's coil colour is reserved for this).
+- A configurable visor (owner, later): the readouts are separate pieces
+  (`VISOR_SHOWS_AMMO` in ammo.js is the first such switch).
 - Rebalancing the sound mix (relative volumes).
 
 ---
@@ -560,7 +581,7 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 ## 10. Controls
 
 Click to capture the mouse (Esc frees) · WASD move · ←/→ turn · click / ↑
-fire (hold to spin up) · N sound · U music · R restart (once you've died) ·
+fire (hold to spin up) · 1 2 3 load standard / incendiary / piercing · N sound · U music · R restart (once you've died) ·
 Enter carry on (title, briefing, LEVEL COMPLETE, finale) · P pause (shows
 the controls; R and Enter aren't listed, the screens that use them say so;
 the page itself has no help text) · with `?playtest` only: M map, V visor,

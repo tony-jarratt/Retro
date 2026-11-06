@@ -21,6 +21,7 @@ const CONTROLS = [
   ['WASD', 'MOVE'],
   ['LEFT / RIGHT', 'TURN'],
   ['CLICK / UP', 'FIRE  HOLD TO SPIN UP'],
+  ['1 2 3', 'LOAD STANDARD  INCENDIARY  PIERCING'],
   ['CLICK VIEW', 'CAPTURE MOUSE'],
   ['ESC', 'FREE MOUSE'],
   ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT']] : []),

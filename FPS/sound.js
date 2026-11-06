@@ -244,7 +244,9 @@ function drumHit(dest, type, f0, f1, drop, dur, vol, delay = 0) {
 //          skipping the gun channel's distortion, which would round it off.
 // Each mode is pitched a little differently, so you can hear what it's
 // doing; automatic is shorter still, so rapid fire stays a drum roll.
-function sfxPlayerShot(mode) {
+// The AMMO TYPE (ammo.js) adds its own layer: an incendiary round a low
+// whoomph of burning air, an armour-piercing one a hard metallic ring.
+function sfxPlayerShot(mode, ammo = 'standard') {
   if (!audioReady()) return;
   const pitch = { single: 1, burst: 0.92, auto: 0.85 }[mode];
   const len = mode === 'auto' ? 0.7 : 1;
@@ -254,6 +256,29 @@ function sfxPlayerShot(mode) {
   tone(audio.gun, 'sawtooth', 700 * pitch, 260 * pitch, 0.05, 0.12);        // zap
   noiseBurst(audio.master, 'highpass', 1500, 4000, 0.015, 0.65);            // crack...
   tone(audio.master, 'square', 3000, 2200, 0.004, 0.3);                     // ...and its click
+  if (ammo === 'incendiary') {
+    noiseBurst(audio.gun, 'lowpass', 900, 300, 0.18, 0.6);                   // whoomph
+    tone(audio.gun, 'sawtooth', 160, 60, 0.15, 0.15);
+  }
+  if (ammo === 'piercing') {
+    tone(audio.master, 'sine', 3400, 3300, 0.12, 0.1);                       // ring
+    tone(audio.master, 'sine', 5100, 5000, 0.08, 0.06);
+  }
+}
+
+// Loading another ammo type (ammo.js): the old rounds out, the new ones in.
+function sfxLoadAmmo() {
+  if (!audioReady()) return;
+  metalClack(1700, 0.2, 0);
+  metalClack(950, 0.3, 0.12);
+}
+
+// A creature catching fire (ammo.js): a soft rush of flame.
+function sfxIgnite(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'bandpass', 700, 1800, 0.35, 0.5);
+  noiseBurst(out, 'lowpass', 400, 200, 0.4, 0.4, 0.05);
 }
 
 // Pulling the trigger on an empty gun: the firing pin snapping on nothing
@@ -715,6 +740,7 @@ function sfxPickup(type) {
   if (type === 'ammo') { metalClack(1300, 0.3, 0); metalClack(820, 0.4, 0.09); return; }
   if (type === 'ammocrate') { metalClack(1100, 0.35, 0); metalClack(700, 0.4, 0.08); metalClack(900, 0.35, 0.17); return; }
   if (type === 'clip') { metalClack(1500, 0.25, 0); return; }
+  if (type === 'incendiary' || type === 'piercing') { metalClack(1900, 0.25, 0); metalClack(1200, 0.3, 0.07); metalClack(1600, 0.25, 0.14); return; } // ammo.js
   const notes = {
     repair: [440, 554, 660, 880],
     redkey: [988, 1319, 1976], bluekey: [988, 1319, 1976],
@@ -924,7 +950,7 @@ function fadeOutLoops() {
 function rememberState() {
   for (const d of DOORS) last.doors.set(d, d.state);
   for (const p of PANELS) last.panels.set(p, p.state);
-  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime, pairCaller: e.pairCaller, radioCalls: e.radioCalls, torchBroken: e.torchBroken });
+  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime, pairCaller: e.pairCaller, radioCalls: e.radioCalls, torchBroken: e.torchBroken, burn: e.burn });
   last.pickups = new Set(pickups);
   for (const h of hives) last.hives.set(h, h.left);
   for (const t of terminals) last.terminals.set(t, t.state);
@@ -975,6 +1001,7 @@ function watchTheGame() {
     if (e.pairCaller && !was.pairCaller) sfxPairCall(e);           // creatures.js: a pair has seen you
     if (e.radioCalls > was.radioCalls) sfxRadio(e);                // guard.js: calling it in
     if (e.torchBroken && !was.torchBroken) sfxTorchBreak(e);       // ...its torch shot out
+    if (e.burn > was.burn) sfxIgnite(e);                           // ammo.js: set alight (or alight again)
     if (e.state === 'reload' && was.state !== 'reload') sfxGuardReload(e, GUARD_RELOAD);
     if (creature && e.state !== was.state) {
       if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) {

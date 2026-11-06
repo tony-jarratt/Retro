@@ -59,9 +59,10 @@ function wakeAllMoths() {
 }
 
 // You fired, at (x, y) (combat.js): every pack that can see the flash comes.
-function mothsSeeFlash(x, y) {
+// `reach` scales how far: an incendiary round's flash is seen from further (ammo.js).
+function mothsSeeFlash(x, y, reach = 1) {
   for (const m of moths) {
-    if (m.state === 'circling' && Math.hypot(m.x - x, m.y - y) < MOTH_FLASH_RANGE && clearLine(m.x, m.y, x, y)) wakeMothPack(m.pack);
+    if (m.state === 'circling' && Math.hypot(m.x - x, m.y - y) < MOTH_FLASH_RANGE * reach && clearLine(m.x, m.y, x, y)) wakeMothPack(m.pack);
   }
 }
 

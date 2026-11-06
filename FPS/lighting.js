@@ -25,7 +25,6 @@ const FULL_LIGHT = [1, 1, 1];
 const LAMP_LIGHT = { colour: [1.4, 0.85, 0.35], radius: 4.5 };    // caged sodium lamps
 const CEILING_LIGHT = THEME.ceilingLight;                         // the theme's (map.js: THEMES)
 const SCREEN_LIGHT = { colour: [0.15, 0.5, 0.25], radius: 2.5 };  // computer banks: a green spill
-const PLAYER_FLASH_RADIUS = 5;                                    // your gun (its colour: GUN_FLASH_LIGHT, weapons.js)
 const ROBOT_FLASH = { colour: [1.4, 1.0, 0.5], radius: 4.5 };     // a walker's chin gun
 
 // A light map: 3 floats (R, G, B) per sample, row after row like everything else.
@@ -242,7 +241,8 @@ function updateLighting() {
   // Muzzle flashes, fading as their flash timers run down. Worked out fresh
   // each frame (shadows and all), which is affordable for a light or two.
   if (gun.flash > 0) {
-    addLight(lightGrid, player.x, player.y, GUN_FLASH_LIGHT, PLAYER_FLASH_RADIUS, gun.flash / GUN_FLASH_TIME);
+    const round = AMMO_TYPES[gun.flashType]; // ammo.js: an incendiary round's flash is bigger and brighter
+    addLight(lightGrid, player.x, player.y, round.light, round.radius, gun.flash / GUN_FLASH_TIME);
   }
   for (const e of enemies) {
     // A spitter has no muzzle flash (its glob carries its own light, acid.js); a guard's pistol does.
@@ -266,6 +266,7 @@ function updateLighting() {
   addGuardLights(lightGrid);    // guards' torches (guard.js)
   addAcidLights(lightGrid);     // globs in flight and pools of acid (acid.js)
   addSporeLights(lightGrid);    // spore clouds' glowing motes (spores.js)
+  addBurnLights(lightGrid);     // creatures on fire (ammo.js)
 
   dilateIntoWalls(lightGrid);
 }

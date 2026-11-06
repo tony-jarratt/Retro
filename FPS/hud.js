@@ -130,7 +130,9 @@ function drawGun(pixels) {
   // +18 sinks the gun so its muzzle sits well below the crosshair, with the
   // hand's bottom edge off screen.
   const y = SCREEN_H - GUN_SIZE + 18 + bobY + recoil;
-  drawTextureFlat(pixels, GUN_TEXTURES[litCoils()][gun.flash > 0 ? 1 : 0], x, y, GUN_SIZE);
+  // Firing, the flash is the round's type; otherwise the coils show what's loaded (ammo.js).
+  const ammo = gun.flash > 0 ? gun.flashType : player.loaded;
+  drawTextureFlat(pixels, GUN_TEXTURES[ammo][litCoils()][gun.flash > 0 ? 1 : 0], x, y, GUN_SIZE);
   drawAmmoCounter(pixels, x, y);
 }
 
@@ -201,7 +203,8 @@ function drawArmour(pixels) {
 //      ddd
 // Unlit segments still glow faintly, as on a real panel. It's drawn straight
 // onto the screen each frame, over the gun's dark counter window, so it
-// moves with the gun and always shows the live count. Empty, it blinks 00.
+// moves with the gun and always shows the live count of the LOADED type
+// (ammo.js). Empty, it blinks 00.
 const SEGMENTS = {
   a: [[0, 0], [1, 0], [2, 0]], b: [[2, 0], [2, 1], [2, 2]], c: [[2, 2], [2, 3], [2, 4]],
   d: [[0, 4], [1, 4], [2, 4]], e: [[0, 2], [0, 3], [0, 4]], f: [[0, 0], [0, 1], [0, 2]],
@@ -222,12 +225,32 @@ function drawSegmentDigit(pixels, digit, x, y, lit) {
 // gunX, gunY: where drawGun put the gun's top-left corner. The counter window
 // is texture rows 37-42, centred, so 38 * (GUN_SIZE / 64) down from the top.
 function drawAmmoCounter(pixels, gunX, gunY) {
-  const shown = Math.min(99, player.ammo);
+  const shown = Math.min(99, roundsLoaded());
   const lit = shown > 0 || Math.floor(animTime * 3) % 2 === 0; // empty: blink
   const cx = gunX + GUN_SIZE / 2;
   const top = gunY + Math.round(38 * GUN_SIZE / TEX_SIZE);
   drawSegmentDigit(pixels, Math.floor(shown / 10), cx - 4, top, lit);
   drawSegmentDigit(pixels, shown % 10, cx, top, lit);
+}
+
+// THE LOADED AMMO, in the middle of the visor's bottom rim: the type's name
+// in its colour, and its key. Once you've found a special type, the keys
+// of the others you've found sit beside it, dim in their colours (dimmer still if empty). (VISOR_SHOWS_AMMO,
+// ammo.js: kept separate, for when the visor's readouts can be chosen.)
+function drawAmmoReadout(pixels) {
+  if (!VISOR_SHOWS_AMMO) return;
+  const types = AMMO_ORDER.filter((t) => t === 'standard' || player.found.includes(t));
+  const label = (t) => t === player.loaded ? AMMO_TYPES[t].key + ' ' + AMMO_TYPES[t].name : String(AMMO_TYPES[t].key);
+  const gap = 6;
+  const width = types.reduce((w, t) => w + textWidth(label(t), 1), 0) + gap * (types.length - 1);
+  let x = Math.floor((SCREEN_W - width) / 2);
+  for (const t of types) {
+    const colour = AMMO_TYPES[t].coil;
+    const empty = roundsOf(t) === 0;
+    const shade = t === player.loaded ? 1 : empty ? 0.25 : 0.5;
+    drawText(pixels, label(t), x, READOUT_Y, colour.map((c) => Math.round(c * shade)), 1);
+    x += textWidth(label(t), 1) + gap;
+  }
 }
 
 // The keycards you're carrying: a small card in each colour, just left of the ammo count.
@@ -296,6 +319,7 @@ function drawHud(pixels) {
   if (visorOn) applyVisor(pixels);
 
   drawArmour(pixels);
+  drawAmmoReadout(pixels);
   drawKeys(pixels);
   if (paused) { drawPauseScreen(pixels); return; } // pause.js: the controls, instead of any messages
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);
@@ -314,7 +338,10 @@ function drawHud(pixels) {
       drawTextCentred(pixels, badgeShown[0], 146, [30, 30, 36], 1);
       drawTextCentred(pixels, badgeShown[1], 153, [80, 80, 90], 1);
     }
-    if (weaponMessageTime > 0) drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
+    if (weaponMessageTime > 0) {
+      drawTextCentred(pixels, weaponMessage, 62, HUD_GREEN, 2); // weapons.js
+      if (weaponMessageLine) drawTextCentred(pixels, weaponMessageLine, 78, HUD_GREEN, 1);
+    }
     if (securityMessageTime > 0) {
       const ok = securityMessage === 'CAMERAS OFFLINE' || securityMessage === OBJECTIVE_LOOK.goal;
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);

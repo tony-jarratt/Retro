@@ -106,6 +106,9 @@ LEVELS.push({
     { type: 'ammo',      x: 26.5, y: 14.5 },  // the tank hall's bottom aisle
     { type: 'ammo',      x: 1.5,  y: 9.5 },  // the service passage
     { type: 'ammocrate', x: 1.5,  y: 17.5 },
+    // INCENDIARY ROUNDS (ammo.js): first found here, at the end of the long corridor.
+    { type: 'incendiary', x: 26.5, y: 2.5 },
+    { type: 'incendiary', x: 17.5, y: 16.5 }, // the cold store
   ],
 
   vents: [

@@ -15,7 +15,7 @@
 // Each level is its own page load (map.js reads ?level= once, at the start),
 // so the RUN (time, kills, rounds, hits, failures) is kept between them in the
 // browser's sessionStorage, which lasts as long as the tab. So is your
-// LOADOUT: the armour, ammo and gun modules you take up in the lift go with
+// LOADOUT: the armour, ammo (special rounds too: ammo.js) and gun modules you take up in the lift go with
 // you into the next level (keycards and the charge belong to their level).
 // Die there, and you replay it with what you arrived with.
 //
@@ -46,7 +46,7 @@ const RUN_KEY = 'veridian-run';
 // hits (rounds that struck something hostile: see countsAsHit), failures
 // (times terminated), cleared (levels finished, for the rating's par time),
 // and loadout: what you took into the lift, as
-// { level (the id of the level it's for), armour, ammo, modes }, or null.
+// { level (the id of the level it's for), armour, ammo, modes, rounds, found, loaded }, or null.
 function freshRun() {
   return { time: 0, kills: 0, shots: 0, hits: 0, failures: 0, cleared: 0, loadout: null };
 }
@@ -74,13 +74,22 @@ function applyLoadout() {
   const kit = run.loadout;
   if (!kit || kit.level !== CURRENT_LEVEL.id || game.state !== 'briefing') return;
   const modesOk = Array.isArray(kit.modes) && kit.modes.length > 0 && kit.modes.every((m) => m in FIRE_MODES);
-  if (!Number.isFinite(kit.armour) || !Number.isFinite(kit.ammo) || !modesOk) {
+  // Special rounds (ammo.js). A loadout saved before there were any has none: that's fine.
+  const rounds = kit.rounds || { incendiary: 0, piercing: 0 };
+  const found = kit.found || [];
+  const loaded = kit.loaded || 'standard';
+  const ammoOk = SPECIAL_AMMO.every((t) => Number.isFinite(rounds[t])) && Array.isArray(found) &&
+    found.every((t) => SPECIAL_AMMO.includes(t)) && (loaded === 'standard' || found.includes(loaded));
+  if (!Number.isFinite(kit.armour) || !Number.isFinite(kit.ammo) || !modesOk || !ammoOk) {
     console.warn(`The saved loadout for "${kit.level}" doesn't make sense (${JSON.stringify(kit)}): starting this level with the usual kit.`);
     return;
   }
   player.armour = Math.max(0, Math.min(PLAYER_MAX_ARMOUR, kit.armour));
   player.ammo = Math.max(0, kit.ammo);
   player.modes = MODE_ORDER.filter((m) => kit.modes.includes(m)); // weapons.js: kept in spin-up order
+  for (const t of SPECIAL_AMMO) player.rounds[t] = Math.max(0, rounds[t]);
+  player.found = SPECIAL_AMMO.filter((t) => found.includes(t));
+  player.loaded = roundsOf(loaded) > 0 ? loaded : 'standard';
 }
 
 // Everything you've destroyed on this level: robots and creatures (a downed
@@ -185,7 +194,8 @@ function handleEnter() {
     const next = nextLevel();
     run.kills += levelKills();
     run.cleared += 1;
-    run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes] } : null;
+    run.loadout = next ? { level: next.id, armour: player.armour, ammo: player.ammo, modes: [...player.modes],
+      rounds: { ...player.rounds }, found: [...player.found], loaded: player.loaded } : null;
     saveRun();
     game.state = 'lift';
     startLiftRide(CURRENT_LEVEL.floor, next ? next.floor : ROOF_FLOOR); // lift.js
@@ -265,6 +275,12 @@ function drawCampaignScreen(pixels) {
   const modules = player.modes.filter((m) => m !== 'single').map((m) => FIRE_MODES[m].name);
   const kit = `ARMOUR ${player.armour}   ROUNDS ${player.ammo}` + (modules.length ? `   ${modules.join(' + ')}` : '');
   drawTextCentred(pixels, kit, 138, HUD_GREEN, 1);
+  // ...and the special rounds you've found (ammo.js), each in its colour.
+  const specials = player.found.map((t) => `${AMMO_TYPES[t].name} ${player.rounds[t]}`);
+  if (specials.length) {
+    let x = Math.floor((SCREEN_W - textWidth(specials.join('   '), 1)) / 2);
+    player.found.forEach((t, n) => { drawText(pixels, specials[n], x, 146, AMMO_TYPES[t].coil, 1); x += textWidth(specials[n] + '   ', 1) + 1; });
+  }
   if (Math.floor(performance.now() / 600) % 2 === 0) drawTextCentred(pixels, 'PRESS ENTER', 156, HUD_GREEN, 2);
 }
 

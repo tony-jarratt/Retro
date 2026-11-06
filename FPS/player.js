@@ -20,6 +20,10 @@ const player = {
   keys: [],             // keycard colours collected, e.g. ['red']
   charge: false,        // carrying the demolition charge (charge.js)
   modes: ['single'],    // fire modes your gun can spin up to (weapons.js), in the order found
+  // Special rounds (ammo.js): how many of each, the types you've found, and what's loaded.
+  rounds: { incendiary: 0, piercing: 0 },
+  found: [],
+  loaded: 'standard',
   moving: false,        // walking this frame (it spoils your aim: MOVING_CONE)
   walkTime: 0,
 };
@@ -34,7 +38,7 @@ function triggerHeld() {
 }
 
 // on: the functions to call for one-off actions:
-// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, levelChooser, togglePause }.
+// { toggleDebug, fire, restart, toggleFilter, toggleVisor, toggleSound, toggleMusic, enter, levelChooser, togglePause, loadAmmo }.
 function setupInput(canvas, on) {
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -49,6 +53,7 @@ function setupInput(canvas, on) {
       if (e.code === 'KeyU') on.toggleMusic();
       if (e.code === 'KeyL') on.levelChooser();
       if (e.code === 'KeyP') on.togglePause();
+      for (const type of AMMO_ORDER) if (e.code === 'Digit' + AMMO_TYPES[type].key) on.loadAmmo(type); // ammo.js
     }
     if (e.code.startsWith('Arrow')) e.preventDefault(); // stop the page scrolling
   });

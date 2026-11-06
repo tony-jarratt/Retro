@@ -27,7 +27,8 @@ const game = { state: 'playing', hurtFlash: 0, pickupFlash: 0, endTime: 0, playT
 //               if the ammo drops below that mode's minimum part-way
 //   heldTime    seconds the trigger has been held: how far the gun has spun up (weapons.js)
 //   lastMode    the mode last frame, to notice it stepping up
-const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0, pullMode: 'single', heldTime: 0, lastMode: 'single' };
+//   flashType   the ammo type of the last round (ammo.js): its flash's colour and light
+const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0, pullMode: 'single', heldTime: 0, lastMode: 'single', flashType: 'standard' };
 
 // What does a shot fired at `angle` hit? For a dead-straight shot that's
 // whatever is under the crosshair; a round that strays (weapons.js: the
@@ -52,12 +53,17 @@ const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0,
 // Returns a sprite thing, { panel } for a window, { core: true } for the
 // security core (core.js), { bay } for a repair bay (repair.js), or null for
 // any other wall.
-function shotTarget(angle) {
+//
+// An ARMOUR-PIERCING round (ammo.js) goes further: through glass (which it
+// cracks on the way: the window comes first in the list, but doesn't count),
+// and through the first PIERCE_THROUGH - 1 things it hits into the next.
+// So shotTargets gives the LIST of what a round hits, nearest first.
+function shotTargets(angle, pierce) {
   const viewer = { x: player.x, y: player.y, angle };
   const ray = castRay(player.x, player.y, Math.cos(angle), Math.sin(angle));
   const glass = firstBulletStop(ray.panes, ray.dist); // panels.js
-  const stopDist = glass ? glass.dist : ray.dist;
-  let best = null;
+  const stopDist = glass && !pierce ? glass.dist : ray.dist;
+  const found = [];
   for (const thing of spriteThings(player)) {
     if (thing.effect) continue; // a fireball, beam or plume of steam: shots go straight through
     const spot = placeOnScreen(thing, viewer);
@@ -68,14 +74,26 @@ function shotTarget(angle) {
     const texY = thing.aimRow !== null ? thing.aimRow : Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
     if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // the shot misses its square
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
-    if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward, texX, texY };
+    found.push({ thing, forward: spot.forward, texX, texY });
   }
+  found.sort((a, b) => a.forward - b.forward);
   // Which texel it hit goes along too (brood.js tests for her belly).
-  if (best) return { ...best.thing, texX: best.texX, texY: best.texY };
-  if (glass) return { panel: glass.panel }; // nothing nearer: the window takes it
-  if (ray.cell === CORE_CELL) return { core: true };
-  if (ray.cell === REPAIR_CELL) return { bay: bayAt(ray.cellX, ray.cellY) }; // repair.js
-  return null;
+  const hits = found.slice(0, pierce ? PIERCE_THROUGH : 1).map((f) => ({ ...f.thing, texX: f.texX, texY: f.texY }));
+  if (!pierce) {
+    if (hits.length > 0) return hits;
+    if (glass) return [{ panel: glass.panel }]; // nothing nearer: the window takes it
+  }
+  if (hits.length < (pierce ? PIERCE_THROUGH : 1)) {
+    if (ray.cell === CORE_CELL) hits.push({ core: true });
+    else if (ray.cell === REPAIR_CELL) hits.push({ bay: bayAt(ray.cellX, ray.cellY) }); // repair.js
+  }
+  if (pierce && glass) hits.unshift({ panel: glass.panel, passed: true }); // cracked as it goes through
+  return hits;
+}
+
+// What a plain round fired at `angle` hits first, or null.
+function shotTarget(angle) {
+  return shotTargets(angle, false)[0] || null;
 }
 
 // A pull of the trigger, in the current fire mode (weapons.js). The first
@@ -83,7 +101,7 @@ function shotTarget(angle) {
 // updateCombat. Each round costs one ammo, so a burst can run dry part-way.
 function playerFire() {
   if (paused || game.state !== 'playing' || gun.cooldown > 0 || gun.burstLeft > 0) return;
-  if (player.ammo === 0) {
+  if (roundsLoaded() === 0) { // ammo.js: of the type loaded
     // Empty: a dry click (sound.js) on each pull, with a short pause after it
     // so fast pulls don't pile the clicks on top of each other.
     sfxDryFire();
@@ -98,42 +116,46 @@ function playerFire() {
   fireRound();
 }
 
-// One round. It strays a random amount within the mode's cone (wider for
-// each round of a burst, and wider if you're walking), then hits whatever
-// shotTarget finds along that line.
+// One round, of whatever's loaded (ammo.js). It strays a random amount
+// within the mode's cone (wider for each round of a burst, and wider if
+// you're walking), then hits whatever shotTargets finds along that line.
 function fireRound() {
   const mode = FIRE_MODES[gun.pullMode];
-  if (player.ammo === 0) { gun.burstLeft = 0; sfxDryFire(); return; } // ran dry mid-burst: click
-  player.ammo -= 1;
-  sfxPlayerShot(gun.pullMode); // sound.js
+  if (roundsLoaded() === 0) { gun.burstLeft = 0; sfxDryFire(); return; } // ran dry mid-burst: click
+  const type = player.loaded;
+  spendRound(); // ammo.js: a special type run dry goes back to standard
+  gun.flashType = type;
+  sfxPlayerShot(gun.pullMode, type); // sound.js
   makeNoise(player.x, player.y, SHOT_NOISE[gun.pullMode]); // the lab's creatures hear it (creatures.js)
-  mothsSeeFlash(player.x, player.y);                        // and the HQ's moths see the flash (pollinators.js)
+  mothsSeeFlash(player.x, player.y, AMMO_TYPES[type].mothReach); // and the HQ's moths see the flash (pollinators.js)
   gun.burstLeft -= 1;
   gun.burstTimer = mode.gap;
   // A fast gun's flash has to be over before its next round, or it'd never flicker.
   gun.flash = Math.min(GUN_FLASH_TIME, mode.cooldown * 0.6, mode.rounds > 1 ? mode.gap * 0.8 : Infinity);
   const cone = mode.cone + mode.climb * gun.burstRound + (player.moving ? MOVING_CONE : 0);
   gun.burstRound += 1;
-  const target = shotTarget(player.angle + (Math.random() * 2 - 1) * cone);
-  countShot(countsAsHit(target)); // campaign.js: the run's numbers (before the hit, which may kill it)
-  if (target) shotHits(target);
+  const targets = shotTargets(player.angle + (Math.random() * 2 - 1) * cone, type === 'piercing');
+  countShot(targets.some(countsAsHit)); // campaign.js: the run's numbers (before the hits, which may kill)
+  for (const target of targets) shotHits(target, type);
 }
 
-// One round arriving at what it hit.
-function shotHits(target) {
-  if (target.panel) { hitGlass(target.panel); return; } // panels.js
-  if (target.core) { damageCore(1); return; }          // core.js
-  if (target.bay) { damageBay(target.bay, 1); return; } // repair.js
-  if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
+// One round of ammo `type` (ammo.js) arriving at something it hit.
+function shotHits(target, type = 'standard') {
+  if (target.panel) { hitGlass(target.panel); return; }            // panels.js
+  if (target.core) { damageCore(objectiveHits(type)); return; }   // core.js; ammo.js: what this type is worth on it
+  if (target.bay) { damageBay(target.bay, type === 'piercing' ? 2 : 1); return; } // repair.js
   if (target.enemy && target.enemy.state !== 'dead' && target.enemy.type === 'guard' && guardTorchHit(target.enemy, target.texX, target.texY)) {
     breakTorch(target.enemy); // guard.js: a round on its torch puts the light out, and does it no harm
     return;
   }
+  if (target.enemy && type === 'incendiary') ignite(target.enemy); // ammo.js: alight, before the hit, so it dies burning
+  if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
     const hits = target.enemy.type === 'brood' ? (broodBellyHit(target.enemy, target.texX, target.texY) ? 2 : 1) // brood.js: the belly
       : isFacingAway(target.enemy) ? ENEMY_TYPES[target.enemy.type].backHits : 1;
-    damageEnemy(target.enemy, hits);
+    const machine = !ENEMY_TYPES[target.enemy.type].creature;
+    damageEnemy(target.enemy, type === 'piercing' && machine ? hits * 2 : hits); // ammo.js: armour-piercing, double on a robot
   }
   if (target.camera) shootCamera(target.camera); // security.js
   if (target.drone) destroyDrone(target.drone);   // drones.js
@@ -154,13 +176,15 @@ function damageEnemy(enemy, hits = 1, byPlayer = true) {
   enemy.hurtTime = HURT_FLASH_TIME;
   if (enemy.state === 'dormant' && ENEMY_TYPES[enemy.type].creature) wakeCreature(enemy); // shot in its tank (creatures.js)
   if (enemy.health <= 0) {
-    bloomerDies(enemy); // infected.js: it bursts as it goes
+    const onFire = burning(enemy); // ammo.js: dying alight, it's burnt
+    if (!onFire) bloomerDies(enemy); // infected.js: it bursts as it goes (unless it burns)
     managerDies(enemy); // manager.js: the PA dies, its suits reel
     guardDies(enemy);   // guard.js: its ammo, and its torch on the floor
     enemy.state = 'dead';
     enemy.moving = false;
     if (!ENEMY_TYPES[enemy.type].creature) dropClip(enemy); // creatures leave nothing to pick up
     knockedDown(enemy); // infected.js: a suit is only down
+    if (onFire) burnUp(enemy); // ammo.js: ash, and a suit stays down
     return;
   }
   if (enemy.state === 'grab') loseGrip(enemy); // infected.js: shot, it lets go of you

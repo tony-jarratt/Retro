@@ -119,6 +119,9 @@ LEVELS.push({
     { type: 'charge',    x: 1.5,  y: 9.5 },  // side room, past the larvae: the quiet way to burn the chamber (charge.js)
     { type: 'ammocrate', x: 21.5, y: 12.5 }, // lower lab
     { type: 'repair',    x: 1.5,  y: 14.5 }, // lower lab
+    // Incendiary rounds (ammo.js), for the way down: they count double on the breeding chamber.
+    { type: 'incendiary', x: 22.5, y: 10.5 }, // specimen hall, by the way down
+    { type: 'incendiary', x: 6.5,  y: 7.5 },  // side room
   ],
 
   vents: [
