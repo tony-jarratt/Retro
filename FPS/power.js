@@ -8,11 +8,11 @@
 // creatures, spores, your muzzle flash, the breaker's neon sign.
 //
 // When it fails:
-//   - the LOCKDOWN (lockdown.js: the Hangar, Genetics, the Atrium): the
+//   - the LOCKDOWN on a level with `lockdownBlackout` (the Hangar): the
 //     bulkheads come down and the power goes with them; the escape is in the dark
-//   - a SCRIPTED CUT on Storage and the Offices (not the Workshops: the first
-//     level keeps its lights): the first time you reach the level's
+//   - a SCRIPTED CUT (the Offices): the first time you reach the level's
 //     `powerCut` spot ({ x, y, radius })
+// Only those two (owner): blackouts are an event, not the norm.
 // While it's off, the visor's NIGHT VISION is on (nightvision.js).
 // A level that can lose its power must have a BREAKER (`breakers`: { x, y,
 // face }, wall cells, like a decal): walk up to one and face it, and it's
@@ -41,8 +41,15 @@ const breakers = (CURRENT_LEVEL.breakers || []).map((b, n) => {
   const wallX = b.x + 0.5 + step[0] * 0.5, wallY = b.y + 0.5 + step[1] * 0.5;
   return { wallX, wallY, glowX: wallX + step[0] * 0.3, glowY: wallY + step[1] * 0.3, decal };
 });
-if ((POWER_CUT || LOCKDOWN.length > 0) && breakers.length === 0) {
-  throw new Error(`Level "${CURRENT_LEVEL.id}" can lose its power (a powerCut or a lockdown) but has no breaker to bring it back.`);
+const CAN_LOSE_POWER = Boolean(POWER_CUT) || Boolean(CURRENT_LEVEL.lockdownBlackout);
+if (CAN_LOSE_POWER && breakers.length === 0) {
+  throw new Error(`Level "${CURRENT_LEVEL.id}" can lose its power (a powerCut or lockdownBlackout) but has no breaker to bring it back.`);
+}
+if (!CAN_LOSE_POWER && breakers.length > 0) {
+  throw new Error(`Level "${CURRENT_LEVEL.id}" has breakers but never loses its power: give it a powerCut or lockdownBlackout, or remove them.`);
+}
+if (CURRENT_LEVEL.lockdownBlackout && LOCKDOWN.length === 0) {
+  throw new Error(`Level "${CURRENT_LEVEL.id}" has lockdownBlackout but no lockdown to bring it.`);
 }
 
 // The power goes (lockdown.js, or the scripted cut below).

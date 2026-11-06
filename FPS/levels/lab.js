@@ -144,11 +144,7 @@ LEVELS.push({
     { x: 5.5,  y: 13.5 },              // the lower lab
   ],
 
-  // POWER (power.js): it goes with the lockdown; the breaker is in the side
-  // room, on the way home.
-  breakers: [
-    { x: 0, y: 10, face: 'E' },
-  ],
+  // No blackout here (owner): only the Hangar (with its lockdown) and the Offices lose their power.
 
   // The floor plan (plans.js): a whiteboard in the specimen hall, before the way down.
   plans: [

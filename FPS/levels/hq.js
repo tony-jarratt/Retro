@@ -211,11 +211,7 @@ LEVELS.push({
     { x: 13.5, y: 18.5 },              // just inside the boardroom
   ],
 
-  // POWER (power.js): it goes with the lockdown; the breaker is in the
-  // open-plan office, on the way home.
-  breakers: [
-    { x: 17, y: 4, face: 'W' },
-  ],
+  // No blackout here (owner): only the Hangar (with its lockdown) and the Offices lose their power.
 
   // The floor plan (plans.js): the fire evacuation plan, by the lift in reception.
   plans: [

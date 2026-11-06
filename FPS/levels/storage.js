@@ -124,12 +124,7 @@ LEVELS.push({
     { x: 19.5, y: 17.5 },              // the cold store, just off its flickering light
   ],
 
-  // POWER (power.js): the lights die as you go down into the tank hall; the
-  // breaker is on its far wall, past the tanks.
-  powerCut: { x: 17.5, y: 6.5, radius: 1.2 },
-  breakers: [
-    { x: 27, y: 10, face: 'W' },
-  ],
+  // No blackout here (owner): only the Hangar (with its lockdown) and the Offices lose their power.
 
   // The floor plan (plans.js): a whiteboard along the long corridor.
   plans: [

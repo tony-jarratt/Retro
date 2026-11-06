@@ -2,8 +2,8 @@
 // Hangar, Genetics, the Atrium), destroying the objective locks the floor
 // down. A moment after it goes, BULKHEADS slam shut across the doors the
 // level lists in `lockdown` (levels/*.js: { x, y }, door cells), for good.
-// The way you came in is cut, the POWER fails with it (power.js: faint red
-// emergency light until you throw a breaker), and you have to find another
+// The way you came in is cut (on the Hangar, `lockdownBlackout`, the POWER
+// fails with it: power.js), and you have to find another
 // way back to the lift, through the rooms you skipped. The floor plans show the sealed doors in red (plans.js).
 //
 // A bulkhead is a door sealed forever (doors.js: `sealed` = Infinity, as the
@@ -62,7 +62,7 @@ function updateLockdown(dt) {
     if (lockdownTimer <= 0) {
       for (const d of bulkheads) { d.bulkhead = true; d.sealed = Infinity; } // doors.js: shut, for good
       showSecurityMessage(LOCKDOWN_MESSAGE); // security.js
-      powerFail(); // power.js: and the power goes with them
+      if (CURRENT_LEVEL.lockdownBlackout) powerFail(); // power.js: on the Hangar, the power goes with them
     }
   }
   for (const d of bulkheads) {

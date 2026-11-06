@@ -174,13 +174,15 @@ THROW A BREAKER (a grey box, lever down and a red lamp, under a red NEON
 sign, EMERGENCY BREAKER, that always glows and in a blackout lights the wall
 and floor round it red; walk up and face it): the lights stutter back on,
 POWER RESTORED.
-- With the LOCKDOWN (Hangar, Genetics, Atrium): the escape is in the dark;
-  the breaker is on the way home.
-- A SCRIPTED CUT (level `powerCut` {x, y, radius}) on the first level of
-  the later settings: Storage's way down into the tank hall (breaker on its
-  far wall), the Offices' archive (breaker in the kitchen). Not the
-  Workshops (owner): the first level keeps its lights.
-A level that can lose power must have a breaker (`breakers`), checked at load.
+ONLY TWICE in the game (owner: less is more; the first time surprises you,
+the second you manage with what you learned):
+- The HANGAR, with its lockdown (level `lockdownBlackout: true`): the escape
+  is in the dark; the breaker is in the workshop on the long way home.
+  (Genetics and the Atrium lock down too, but keep their lights.)
+- The OFFICES, a SCRIPTED CUT (level `powerCut` {x, y, radius}): the lights
+  die as you step into the archive; the breaker is in the kitchen beyond.
+A level that can lose power must have a breaker (`breakers`), and one that
+can't must have none; both checked at load.
 
 ### Night vision (`nightvision.js`, owner 2026-11-06)
 

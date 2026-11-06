@@ -190,8 +190,9 @@ LEVELS.push({
     { x: 0,  y: 20, zone: 'hangar' },    // deep in the hangar, far left
   ],
 
-  // POWER (power.js): it goes with the lockdown; the breaker is in the
-  // workshop, on the long way home.
+  // POWER (power.js): it goes with the lockdown (`lockdownBlackout`); the
+  // breaker is in the workshop, on the long way home.
+  lockdownBlackout: true,
   breakers: [
     { x: 31, y: 11, face: 'W' },
   ],
