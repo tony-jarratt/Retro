@@ -50,7 +50,8 @@ const gun = { cooldown: 0, flash: 0, burstLeft: 0, burstTimer: 0, burstRound: 0,
 // walker's hull is a long box, so it's a slightly wider target side-on than face-on.
 //
 // Returns a sprite thing, { panel } for a window, { core: true } for the
-// security core (core.js), or null for any other wall.
+// security core (core.js), { bay } for a repair bay (repair.js), or null for
+// any other wall.
 function shotTarget(angle) {
   const viewer = { x: player.x, y: player.y, angle };
   const ray = castRay(player.x, player.y, Math.cos(angle), Math.sin(angle));
@@ -72,6 +73,7 @@ function shotTarget(angle) {
   if (best) return best.thing;
   if (glass) return { panel: glass.panel }; // nothing nearer: the window takes it
   if (ray.cell === CORE_CELL) return { core: true };
+  if (ray.cell === REPAIR_CELL) return { bay: bayAt(ray.cellX, ray.cellY) }; // repair.js
   return null;
 }
 
@@ -120,6 +122,7 @@ function fireRound() {
 function shotHits(target) {
   if (target.panel) { hitGlass(target.panel); return; } // panels.js
   if (target.core) { damageCore(1); return; }          // core.js
+  if (target.bay) { damageBay(target.bay, 1); return; } // repair.js
   if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).

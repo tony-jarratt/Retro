@@ -24,7 +24,7 @@ LEVELS.push({
   rows: [
   // x: 0         1         2         3
   //    01234567890123456789012345678901
-    '################################', //  0
+    '##############R#################', //  0  repair bay (x14): the fuel depot's
     '#.......#..........#....P......#', //  1  start bay | fuel depot | pipe works
     'L.......#..........#....P......#', //  2  exit lift (x0), behind you as you start
     'L.......D....HH....#....P..P...#', //  3
@@ -33,7 +33,7 @@ LEVELS.push({
     '#.......T..........T.......P...#', //  6  terminals: depot (x8), pipe works (x19)
     '#.......#..........#.......P...#', //  7
     '####D##########D#########D######', //  8  red door (x4), to corridor (x15), to workshop (x25)
-    '#............P...P.............#', //  9  server room | corridor | workshop
+    '#............P...P.............R', //  9  server room | corridor | workshop; repair bay (x31): the workshop's
     '#............W...P.............#', // 10  window: corridor looks into the server room
     '#..C..C..C...W...P.......PP....#', // 11
     '#............P...D.......PP....#', // 12
@@ -47,7 +47,7 @@ LEVELS.push({
     'T.........H.........H..........#', // 20  terminal: hangar (x0)
     '#..............................#', // 21
     '#..............................#', // 22
-    '########KKK#####################', // 23  the security core (x8-10), at the back of the hangar
+    '########KKK###############R#####', // 23  the security core (x8-10), at the back of the hangar; repair bay (x26)
   ],
 
 

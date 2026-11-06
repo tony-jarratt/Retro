@@ -65,6 +65,7 @@ function spriteThings(viewer) {
     ...larvaThings(thing),    // the lab's swarm (larvae.js)
     ...acidThings(thing),     // spitters' globs, and where they'll land (acid.js)
     ...chargeThings(thing),   // the demolition charge, once it's set (charge.js)
+    ...repairThings(thing, viewer), // sparks off robots going for repair (repair.js)
     ...sporeThings(thing),    // spore clouds (spores.js)
     ...sprinklerThings(thing), // sprinkler spray (sprinklers.js)
     ...mothThings(thing),     // the HQ's swarm (pollinators.js)

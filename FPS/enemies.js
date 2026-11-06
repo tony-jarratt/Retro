@@ -147,6 +147,8 @@ const enemies = ENEMIES.map((start) => ({
   attackTime: 0, // creatures: seconds into the current stage of a melee attack (creatures.js)
   lungeLeft: 0,  // creatures: cells of lunge still to go
   downTime: 0,   // a downed suit: seconds until it gets up; 0 if it never will (infected.js)
+  bay: null,     // smart robots: the repair bay it's heading for or docked in (repair.js)
+  repairTime: 0, // seconds of welding towards the next hit restored
 }));
 
 // The difference between two angles, wrapped into -PI..PI, so that e.g. 350°
@@ -237,6 +239,7 @@ function alertEnemy(enemy, x, y) {
 function turnTowardsPlayer(enemy) {
   if (enemy.state === 'dead' || enemy.state === 'offline') return;
   if (ATTACK_STATES.includes(enemy.state)) return; // a creature mid-attack is already facing you, and won't be put off
+  if (enemy.state === 'retreat' || enemy.state === 'repair') return; // fleeing to a bay, or docked: it shows you its back (repair.js)
   // Already facing you (say, a robot aiming at you): nothing to turn, and
   // pausing it would let rapid fire freeze it in place.
   const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -340,11 +343,14 @@ function callForHelp(enemy) {
 //   aim    within its aimRange and in sight: stop, face you, charge, fire
 //   search lost sight of you (or was alerted): follow the path to where you
 //          were last seen, round corners if need be, then go idle
+//   retreat, repair   smart robots at half health: to a repair bay and
+//          back (repair.js), ignoring you meanwhile
 function updateWalker(enemy, dt) {
   const type = ENEMY_TYPES[enemy.type];
   if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
   if (updateInfected(enemy, dt)) return; // grabbing, staggering or getting up (infected.js)
+  if (updateRepairing(enemy, dt)) return; // smart, and badly hurt: off to a repair bay (repair.js)
   const sees = canSee(enemy);
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
@@ -435,8 +441,10 @@ function updateEnemies(dt) {
 // is facing: viewer straight ahead of it sees its front, straight behind sees
 // its back, and in between sees a side. The circle is cut into four 90° slices.
 // A smart robot's beacon: a slow blink while it's unaware of you, fast once
-// it's after you. Its position offsets the timing, so they don't blink in step.
+// it's after you, and held steady while it limps to a repair bay or is welded.
+// Its position offsets the timing, so they don't blink in step.
 function beaconLit(enemy) {
+  if (enemy.state === 'retreat' || enemy.state === 'repair') return true;
   const rate = enemy.state === 'idle' ? BEACON_IDLE_RATE : BEACON_ALERT_RATE;
   return (animTime * rate + enemy.x * 0.37) % 1 < 0.5;
 }

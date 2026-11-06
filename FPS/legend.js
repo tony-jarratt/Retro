@@ -23,6 +23,7 @@ const LAB_CABINET_CELL = 12;
 const TANK_GLASS_CELL = 13;
 const OFFICE_WALL_CELL = 14;
 const OVERGROWN_CELL = 15;
+const REPAIR_CELL = 16;
 
 const LEGEND = {
   '.': 0,         // floor
@@ -36,6 +37,7 @@ const LEGEND = {
   '=': GRATE_CELL, // steel bar grille: see and shoot through, can't walk through
   'K': CORE_CELL,  // the objective: the security core or the lab's breeding chamber, as the level says (core.js). Several K cells are one.
   'L': LIFT_CELL,  // the exit lift: reach it once the objective is destroyed, and the level is done
+  'R': REPAIR_CELL, // a repair bay: damaged smart robots go there to be welded back to full (repair.js)
   // The lab's walls (lower case: the lab's own pieces).
   't': LAB_TILE_CELL,    // stained white tiles
   'b': LAB_CABINET_CELL, // steel bench cabinets under tiles, with a biohazard placard

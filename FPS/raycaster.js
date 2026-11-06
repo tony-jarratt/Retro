@@ -206,6 +206,7 @@ function textureForHit(hit) {
   if (hit.cell === TERMINAL_CELL) return terminalTexture(hit.cellX, hit.cellY);
   if (hit.cell === CORE_CELL) return coreTexture();   // core.js
   if (hit.cell === LIFT_CELL) return liftTexture();
+  if (hit.cell === REPAIR_CELL) return bayTexture(hit.cellX, hit.cellY); // repair.js
   return wallTexture(hit.cell);
 }
 

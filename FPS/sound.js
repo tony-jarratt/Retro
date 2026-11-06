@@ -634,6 +634,26 @@ function sfxCoreHit() {
   clang(out, 210, 0.35, 0.4);
   noiseBurst(out, 'highpass', 6000, 3000, 0.15, 0.35);
 }
+// REPAIR BAYS (repair.js). A robot breaking off for repair: a falling
+// two-note warble from its beacon, so you hear it going. Welding: short
+// crackles of bright noise. A bay hit: a hollow clang.
+function sfxRobotRetreat(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'square', 880, 860, 0.12, 0.12);
+  tone(out, 'square', 587, 570, 0.18, 0.12, 0.13);
+}
+function sfxWeld(bay) {
+  const out = placeAt(bay.dock.x, bay.dock.y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 5000 + Math.random() * 3000, 2500, 0.03 + Math.random() * 0.05, 0.25);
+}
+function sfxBayHit(bay) {
+  const out = placeAt(bay.dock.x, bay.dock.y);
+  if (!out) return;
+  clang(out, 300, 0.25, 0.35);
+  noiseBurst(out, 'highpass', 6000, 3000, 0.1, 0.3);
+}
 // The demolition charge (charge.js). Set: a magnetic clunk onto the core and
 // a rising arming chirp. Its fuse: a hard little beep from where it is,
 // coming faster and faster (charge.js decides when).
@@ -692,7 +712,7 @@ let ambience = null;             // the hangar's hum and air, always there
 // health dropping. It keeps the sound out of the game's logic.
 const last = {
   doors: new Map(), panels: new Map(), enemies: new Map(), pickups: new Set(),
-  hives: new Map(), terminals: new Map(), lockedHint: null, playerStep: 0, messageTime: 0,
+  hives: new Map(), terminals: new Map(), bays: new Map(), lockedHint: null, playerStep: 0, messageTime: 0,
   coreHealth: CORE_HEALTH, coreState: 'online', ready: false,
 };
 
@@ -799,6 +819,7 @@ function rememberState() {
   last.pickups = new Set(pickups);
   for (const h of hives) last.hives.set(h, h.left);
   for (const t of terminals) last.terminals.set(t, t.state);
+  for (const b of bays) last.bays.set(b, b.health);
   last.lockedHint = lockedDoorHint;
   last.messageTime = securityMessageTime;
   last.coreHealth = core.health;
@@ -833,6 +854,7 @@ function watchTheGame() {
     }
     if (e.state === 'dead' && was.downTime > 0 && e.downTime === 0) sfxSuitFinished(e); // infected.js
     if (e.state !== 'dead' && e.moving && step !== was.step) creature ? sfxCreatureStep(e) : sfxRobotStep(e);
+    if (e.state === 'retreat' && was.state !== 'retreat') sfxRobotRetreat(e);
     if (creature && e.state !== was.state) {
       if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) {
         if (e.type === 'spitter') sfxSpitterHiss(e);
@@ -851,6 +873,10 @@ function watchTheGame() {
   for (const h of hives) if (h.left < last.hives.get(h)) sfxHiveRelease(h);
   for (const t of terminals) if (t.state === 'safe' && last.terminals.get(t) !== 'safe') sfxSecurityOffline();
   if (core.health < last.coreHealth) sfxCoreHit();
+  for (const b of bays) {
+    if (b.health < last.bays.get(b)) sfxBayHit(b);
+    if (bayWelding(b) && Math.random() < 0.25) sfxWeld(b); // a crackle every few frames
+  }
   if (core.state === 'destroyed' && last.coreState !== 'destroyed') { sfxSecurityOffline(); sfxLiftOpen(); }
   // A security message that has just appeared (its timer jumped back up).
   if (securityMessage === 'TURRETS ONLINE' && securityMessageTime > last.messageTime) sfxTurretsOnline();

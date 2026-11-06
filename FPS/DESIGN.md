@@ -87,6 +87,20 @@ barrel show the stage (count only — colour is reserved for a future ammo type)
   zone's alarm** — they're walking cameras, so kill them first.
 - Hit chance for robot guns falls with distance (e.g. a walker: 80% at 1
   cell, 30% at 3).
+- **Smart robots retreat and repair** (`repair.js`, owner 2026-11-06): at
+  half health or less (walker 2, scout 1, heavy 3 hits left) a smart robot
+  breaks off for the nearest **repair bay** (`R`) it can reach by path,
+  that's free and has repairs left. Tells: its beacon stops blinking and
+  stays lit, sparks spit off its hull, and a falling two-note warble. On the
+  way it ignores you (but still calls for help if it sees you), and being
+  shot DOESN'T turn it round: a fleeing heavy shows you its back. Docked,
+  it's welded back 1 hit a second (blue-white flicker and crackle), then
+  goes back to where it last saw you. A bay has 3 repairs (one per docking,
+  shown as its lamps) and one user at a time; shot out (4 hits) it explodes,
+  which usually kills a robot docked in it. No bay reachable: it fights on.
+  Choices: chase it, wreck the bay, ambush it there, or let it come back
+  whole. The Hangar has three bays (depot, workshop, hangar hall); the
+  server room's smart scout has none.
 
 ---
 
@@ -105,6 +119,7 @@ All placed in a level file (`levels/*.js`), using the cell characters in
 | `T` | Security terminal | Walk up to it: its zone's **cameras** shut down for good (not tripwires or turrets) |
 | `o`, `v` | HQ walls | Office wall; overgrown wall (the HQ's own pieces) |
 | `K` | Security core | The objective. Several `K` cells are one core, 18 hits (blasts count), or one **demolition charge**. Doesn't fight back |
+| `R` | Repair bay | Damaged smart robots dock here to be welded back to full. 3 repairs (amber lamps), 4 hits to wreck (it blows up: bad news for a robot docked in it). Needs floor on exactly one side |
 | `L` | Exit lift | Red lamp until the core is down, then green: reach it to finish |
 | `D` | Blast door | Opens on approach; may be locked (`LOCKED_DOORS`) |
 | `W` | Wired glass | See through; stops bullets; cracks then shatters; never walkable |
@@ -413,8 +428,15 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 
 ## 9. Open ideas
 
-- **Smart robots retreat and self-repair** — gives taking cover a purpose,
-  and a choice: chase it into danger, or let it come back at full strength.
+- **Next (agreed 2026-11-06), in order:**
+  1. Lab creatures: wounded lurchers **feed on corpses** to heal (burn the
+     bodies, or they're food); a **stalker** nearly invisible in the dark,
+     seen properly only under light or your muzzle flash; lurchers that
+     **hunt in pairs** (one rears up, the other flanks).
+  2. **Spawn events**, both kinds: scripted, telegraphed ambushes (a trigger
+     such as a room or the lift key; a hatch flashes and a klaxon sounds,
+     then enemies drop in), and spawners you must kill (an industrial
+     **fabricator** building robots; a lab **brood mother** birthing young).
 - Ammo types (the gun's coil colour is reserved for this).
 - Rebalancing the sound mix (relative volumes).
 

@@ -592,6 +592,64 @@ function makeTerminal(safe) {
   });
 }
 
+// A REPAIR BAY (repair.js): a dark recess in the wall with two welding
+// arms hanging from its top corners, and a row of three amber lamps over it,
+// one lit for each repair it has left. `weld` 0 is still; 1 and 2 are the
+// two flicker frames while a robot is docked (the arm tips flare white-blue
+// and spit sparks). `wrecked` draws it shot out: lamps dead, arms snapped.
+// Hazard stripes along the sill say robots stand here.
+function makeRepairBay(charges, weld, wrecked) {
+  const lampOn = [255, 180, 60], lampOff = [70, 46, 22];
+  const weldColour = [200, 230, 255];
+  // Distance from (x, y) to the segment (ax, ay)-(bx, by): for thick lines.
+  const toSegment = (x, y, ax, ay, bx, by) => {
+    const vx = bx - ax, vy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy)));
+    return Math.hypot(x - (ax + vx * t), y - (ay + vy * t));
+  };
+  // Each arm: shoulder at a top corner, elbow out wide, tip in near the middle.
+  // A wrecked arm ends at its elbow, hanging.
+  const arms = [[12, 14, 18, 30, 27, 38], [51, 14, 45, 30, 36, 38]];
+  return makeTexture(STEEL, (x, y) => {
+    if (x < 2 || y < 2 || x >= 62 || y >= 62) return brighten(STEEL, 0.4);
+    // The lamps, in a housing across the top.
+    if (y >= 3 && y < 9) {
+      for (let n = 0; n < 3; n++) {
+        const cx = 20 + n * 12;
+        if (Math.hypot(x + 0.5 - cx, y + 0.5 - 6) < 2.6) {
+          return !wrecked && n < charges ? glowing(y < 5 ? [255, 235, 190] : lampOn) : lampOff;
+        }
+      }
+      return brighten(DARK_STEEL, 1.2);
+    }
+    if (x >= 8 && x < 56 && y >= 10 && y < 56) {
+      for (const [sx, sy, ex, ey, tx, ty] of arms) {
+        if (toSegment(x, y, sx, sy, ex, ey) < 2.2) return wrecked && y > 26 && noise(x, y, 131) < 0.4 ? [30, 26, 24] : brighten(STEEL, 1.1);
+        if (wrecked) { if (toSegment(x, y, ex, ey, ex + (sx < 32 ? -2 : 2), ey + 14) < 1.5) return brighten(STEEL, 0.7); continue; }
+        if (toSegment(x, y, ex, ey, tx, ty) < 1.6) return brighten(STEEL, 0.95);
+        const tip = Math.hypot(x + 0.5 - tx, y + 0.5 - ty);
+        if (weld && tip < 1.5 + weld) return glowing(tip < 1.2 ? [255, 255, 255] : weldColour);
+        if (weld && tip < 9 && noise(x, y, 132 + weld) < 0.06) return glowing([255, 220, 120]); // sparks
+      }
+      if (wrecked && noise(x >> 1, y >> 1, 133) < 0.12) return [16, 14, 12]; // scorch
+      return brighten(DARK_STEEL, 0.55 + 0.1 * noise(x, y, 134)); // the recess
+    }
+    if (y >= 56 && x >= 8 && x < 56) return Math.floor((x + y) / 4) % 2 ? HAZARD_YELLOW : HAZARD_BLACK; // the sill
+    return brighten(STEEL, 0.85 + 0.12 * noise(x, y, 135));
+  });
+}
+
+// SPARKS (repair.js): a handful of bright specks around a robot's hull,
+// drawn over a damaged robot limping to a bay, and over one being welded.
+// Three frames, so they jump about. Transparent everywhere else.
+function makeSparks(seed) {
+  return makeTexture([255, 210, 120], (x, y) => {
+    const r = Math.hypot(x - 32, y - 32);
+    if (r > 14 || noise(x, y, 140 + seed) > 0.025) return null;
+    return glowing(r < 6 ? [255, 250, 220] : [255, 190, 80]);
+  });
+}
+
 // THE SECURITY CORE (core.js): a wall of server racks with a red "heart" in
 // the middle that pulses. `damage` 0, 1 or 2 adds sparking cracks and
 // scorch; `pulse` 0-3 is how bright the heart is this moment (the core
@@ -1229,6 +1287,10 @@ const CHAMBER_DEAD_TEXTURE = makeChamber(2, 0, true);
 const MOTHER_PLANT_TEXTURES = [0, 1, 2].map((damage) => [0, 1, 2, 3].map((pulse) => makeMotherPlant(damage, pulse, false)));
 const MOTHER_PLANT_DEAD_TEXTURE = makeMotherPlant(2, 0, true);
 const LIFT_TEXTURES = { locked: makeLift(false), open: makeLift(true) };
+// REPAIR_BAY_TEXTURES[charges][weld], and the wreck; sparks (repair.js).
+const REPAIR_BAY_TEXTURES = [0, 1, 2, 3].map((charges) => [0, 1, 2].map((weld) => makeRepairBay(charges, weld, false)));
+const REPAIR_BAY_WRECK = makeRepairBay(0, 0, true);
+const SPARK_TEXTURES = [0, 1, 2].map(makeSparks);
 // The gun in each fire mode, [normal, firing], and the upgrade modules (weapons.js).
 // GUN_TEXTURES[n] is the gun with n coils lit: [normal, firing].
 const GUN_TEXTURES = [1, 2, 3].map((lit) => [makeGun(false, lit), makeGun(true, lit)]);
@@ -1283,6 +1345,7 @@ const TEXTURES = {
   [TANK_GLASS_CELL]: GLASS_TEXTURES.intact,
   [CORE_CELL]: CORE_TEXTURES[0][0], // core.js shows its damage, pulse, or wreck
   [LIFT_CELL]: LIFT_TEXTURES.locked, // core.js shows locked or open
+  [REPAIR_CELL]: REPAIR_BAY_TEXTURES[3][0], // repair.js shows its charges, welding, or wreck
   [DOOR_CELL]: makeBlastDoor(null),
   [LAB_TILE_CELL]: makeLabTiles(),
   [LAB_CABINET_CELL]: makeLabCabinet(),

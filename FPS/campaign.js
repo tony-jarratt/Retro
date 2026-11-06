@@ -105,12 +105,13 @@ function countShot(hit) {
 }
 
 // What counts as a HIT for accuracy: anything that's fighting you, or a
-// target you'd mean to shoot (a camera, the core, a fuel drum that's still
-// whole). Not windows, struts, walls, or a corpse that's staying down.
+// target you'd mean to shoot (a camera, the core, a repair bay, a fuel drum
+// that's still whole). Not windows, struts, walls, or a corpse that's staying down.
 function countsAsHit(target) {
   if (!target) return false;
   if (target.enemy) return target.enemy.state !== 'dead' || target.enemy.downTime > 0; // a downed suit, finished off
   if (target.prop) return Boolean(SPRITE_TYPES[target.prop.type].explosive) && target.prop.state !== 'exploded';
+  if (target.bay) return target.bay.health > 0;
   return Boolean(target.camera || target.drone || target.larva || target.moth || target.core);
 }
 
