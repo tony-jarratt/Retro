@@ -47,6 +47,7 @@ const ROOT_TICK = 0.8;        // seconds between squeezes
 const ROOT_DAMAGE = 3;        // armour a squeeze
 const ROOT_HOLD = 5;          // seconds it holds before it gives up and sinks
 const ROOT_HEALTH = 2;        // hits
+const ROOT_AIM_ROW = 52;      // the texture row a shot tests: the gun aims down at it (combat.js), as at larvae
 
 // THE PICTURES -----------------------------------------------------------------
 // A ceiling vent: a square grille, slatted. Open, the slats are gone: a black hole.
@@ -98,6 +99,13 @@ const DRIP_TEXTURE = makeTexture([170, 200, 120], (x, y) => (Math.hypot(x + 0.5 
 function makeRoot(frame, grabbing) {
   const bark = [92, 70, 42];
   return makeTexture(bark, (x, y) => {
+    // A thick central stem out of the torn carpet, so there's something solid to shoot.
+    if (y >= ROOT_AIM_ROW - 8) {
+      const t = (63 - y) / (63 - (ROOT_AIM_ROW - 8));
+      if (Math.abs(x + 0.5 - 32 - (grabbing ? 2 * t : Math.sin(frame * 1.5 + t * 2))) < 4.5 - 2 * t) {
+        return brighten(bark, 0.75 + 0.2 * noise(x, y, 153));
+      }
+    }
     for (let n = 0; n < 4; n++) {
       const base = 24 + n * 5.5;
       const top = grabbing ? 40 + n * 2 : 18 + n * 4;
@@ -124,6 +132,7 @@ const membraneVein = new Uint8Array(SCREEN_W * SCREEN_H);
 (function buildMembrane() {
   const cx = SCREEN_W / 2, cy = SCREEN_H / 2 + 6;
   const suckers = [[-40, -20], [35, -30], [-60, 25], [55, 20], [0, 40], [-10, -45], [80, -5]];
+  const a0 = 0.2; // the veins' first direction
   for (let y = 0; y < SCREEN_H; y++) {
     for (let x = 0; x < SCREEN_W; x++) {
       const dx = (x - cx) / (SCREEN_W * 0.46), dy = (y - cy) / (SCREEN_H * 0.5);
@@ -131,8 +140,18 @@ const membraneVein = new Uint8Array(SCREEN_W * SCREEN_H);
       const edge = 1 + 0.18 * Math.sin(a * 5 + 1) + 0.1 * Math.sin(a * 11) + 0.15 * (noise(x >> 3, y >> 3, 151) - 0.5);
       const d = Math.hypot(dx, dy) / edge; // under 1: on it
       const p = y * SCREEN_W + x;
-      membraneCover[p] = d < 1 ? Math.min(0.88, 0.55 + 0.4 * (1 - d)) : 0;
-      if (d < 1 && Math.abs(noise(x >> 2, y >> 2, 152) - 0.5) < 0.035) membraneVein[p] = 1;
+      membraneCover[p] = d < 1 ? Math.min(0.85, 0.5 + 0.4 * (1 - d)) : 0;
+      // VEINS: a dozen wavering lines spreading out from the middle, each a
+      // pixel wide, fading out before the edge; every other one forks.
+      if (d < 0.92 && d > 0.05) {
+        const radius = d * SCREEN_W * 0.46; // roughly, in pixels from the middle
+        for (let k = 0; k < 12; k++) {
+          const along = a0 + k * Math.PI / 6 + 0.35 * Math.sin(d * 7 + k * 1.7);
+          const fork = along + (k % 2 ? 0.5 * Math.max(0, d - 0.45) : 0);
+          if (Math.abs(angleDiff(a, along)) * radius < 0.8 || (k % 2 && d > 0.45 && Math.abs(angleDiff(a, fork)) * radius < 0.7)) membraneVein[p] = 1;
+        }
+      }
+      if (d < 1 && membraneVein[p] === 0 && dx < -0.1 && dy < -0.1 && Math.abs(dx - dy * 0.6 + 0.45) < 0.05) membraneVein[p] = 3; // a wet sheen
       for (const [sx, sy] of suckers) {
         const s = Math.hypot(x - cx - sx, y - cy - sy);
         if (d < 1 && s < 6 && s > 3.5) membraneVein[p] = 2; // a sucker's ring, pressed to the glass
@@ -317,7 +336,7 @@ function ambushThings(thing) {
     const frame = Math.floor(animTime * 3 + r.x) % 2;
     const tex = r.state === 'holding' ? ROOT_GRAB_FRAMES[frame] : ROOT_FRAMES[frame];
     const lift = r.state === 'rising' ? -0.8 * (1 - r.time / ROOT_RISE) : 0;
-    list.push(thing(r.x, r.y, tex, { root: r, lift, shade: r.hurtTime > 0 ? 3 : 1 }));
+    list.push(thing(r.x, r.y, tex, { root: r, lift, shade: r.hurtTime > 0 ? 3 : 1, aimRow: ROOT_AIM_ROW }));
   }
   return list;
 }
@@ -333,7 +352,8 @@ function drawMembrane(pixels) {
       const p = y * SCREEN_W + ((x + slide) % SCREEN_W);
       const cover = membraneCover[p] * pulse;
       if (cover <= 0) continue;
-      const colour = membraneVein[p] === 1 ? MEMBRANE_VEIN : membraneVein[p] === 2 ? brighten(MEMBRANE_COLOUR, 0.6) : MEMBRANE_COLOUR;
+      const v = membraneVein[p];
+      const colour = v === 1 ? MEMBRANE_VEIN : v === 2 ? brighten(MEMBRANE_COLOUR, 0.6) : v === 3 ? [245, 240, 225] : MEMBRANE_COLOUR;
       const i = (y * SCREEN_W + x) * 4;
       for (let c = 0; c < 3; c++) pixels[i + c] += (colour[c] - pixels[i + c]) * cover;
     }
