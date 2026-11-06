@@ -61,8 +61,8 @@ One pulse gun. You never switch it: it **spins up**.
 | Stage | Reached by | Rounds | Accuracy |
 |---|---|---|---|
 | Single | pressing the trigger | 1 per press | near perfect |
-| Burst | holding 0.5 s | 3 rounds, 0.07 s apart | each round wider |
-| Automatic | holding 1.5 s | 8 a second | widest |
+| Burst | holding 0.4 s | 3 rounds, 0.07 s apart | each round wider |
+| Automatic | holding 1.2 s | 8 a second | widest |
 
 Letting go drops it back to single. **Modules** found in the level decide how
 far it can spin up (burst module, auto module). **Low ammo** holds it back:

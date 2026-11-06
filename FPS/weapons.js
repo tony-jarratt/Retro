@@ -37,7 +37,7 @@ const FIRE_MODES = {
   auto:   { name: 'AUTOMATIC',   rounds: 1, gap: 0,    cooldown: 0.12, cone: 0.06,  climb: 0,     recoil: 3, minAmmo: 8 },
 };
 const MODE_ORDER = ['single', 'burst', 'auto'];          // the spin-up steps, in order
-const SPIN_UP = { single: 0, burst: 0.5, auto: 1.5 };   // seconds of holding the trigger to reach each
+const SPIN_UP = { single: 0, burst: 0.4, auto: 1.2 };   // seconds of holding the trigger to reach each (owner, 2026-11-06: was 0.5 and 1.5)
 const MOVING_CONE = 0.04;   // extra cone, in radians, while you're walking
 const MODULE_AMMO = 8;      // an upgrade module comes with some ammo
 
