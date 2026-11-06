@@ -82,8 +82,12 @@ LEVELS.push({
     { type: 'lurcher', x: 19.5, y: 3.5,  angle: Math.PI / 2, tank: true },
     { type: 'spitter', x: 15.5, y: 8.5,  angle: 0, tank: true },
     // The lower lab, round the chamber. Shooting down here wakes them all, and the pods.
-    { type: 'lurcher', x: 4.5,  y: 12.5, angle: 0 },
-    { type: 'lurcher', x: 10.5, y: 13.5, angle: -Math.PI / 2 },
+    { type: 'lurcher', x: 4.5,  y: 12.5, angle: 0, pair: 'lower' },           // a pair: they hunt together
+    { type: 'lurcher', x: 10.5, y: 13.5, angle: -Math.PI / 2, pair: 'lower' },
+    // STALKERS (stalker.js): nearly invisible in the dark. One in the specimen
+    // hall's dark end, past the tanks; one between the lower lab's lights.
+    { type: 'stalker', x: 22.5, y: 8.5,  angle: Math.PI },
+    { type: 'stalker', x: 16.5, y: 14.5, angle: Math.PI },
     { type: 'spitter', x: 19.5, y: 13.5, angle: Math.PI },
   ],
 

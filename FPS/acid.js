@@ -105,6 +105,8 @@ function updateAcid(dt) {
     placeDecal('floor', p.x, p.y, null, 'acid', (Math.floor(animTime * ACID_BUBBLE_RATE) % 2) / 2 + 0.01, 0, false);
   }
 
+  burnCorpsesInPools(); // feeding.js: acid eats the bodies lying in it
+
   // Burning whoever's standing in one.
   if (inPool(player.x, player.y)) {
     acidTimer += dt;

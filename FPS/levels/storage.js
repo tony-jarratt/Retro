@@ -15,7 +15,7 @@
 //     which is where they'll see you: step out of it. Three of the tanks
 //     hold something asleep. A drum stands between two of them: a blast
 //     breaks glass.
-//   - The cold store: two more, waiting in the dark.
+//   - The cold store: two more, waiting in the dark: a PAIR, hunting together.
 //
 // THE RACE BACK: taking the lift key wakes the whole level, and EVERY TANK
 // BREAKS. Back through the tank hall, with whatever was in the tanks now
@@ -86,10 +86,12 @@ LEVELS.push({
     { type: 'lurcher', x: 14.5, y: 8.5,  angle: 0, tank: true }, // asleep in the tanks
     { type: 'lurcher', x: 22.5, y: 8.5,  angle: Math.PI, tank: true },
     { type: 'lurcher', x: 16.5, y: 12.5, angle: Math.PI / 2, tank: true },
-    { type: 'lurcher', x: 19.5, y: 16.5, angle: Math.PI },      // the cold store
-    { type: 'lurcher', x: 24.5, y: 17.5, angle: Math.PI },
-    { type: 'lurcher', x: 3.5,  y: 12.5, angle: -Math.PI / 2 }, // the service passage
-    { type: 'lurcher', x: 2.5,  y: 16.5, angle: -Math.PI / 2 },
+    // A PAIR (pair: same tag, creatures.js) hunts together: one calls the
+    // other, and the further one swings round to your side.
+    { type: 'lurcher', x: 19.5, y: 16.5, angle: Math.PI, pair: 'cold' },      // the cold store
+    { type: 'lurcher', x: 24.5, y: 17.5, angle: Math.PI, pair: 'cold' },
+    { type: 'lurcher', x: 3.5,  y: 12.5, angle: -Math.PI / 2, pair: 'passage' }, // the service passage
+    { type: 'lurcher', x: 2.5,  y: 16.5, angle: -Math.PI / 2, pair: 'passage' },
   ],
 
   // Creatures drop nothing: the ammo comes in crates.

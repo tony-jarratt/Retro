@@ -77,7 +77,8 @@ function lurcherLeg(x, y, dx, hip, knee, ankle, shade) {
 // YOUR left; from behind, on your right.
 function lurcherFrontBackShape(view, pose) {
   const front = view === 'front';
-  const drop = pose === 'lunge' ? 3 : 0; // it crouches into the lunge
+  const feed = pose === 'feed';
+  const drop = pose === 'lunge' ? 3 : feed ? 8 : 0; // it crouches into the lunge, and low over a meal
   const open = pose === 'rear' || pose === 'lunge';
   return (x, y) => {
     const dx = x + 0.5 - 32;
@@ -90,6 +91,7 @@ function lurcherFrontBackShape(view, pose) {
       let shoulder = [side * 12, 23 + drop], elbow, hand;
       if (pose === 'rear') { elbow = [side * 21, 13]; hand = [side * 17, 7]; }
       else if (pose === 'lunge') { elbow = [side * 22, 29]; hand = [side * 25, 37]; }
+      else if (feed) { elbow = [side * 15, 41]; hand = [side * 8, 55]; } // tearing at what's on the floor
       else { elbow = [side * 18, 37]; hand = [side * 18 + sway * 0.5, 50 + Math.abs(sway) * 0.5]; }
       const arm = lurcherArm(x, y, dx, shoulder, elbow, hand, big, pose === 'rear', 1);
       if (arm) return arm;
@@ -101,6 +103,7 @@ function lurcherFrontBackShape(view, pose) {
       if (front) {
         const eyeRow = yy >= 17 && yy < 19;
         if (eyeRow && Math.abs(dx) > 1.2 && Math.abs(dx) < 4) {
+          if (feed) return brighten(CREATURE_EYE, 0.35); // eating, the eyes dim
           return glowing(open ? [230, 255, 200] : CREATURE_EYE); // rearing, the eyes flare
         }
         const mouthTop = 21, mouthBottom = open ? 25 : 23;
@@ -139,7 +142,8 @@ function lurcherFrontBackShape(view, pose) {
     // Legs: the stepping one lifts its foot.
     for (const side of [-1, 1]) {
       const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 3 : 0;
-      const leg = lurcherLeg(x, y, dx, [side * 6, 43 + drop], [side * 10, 52 + drop * 0.5 - lift], [side * 8, 59 - lift], 1);
+      const knee = feed ? [side * 13, 56] : [side * 10, 52 + drop * 0.5 - lift];
+      const leg = lurcherLeg(x, y, dx, [side * 6, Math.min(43 + drop, 50)], knee, [side * 8, 59 - lift], 1);
       if (leg) return leg;
     }
     return null;
@@ -149,6 +153,14 @@ function lurcherFrontBackShape(view, pose) {
 // Side on, facing right: the hunch shows here, head thrust forward. The near
 // arm hangs in front of the body; the swollen far arm pokes out behind it.
 function lurcherSideShape(pose) {
+  if (pose === 'feed') {
+    const stand = lurcherSideShape('stand');
+    return (x, y) => {
+      if (y < 5) return null;
+      const t = stand(x, y - 5);
+      return t && t[3] === true ? brighten(CREATURE_EYE, 0.35) : t; // the only glow is the eye: dimmed
+    };
+  }
   const swing = pose === 'walk1' ? 4 : pose === 'walk2' ? -4 : 0;
   return (x, y) => {
     const dx = x + 0.5 - 32;
@@ -186,7 +198,7 @@ function lurcherSideShape(pose) {
 
 function makeLurcherFrames() {
   const bake = (shape) => makeTexture(FLESH, shape);
-  const poses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2') });
+  const poses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2'), feed: make('feed') });
   const front = (pose) => bake(lurcherFrontBackShape('front', pose));
   return {
     front: { ...poses(front), rear: front('rear'), lunge: front('lunge') },
@@ -417,7 +429,189 @@ function larvaShape(frame) {
 }
 const LARVA_FRAMES = [0, 1, 2].map((f) => makeTexture(LARVA_SKIN, larvaShape(f)));
 
+
+// THE STALKER: lean and long-limbed, taller than you, on digitigrade legs,
+// with long blade fingers. Its skin bends the light: in the dark it's almost
+// nothing, a shimmer at its edges and two cold eye-glints; under a lamp, or
+// in your muzzle flash, you see all of it. So its frames come in
+// STALKER_LEVELS of visibility, and enemies.js picks one by the light where
+// it stands (stalkerVisibility, stalker.js).
+// Poses: stand, walk1, walk2, and front 'slash' (a blade arm raised).
+const STALKER_SKIN = [124, 116, 144];
+const STALKER_DARK = [64, 58, 80];
+const STALKER_EYE = [190, 230, 255];
+const STALKER_BLADE = [200, 205, 220];
+// How opaque its skin is at each visibility level (0 = dark ... 3 = lit).
+// Level 0 is a shimmer: faint skin, a brighter rim. The eyes always glow.
+const STALKER_ALPHA = [12, 80, 170, 255];
+const STALKER_RIM_ALPHA = [70, 120, 200, 255];
+const STALKER_SHIMMER = [[46, 50, 66], [70, 74, 98]]; // the glowing rim's colour at levels 0 and 1
+
+// Its skin: bands that ripple like heat haze, which is the "light-bending".
+function stalkerSkin(x, y, shade) {
+  const band = 0.75 + 0.3 * Math.sin((x + y * 0.6) * 0.9 + 3 * noise(x >> 2, y >> 2, 150));
+  return brighten(STALKER_SKIN, shade * band);
+}
+
+// A thin limb from a to b, then on to c: shaded down its length.
+function stalkerLimb(dx, y, x, pts, w, shade) {
+  for (let n = 0; n + 1 < pts.length; n++) {
+    const d = segmentDistance(dx, y, pts[n][0], pts[n][1], pts[n + 1][0], pts[n + 1][1]);
+    if (d < w) return stalkerSkin(x, y, shade * (1.1 - 0.5 * d / w));
+  }
+  return null;
+}
+
+// Three long blades from the hand, pointing along (ux, uy).
+function stalkerBlades(dx, y, hand, ux, uy) {
+  for (const k of [-1, 0, 1]) {
+    const tx = hand[0] + ux * 9 + k * 1.8 * Math.abs(uy), ty = hand[1] + uy * 9 + k * 1.8 * Math.abs(ux);
+    if (segmentDistance(dx, y, hand[0], hand[1], tx, ty) < 0.7) return STALKER_BLADE;
+  }
+  return null;
+}
+
+function stalkerFrontBackShape(view, pose) {
+  const front = view === 'front';
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    for (const side of [-1, 1]) {
+      const sway = pose === 'walk1' ? side * 2 : pose === 'walk2' ? -side * 2 : 0;
+      const raised = pose === 'slash' && side > 0;
+      const shoulder = [side * 7, 21];
+      const elbow = raised ? [side * 14, 12] : [side * 12, 33];
+      const hand = raised ? [side * 9, 4] : [side * 13 + sway * 0.5, 45];
+      const blade = raised ? stalkerBlades(dx, y, hand, -0.3 * side, -1) : stalkerBlades(dx, y, hand, 0.1 * side, 1);
+      if (blade) return blade;
+      const arm = stalkerLimb(dx, y, x, [shoulder, elbow, hand], 1.6, 1);
+      if (arm) return arm;
+    }
+    const head = inEllipse(dx, y, 0, 12, 3.5, 5);
+    if (head !== null) {
+      if (front && y >= 11 && y < 13 && Math.abs(dx) > 0.8 && Math.abs(dx) < 2.8) return glowing(STALKER_EYE);
+      return stalkerSkin(x, y, 1.15 - 0.4 * head);
+    }
+    if (y >= 17 && y < 20 && Math.abs(dx) < 1.3) return stalkerSkin(x, y, 0.8); // the neck
+    if (y >= 20 && y < 41) {
+      const halfW = 7 - (y - 20) * 0.17;
+      if (Math.abs(dx) < halfW) {
+        if (front && y >= 23 && y < 34 && (y - 23) % 3 === 0 && Math.abs(dx) > 1) return brighten(STALKER_DARK, 0.9); // ribs
+        if (!front && Math.abs(dx) < 1 && y % 3 < 2) return brighten(STALKER_SKIN, 1.3); // spine
+        return stalkerSkin(x, y, roundShade(dx / halfW));
+      }
+    }
+    for (const side of [-1, 1]) {
+      const lift = (pose === 'walk1' && side < 0) || (pose === 'walk2' && side > 0) ? 3 : 0;
+      const leg = stalkerLimb(dx, y, x, [[side * 3.5, 40], [side * 6.5, 48 - lift], [side * 3, 55 - lift], [side * 5, 61 - lift]], 1.7, 0.95);
+      if (leg) return leg;
+    }
+    return null;
+  };
+}
+
+// Side on, facing right: leaning forward, head out front, arms reaching.
+function stalkerSideShape(pose) {
+  const swing = pose === 'walk1' ? 4 : pose === 'walk2' ? -4 : 0;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    const nearHand = [12 + swing * 0.6, 42];
+    const blade = stalkerBlades(dx, y, nearHand, 0.5, 0.85);
+    if (blade) return blade;
+    const near = stalkerLimb(dx, y, x, [[3, 22], [9 + swing * 0.3, 32], nearHand], 1.6, 1);
+    if (near) return near;
+    const head = inEllipse(dx, y, 9, 15, 5, 3.5);
+    if (head !== null) {
+      if (dx >= 10.5 && dx < 13 && y >= 14 && y < 16) return glowing(STALKER_EYE);
+      return stalkerSkin(x, y, 1.15 - 0.4 * head);
+    }
+    if (segmentDistance(dx, y, 1, 21, 6, 16) < 1.3) return stalkerSkin(x, y, 0.85); // the neck
+    const body = segmentDistance(dx, y, 1, 22, -3, 40);
+    if (body < 4.5) return stalkerSkin(x, y, 1.1 - 0.5 * body / 4.5);
+    const far = stalkerLimb(dx, y, x, [[1, 22], [6 - swing * 0.3, 32], [10 - swing * 0.6, 42]], 1.5, 0.6);
+    if (far) return far;
+    for (const [s, shade] of [[swing, 1], [-swing, 0.6]]) {
+      const leg = stalkerLimb(dx, y, x, [[-3, 40], [3 + s * 0.5, 47], [-3 + s, 54], [1 + s, 61]], 1.7, shade);
+      if (leg) return leg;
+    }
+    return null;
+  };
+}
+
+// Bake a shape at one visibility level: skin and blades go see-through by
+// STALKER_ALPHA, the rim (a texel with empty space beside it) a little
+// less, the eyes stay lit. Nothing goes fully transparent where the body
+// is, so you can still shoot what you can't see. In the dark (levels 0 and
+// 1) every other rim texel GLOWS faintly instead: the darkness would
+// swallow a merely see-through rim, but a glowing one ignores the light,
+// so you see a broken shimmer of an outline, and the eyes.
+function bakeStalker(shape, level) {
+  const at = (x, y) => (x < 0 || y < 0 || x >= TEX_SIZE || y >= TEX_SIZE ? null : shape(x, y));
+  return makeTexture(STALKER_SKIN, (x, y) => {
+    const t = at(x, y);
+    if (t === null) return null;
+    if (t[3] === true || level === 3) return t;
+    const rim = at(x - 1, y) === null || at(x + 1, y) === null || at(x, y - 1) === null || at(x, y + 1) === null;
+    if (rim && level < 2 && noise(x, y, 155) < 0.5) return glowing(STALKER_SHIMMER[level]);
+    return seeThrough(t, rim ? STALKER_RIM_ALPHA[level] : STALKER_ALPHA[level]);
+  });
+}
+
+function makeStalkerFrames(level) {
+  const bake = (shape) => bakeStalker(shape, level);
+  const poses = (make) => ({ stand: make('stand'), walk1: make('walk1'), walk2: make('walk2') });
+  const front = (pose) => bake(stalkerFrontBackShape('front', pose));
+  return {
+    front: { ...poses(front), slash: front('slash') },
+    back:  poses((pose) => bake(stalkerFrontBackShape('back', pose))),
+    right: poses((pose) => bake(stalkerSideShape(pose))),
+    left:  poses((pose) => bake(mirroredShape(stalkerSideShape(pose), true))),
+  };
+}
+const STALKER_FRAMES = [0, 1, 2, 3].map(makeStalkerFrames);
+
+// Dead, its skin stops bending the light: a tangle of long limbs, fully seen.
+function makeStalkerCorpse() {
+  return makeTexture(STALKER_SKIN, (x, y) => {
+    const dx = x + 0.5 - 32;
+    for (const [a, b] of [[[-20, 60], [-4, 55]], [[-4, 55], [14, 58]], [[14, 58], [24, 52]], [[0, 56], [-12, 50]], [[-12, 50], [-22, 53]]]) {
+      if (segmentDistance(dx, y, a[0], a[1], b[0], b[1]) < 1.8) return stalkerSkin(x, y, 0.7);
+    }
+    const body = inEllipse(dx, y, 2, 58, 9, 3.5);
+    if (body !== null) return stalkerSkin(x, y, 0.9 - 0.3 * body);
+    if (y >= 58 && y < 60 && dx > 10 && dx < 12.5) return [40, 50, 60]; // an eye, gone dark
+    if (y >= 61 && Math.abs(dx) < 18) return brighten(ICHOR, 0.6 + 0.3 * noise(x, y, 151));
+    return null;
+  });
+}
+
+// A body eaten clean (feeding.js): a ribcage, a skull, some long bones.
+const BONE = [214, 204, 178];
+const BONES_TEXTURE = makeTexture(BONE, (x, y) => {
+  const dx = x + 0.5 - 32;
+  const skull = inEllipse(dx, y, -12, 56, 4, 3.5);
+  if (skull !== null) return y >= 56 && y < 58 && Math.abs(Math.abs(dx + 12) - 1.6) < 0.8 ? [30, 24, 20] : brighten(BONE, 1.05 - 0.3 * skull);
+  for (let r = 0; r < 4; r++) { // ribs: arcs over a spine
+    const cx = -3 + r * 4;
+    if (Math.abs(Math.hypot(dx - cx, (y - 61) * 1.4) - 5) < 0.7 && y < 61) return brighten(BONE, 0.9);
+  }
+  if (y >= 60 && y < 62 && dx > -6 && dx < 14) return brighten(BONE, 0.8); // the spine
+  if (segmentDistance(dx, y, 14, 61, 26, 58) < 1 || segmentDistance(dx, y, -20, 62, -28, 59) < 1) return BONE;
+  if (y >= 62 && Math.abs(dx) < 20) return brighten(ICHOR, 0.45);
+  return null;
+});
+
+// A body burnt to ash (a blast, or acid): a black heap with a few embers.
+const ASH_TEXTURE = makeTexture([40, 36, 32], (x, y) => {
+  const dx = x + 0.5 - 32;
+  if (y < 52) return null;
+  const halfW = (y - 52) * 2.2 + 4;
+  if (Math.abs(dx) >= halfW || Math.abs(dx) > 22) return null;
+  if (noise(x, y, 152) < 0.04) return glowing([255, 120 + Math.floor(noise(x, y, 153) * 80), 30]);
+  return brighten([46, 42, 38], 0.6 + 0.6 * noise(x >> 1, y, 154));
+});
+
 ROBOT_FRAMES.lurcher = makeLurcherFrames();
 ROBOT_FRAMES.spitter = makeSpitterFrames();
+ROBOT_FRAMES.stalker = STALKER_FRAMES[3]; // fully seen: the default (the debug map, the load check)
 // What each type leaves behind (enemies.js). Robots leave the robot wreck.
-const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse(), spitter: makeSpitterCorpse() };
+const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse(), spitter: makeSpitterCorpse(), stalker: makeStalkerCorpse() };

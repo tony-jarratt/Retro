@@ -43,6 +43,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   spitter  frail, keeps its distance and lobs acid where you're standing
 //            (acid.js), leaving a burning pool. Its glands are on its back:
 //            hits there count double. Get close, and it backs off.
+//   stalker  fast and frail, nearly invisible in the dark; slashes and runs,
+//            and holds off from you while you're lit up (stalker.js)
 //
 // THE HQ'S INFECTED (infected.js):
 //   suit     an office worker the plant virus took. Shambles, GRABS and holds
@@ -57,7 +59,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //              reach to start an attack)
 //   weapon     'gun', 'rocket' (explosions.js), 'melee' or 'lob' (creatures.js,
 //              acid.js), 'grab' (infected.js: aimRange is its reach), or
-//              'spores' (infected.js: aimRange is how close sets it off)
+//              'spores' (infected.js: aimRange is how close sets it off), or
+//              'slash' (stalker.js: aimRange is its reach to start one)
 // and these only if it differs from ENEMY_DEFAULTS:
 //   charge     seconds of charging (visor brightening) before each shot
 //   damage     per hit: a 'gun' round, a lunge that connects, an acid splash
@@ -73,9 +76,10 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   retreat    creatures that fight at range: closer than this, it backs away
 //              (and shows you its back) rather than fire, unless it's cornered
 //   rises      shot down, it gets back up unless finished off (infected.js)
+//   feeds      wounded, it eats the dead to heal (feeding.js)
 const ENEMY_DEFAULTS = {
   charge: 0, damage: 0, hitNear: 0, hitFar: 0, backHits: 1, mobile: true,
-  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false,
+  strafe: false, weave: false, volley: 1, volleyGap: 0, creature: false, retreat: 0, rises: false, feeds: false,
 };
 const ENEMY_REQUIRED = ['speed', 'health', 'aimRange', 'weapon'];
 const ENEMY_TYPES = {
@@ -83,8 +87,9 @@ const ENEMY_TYPES = {
   scout:   { speed: 3.0, health: 2, aimRange: 1.6, weapon: 'gun',    charge: 0.5, damage: 8,  hitNear: 0.7,  hitFar: 0.45, strafe: true, weave: true },
   heavy:   { speed: 0.8, health: 6, aimRange: 6,   weapon: 'rocket', charge: 1.8, backHits: 2 },
   turret:  { speed: 0,   health: 4, aimRange: 8,   weapon: 'gun',    charge: 1.2, damage: 6,  hitNear: 0.75, hitFar: 0.35, mobile: false, volley: 5, volleyGap: 0.12 },
-  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true },
+  lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true, feeds: true },
   spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
+  stalker: { speed: 2.5, health: 3, aimRange: 1.0, weapon: 'slash',              damage: 12, creature: true },
   suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
   bloomer: { speed: 0,   health: 2, aimRange: 2.2, weapon: 'spores', charge: 0.9, mobile: false, creature: true },
 };
@@ -148,6 +153,8 @@ const enemies = ENEMIES.map((start) => ({
   lungeLeft: 0,  // creatures: cells of lunge still to go
   downTime: 0,   // a downed suit: seconds until it gets up; 0 if it never will (infected.js)
   bay: null,     // smart robots: the repair bay it's heading for or docked in (repair.js)
+  pair: start.pair || null, // lurchers that hunt together share a tag (creatures.js)
+  pairCalled: false, pairCaller: false,
   repairTime: 0, // seconds of welding towards the next hit restored
 }));
 
@@ -240,6 +247,7 @@ function turnTowardsPlayer(enemy) {
   if (enemy.state === 'dead' || enemy.state === 'offline') return;
   if (ATTACK_STATES.includes(enemy.state)) return; // a creature mid-attack is already facing you, and won't be put off
   if (enemy.state === 'retreat' || enemy.state === 'repair') return; // fleeing to a bay, or docked: it shows you its back (repair.js)
+  if (['hungry', 'feed', 'slash', 'flee', 'lurk'].includes(enemy.state)) return; // going to eat or eating (feeding.js); a stalker's own moves (stalker.js)
   // Already facing you (say, a robot aiming at you): nothing to turn, and
   // pausing it would let rapid fire freeze it in place.
   const want = Math.atan2(player.y - enemy.y, player.x - enemy.x);
@@ -349,12 +357,15 @@ function updateWalker(enemy, dt) {
   const type = ENEMY_TYPES[enemy.type];
   if (enemy.state === 'dormant') return; // a creature asleep in its tank (creatures.js)
   if (type.weapon === 'melee' && updateMeleeAttack(enemy, dt)) return; // mid-attack (creatures.js)
+  if (type.weapon === 'slash' && updateStalker(enemy, dt)) return;      // slashing, running, lurking (stalker.js)
   if (updateInfected(enemy, dt)) return; // grabbing, staggering or getting up (infected.js)
   if (updateRepairing(enemy, dt)) return; // smart, and badly hurt: off to a repair bay (repair.js)
+  if (updateFeeding(enemy, dt)) return;   // a wounded lurcher, off to eat the dead (feeding.js)
   const sees = canSee(enemy);
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (sees) {
     if (enemy.smart) callForHelp(enemy);
+    if (enemy.pair) pairSpotted(enemy); // creatures.js: it calls its partner
     enemy.lastSeenX = player.x;
     enemy.lastSeenY = player.y;
     enemy.state = dist <= type.aimRange ? 'aim' : 'chase';
@@ -371,19 +382,28 @@ function updateWalker(enemy, dt) {
 
   if (enemy.state === 'aim' && type.weapon === 'melee') {
     startMeleeAttack(enemy); // creatures.js: it rears up
+  } else if (enemy.state === 'aim' && type.weapon === 'slash') {
+    startSlash(enemy);       // stalker.js: a hiss, and the blades
   } else if (enemy.state === 'aim' && type.weapon === 'grab') {
     startGrab(enemy);        // infected.js: it takes hold
   } else if (enemy.state === 'aim') {
     aimAndFire(enemy, dt);
     if (enemy.smart && type.strafe) enemy.moving = strafeStep(enemy, dt);
   } else if (enemy.state === 'chase') {
-    if (enemy.smart && type.weave && sees) {
+    if (type.weapon === 'slash' && sees && stalkerHoldsOff(enemy, dist)) return; // stalker.js: you're lit up, it waits in the dark
+    const flank = enemy.pair ? pairFlankPoint(enemy) : null; // creatures.js: the second of a pair comes round your side
+    if (flank) {
+      enemy.moving = moveAlongPath(enemy, flank.x, flank.y, dt);
+    } else if (enemy.smart && type.weave && sees) {
       enemy.moving = weaveStep(enemy, dt);
     } else {
       // No route (a door shut between you)? It waits, still watching.
       enemy.moving = moveAlongPath(enemy, player.x, player.y, dt);
     }
   } else if (enemy.state === 'search') {
+    // Called by its partner (creatures.js): it comes round your side, not after it.
+    const flank = enemy.pairCalled ? pairFlankPoint(enemy) : null;
+    if (flank) { enemy.moving = moveAlongPath(enemy, flank.x, flank.y, dt); return; }
     const arrived = Math.hypot(enemy.lastSeenX - enemy.x, enemy.lastSeenY - enemy.y) < 0.2;
     enemy.moving = !arrived && moveAlongPath(enemy, enemy.lastSeenX, enemy.lastSeenY, dt);
     // Got there, or no way through / completely stuck: give up and stand guard here.
@@ -452,11 +472,13 @@ function beaconLit(enemy) {
 function enemyTexture(enemy, viewer) {
   if (enemy.state === 'dead') {
     if (enemy.downTime > 0) return downedTexture(enemy); // infected.js: down, but getting up again
-    return CORPSE_TEXTURES[enemy.type] || WRECK_TEXTURE; // a heap looks the same from every side
+    return corpseTexture(enemy) || WRECK_TEXTURE; // feeding.js: whole, bones or ash; a heap looks the same from every side
   }
-  const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off'] : ROBOT_FRAMES[enemy.type];
+  const frames = enemy.smart ? SMART_ROBOT_FRAMES[enemy.type][beaconLit(enemy) ? 'on' : 'off']
+    : enemy.type === 'stalker' ? STALKER_FRAMES[stalkerVisibility(enemy)] // stalker.js: seen only as well as it's lit
+    : ROBOT_FRAMES[enemy.type];
   // A creature's attack faces you throughout, so it's only ever seen from the front.
-  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open' }[enemy.state];
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open', slash: 'slash' }[enemy.state];
   if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.
@@ -474,6 +496,7 @@ function enemyTexture(enemy, viewer) {
   // WALK_FPS times a second; otherwise they stand.
   let pose = 'stand';
   if (enemy.state === 'dormant' || enemy.state === 'offline') pose = 'dormant';
+  else if (enemy.state === 'feed') pose = 'feed'; // hunched over a body (feeding.js)
   else if (enemy.moving) pose = Math.floor(enemy.walkTime * WALK_FPS) % 2 === 0 ? 'walk1' : 'walk2';
   return frames[view][pose] || frames[view].stand; // a creature asleep in its tank just stands
 }

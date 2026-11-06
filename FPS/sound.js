@@ -396,6 +396,30 @@ function sfxRobotStep(enemy) {
 }
 
 // THE LAB'S CREATURES: flesh, not metal. Hits are wet slaps, not clangs.
+// A pair of lurchers spotting you: two snarls a fifth apart, the second
+// answering the first, so you know there are two.
+function sfxPairCall(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 110, 80, 0.5, 0.14);
+  tone(out, 'sawtooth', 165, 120, 0.5, 0.12, 0.35);
+  noiseBurst(out, 'bandpass', 600, 300, 0.8, 0.25);
+}
+// Feeding: a wet tear, low and short.
+function sfxFeeding(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 900 + Math.random() * 400, 200, 0.18, 0.45);
+  drumHit(out, 'sine', 120, 60, 0.04, 0.08, 0.2);
+}
+// The stalker: no snarl as it comes, only a sharp hiss as it strikes, and
+// the blades whistling through.
+function sfxStalkerSlash(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'highpass', 4000, 2500, 0.22, 0.4);
+  noiseBurst(out, 'bandpass', 2500, 900, 0.12, 0.35, 0.22);
+}
 function sfxCreatureHit(enemy) {
   const out = placeAt(enemy.x, enemy.y);
   if (!out) return;
@@ -815,7 +839,7 @@ function fadeOutLoops() {
 function rememberState() {
   for (const d of DOORS) last.doors.set(d, d.state);
   for (const p of PANELS) last.panels.set(p, p.state);
-  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime });
+  for (const e of enemies) last.enemies.set(e, { health: e.health, state: e.state, step: Math.floor(e.walkTime * WALK_FPS), downTime: e.downTime, pairCaller: e.pairCaller });
   last.pickups = new Set(pickups);
   for (const h of hives) last.hives.set(h, h.left);
   for (const t of terminals) last.terminals.set(t, t.state);
@@ -855,17 +879,20 @@ function watchTheGame() {
     if (e.state === 'dead' && was.downTime > 0 && e.downTime === 0) sfxSuitFinished(e); // infected.js
     if (e.state !== 'dead' && e.moving && step !== was.step) creature ? sfxCreatureStep(e) : sfxRobotStep(e);
     if (e.state === 'retreat' && was.state !== 'retreat') sfxRobotRetreat(e);
+    if (e.state === 'feed' && Math.random() < 0.05) sfxFeeding(e); // feeding.js: tearing, now and then
+    if (e.pairCaller && !was.pairCaller) sfxPairCall(e);           // creatures.js: a pair has seen you
     if (creature && e.state !== was.state) {
       if (e.state === 'chase' && (was.state === 'idle' || was.state === 'search')) {
         if (e.type === 'spitter') sfxSpitterHiss(e);
         else if (e.type === 'suit') sfxSuitMoan(e);
-        else sfxLurcherSnarl(e);
+        else if (e.type !== 'stalker') sfxLurcherSnarl(e); // the stalker comes silently
       }
       if (e.state === 'grab') sfxSuitGrab(e);
       if (e.state === 'swell') sfxBloomerSwell(e);
       if (e.state === 'rising') sfxSuitRise(e);
       if (e.state === 'windup') sfxLurcherRear(e);
       if (e.state === 'lunge') sfxLurcherSwipe(e);
+      if (e.state === 'slash') sfxStalkerSlash(e);
     }
   }
   // A pickup that was in the list last frame and isn't now has been collected.

@@ -335,6 +335,27 @@ cameras, tripwires or terminals (owner, 2026-11-05).
 - **The lab comes loose:** burning the chamber breaks every tank, bursts
   every pod, turns the lights red, and from then on every creature always
   knows where you are.
+- **Feeding** (`feeding.js`, owner 2026-11-06): a lurcher down to 2 hits
+  goes to the nearest creature corpse it can reach (12 steps), hunches over
+  it (eyes dim, wet tearing) and eats: 1 hit back every 1.5 s, 2 hits of food
+  per body, then the body is bones. Going to eat and eating, it ignores you
+  and doesn't turn when shot. A blast or an acid pool BURNS bodies to ash:
+  no food. You make the food supply. (Larvae leave no body, so they feed
+  nobody.)
+- **Stalker** (`stalker.js`, art in `creature-art.js`): fast (2.5), frail
+  (3 hits), slashes for 12 after a 0.25 s hiss, then runs to the darkest
+  spot 3-5 cells from you and comes again (about every 2.3 s in the dark).
+  It comes silently. If you're lit up (a lamp, your muzzle flash) when it's
+  within 4 cells, it holds off in the dark for up to 4 s, then comes anyway
+  (and won't hold off again for 4 s). Its frames have 4 visibility levels
+  from the light where it stands: in the dark, a broken glowing shimmer of
+  an outline and two cold eye-glints; under light, all of it. Always
+  shootable. Two in Genetics.
+- **Pairs** (`pair: 'tag'` on two lurchers, `creatures.js`): the one that
+  spots you cries out (two voices) and its partner knows where you are;
+  the one further from you swings round to your side (a quarter turn from
+  its partner, 1.5 cells out) instead of following. Storage: the cold store
+  and the service passage are pairs; Genetics: the lower lab's two.
 - **Creatures drop nothing** (owner: it makes sense for robots, not
   creatures). The lab's ammo comes in big supply crates (`ammocrate`, +20),
   and the automatic module lies in the larvae's nest. They can't open doors
@@ -428,12 +449,7 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 
 ## 9. Open ideas
 
-- **Next (agreed 2026-11-06), in order:**
-  1. Lab creatures: wounded lurchers **feed on corpses** to heal (burn the
-     bodies, or they're food); a **stalker** nearly invisible in the dark,
-     seen properly only under light or your muzzle flash; lurchers that
-     **hunt in pairs** (one rears up, the other flanks).
-  2. **Spawn events**, both kinds: scripted, telegraphed ambushes (a trigger
+- **Next (agreed 2026-11-06): spawn events**, both kinds: scripted, telegraphed ambushes (a trigger
      such as a room or the lift key; a hatch flashes and a klaxon sounds,
      then enemies drop in), and spawners you must kill (an industrial
      **fabricator** building robots; a lab **brood mother** birthing young).

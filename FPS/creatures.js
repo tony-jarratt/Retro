@@ -27,6 +27,12 @@
 //     plant (core.js) breaks every tank, bursts every pod, wakes every larva,
 //     and from then on every creature always knows where you are. The
 //     lights go red. Run.
+//   PAIRS. Lurchers placed with the same `pair` tag hunt together. The one
+//     that spots you calls (a two-voice cry), and its partner comes too. The
+//     one further from you doesn't come straight in: it swings round to your
+//     side, a quarter turn from its partner, so dodging one walks you into
+//     the other.
+// Feeding on the dead is in feeding.js; the stalker in stalker.js.
 // The spitter's acid is in acid.js; the larvae and their pods in larvae.js;
 // the HQ's infected suits in infected.js.
 
@@ -47,6 +53,7 @@ const LURCHER_REACH = 0.6;
 const LURCHER_RECOVER = 0.7;      // seconds it stands there afterwards: shoot it
 
 const ATTACK_STATES = ['windup', 'lunge', 'recover'];
+const PAIR_FLANK = 1.5;     // cells from you: where a pair's second lurcher heads, off to your side
 const LOOSE_CALL_GAP = 1.5; // once the lab is loose: seconds between creatures being told where you are
 
 let creaturesLoose = false;
@@ -60,6 +67,49 @@ enemies.forEach((e, n) => {
     throw new Error(`ENEMIES[${n}] (${e.type} at ${e.x}, ${e.y}) is in a tank (tank: true), but there's no tank glass ('g') beside its cell.`);
   }
 });
+
+// Pairs: each tag names exactly two lurchers.
+const pairTags = {};
+enemies.forEach((e, n) => {
+  if (!e.pair) return;
+  if (e.type !== 'lurcher') throw new Error(`ENEMIES[${n}] is a ${e.type} with pair "${e.pair}": only lurchers hunt in pairs.`);
+  pairTags[e.pair] = (pairTags[e.pair] || 0) + 1;
+});
+for (const [tag, count] of Object.entries(pairTags)) {
+  if (count !== 2) throw new Error(`Pair "${tag}" has ${count} lurchers: a pair is two.`);
+}
+
+function partnerOf(enemy) {
+  return enemy.pair ? enemies.find((o) => o !== enemy && o.pair === enemy.pair) : null;
+}
+
+// One of a pair has seen you: it cries out, and its partner knows where you are.
+function pairSpotted(enemy) {
+  if (!enemy.pair || enemy.pairCalled) return;
+  const partner = partnerOf(enemy);
+  enemy.pairCalled = true;
+  enemy.pairCaller = true; // sound.js plays the cry from this one
+  partner.pairCalled = true;
+  alertEnemy(partner, player.x, player.y);
+}
+
+// Where the second of a pair should head instead of straight at you: a
+// quarter turn round you from its partner, on whichever side is nearer,
+// PAIR_FLANK cells out. Only while its partner is alive and either nearer
+// to you or already attacking; null otherwise (or if neither spot is floor).
+function pairFlankPoint(enemy) {
+  const partner = partnerOf(enemy);
+  if (!partner || partner.state === 'dead') return null;
+  const mine = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+  const theirs = Math.hypot(player.x - partner.x, player.y - partner.y);
+  if (!ATTACK_STATES.includes(partner.state) && theirs >= mine) return null; // I'm the nearer one: straight in
+  const a = Math.atan2(partner.y - player.y, partner.x - player.x);
+  const spots = [a + Math.PI / 2, a - Math.PI / 2]
+    .map((b) => ({ x: player.x + Math.cos(b) * PAIR_FLANK, y: player.y + Math.sin(b) * PAIR_FLANK }))
+    .filter((p) => MAP[Math.floor(p.y)]?.[Math.floor(p.x)] === 0)
+    .sort((p, q) => Math.hypot(p.x - enemy.x, p.y - enemy.y) - Math.hypot(q.x - enemy.x, q.y - enemy.y));
+  return spots[0] || null;
+}
 
 // A sleeping creature wakes: it goes to look for you where you are now.
 function wakeCreature(enemy) {
