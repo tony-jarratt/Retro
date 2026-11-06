@@ -283,7 +283,7 @@ function drawWallStrip(pixels, col, hit, player) {
 function wallLight(hit, player) {
   const lx = hit.side === 0 ? hit.hitX + (player.x < hit.hitX ? -0.05 : 0.05) : hit.hitX;
   const ly = hit.side === 1 ? hit.hitY + (player.y < hit.hitY ? -0.05 : 0.05) : hit.hitY;
-  return lightAt(lx, ly);
+  return viewLight(lx, ly); // nightvision.js: lightAt, amplified with the power off
 }
 
 // GLASS AND GRATES. Each column's panels are drawn FARTHEST FIRST (the
@@ -341,7 +341,7 @@ function renderFloorCeiling(pixels, player, hits, placed) {
 
       // Floor and ceiling share a lookup: the light map is flat, so the spot
       // on the ceiling gets the same light as the spot on the floor below it.
-      const light = lightAt(floorX, floorY);
+      const light = viewLight(floorX, floorY);
       copyTexel(pixels, col, row, FLOOR_TEXTURE, texX, texY, light, fog);
       // A puddle, oil, scorch... laid over the floor in this cell (decals.js).
       const cellX = Math.floor(floorX), cellY = Math.floor(floorY);

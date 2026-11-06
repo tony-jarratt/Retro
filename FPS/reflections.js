@@ -96,7 +96,7 @@ function reflectInPuddle(pixels, col, row, d, floorX, floorY, screenX, hit, spri
     const tex = state === 'on' ? CEILING_TEXTURE : state === 'alarm' ? CEILING_ALARM_TEXTURE : CEILING_DARK_TEXTURE;
     colour = glows(tex, texX, texY)
       ? litTexel(tex, texX, texY, FULL_LIGHT, 0)
-      : litTexel(tex, texX, texY, lightAt(cx, cy), fogAmount(farDist));
+      : litTexel(tex, texX, texY, viewLight(cx, cy), fogAmount(farDist));
   }
 
   // THE SPRITES between the puddle and that far thing, farthest first, each

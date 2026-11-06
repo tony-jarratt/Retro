@@ -325,6 +325,7 @@ function drawHud(pixels) {
   drawAmmoReadout(pixels);
   drawKeys(pixels);
   drawScanReadout(pixels); // scanner.js
+  drawNightVisionReadout(pixels); // nightvision.js
   if (player.invulnerable) drawText(pixels, 'INVULNERABLE', SCREEN_W - READOUT_MARGIN - textWidth('INVULNERABLE', 1) - 30, 1, HUD_WARN, 1); // play-testing (I), on the top rim
   if (paused) { drawPauseScreen(pixels); return; } // pause.js: the controls, instead of any messages
   if (game.state === 'dead') displayShutdown(pixels, game.endTime);

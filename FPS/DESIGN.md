@@ -169,18 +169,33 @@ Hand-placed, each with a TELL first, and some DECOYS (the tell, then nothing).
 The lights flicker and buzz for 2 s, a deep clunk, then the strips drop to a
 faint steady RED emergency glow, lamps die, and ambient falls to 30%. What
 glows by itself still does (screens, terminals, the core, fire, spores, your
-muzzle flash). A low mains hum while it's out. Creatures see by light, so
-the dark hides you (but your shots light you up); robots don't care; the
-scanner is how you see. It comes back only when you THROW A BREAKER (a
-grey box, lever down and a red lamp; walk up and face it): the lights
-stutter back on, POWER RESTORED.
+muzzle flash). A low mains hum while it's out. It comes back only when you
+THROW A BREAKER (a grey box, lever down and a red lamp, under a red NEON
+sign, EMERGENCY BREAKER, that always glows and in a blackout lights the wall
+and floor round it red; walk up and face it): the lights stutter back on,
+POWER RESTORED.
 - With the LOCKDOWN (Hangar, Genetics, Atrium): the escape is in the dark;
   the breaker is on the way home.
-- One SCRIPTED CUT per setting (level `powerCut` {x, y, radius}): the
-  Workshops' service corridor (breaker across the loading bay, past the
-  turret), Storage's way down into the tank hall (breaker on its far wall),
-  the Offices' archive (breaker in the kitchen).
+- A SCRIPTED CUT (level `powerCut` {x, y, radius}) on the first level of
+  the later settings: Storage's way down into the tank hall (breaker on its
+  far wall), the Offices' archive (breaker in the kitchen). Not the
+  Workshops (owner): the first level keeps its lights.
 A level that can lose power must have a breaker (`breakers`), checked at load.
+
+### Night vision (`nightvision.js`, owner 2026-11-06)
+
+With the power off the visor switches itself to LOW LIGHT (shown on the top
+rim): no key, no choice, no lamp. It AMPLIFIES the light already there, only
+near you (up to 9x beside you, falling off fast to nothing at 5 cells), so the
+room round you reads and the far end stays black; then the 3D view goes grainy
+monochrome green with scanlines (brightest channel, so red lights and the
+breaker's neon come through bright). It stutters as it boots.
+- The robots and creatures have NIGHT VISION TOO: with the power off the
+  dark doesn't hide you (creatures.js `darkVisibility`). A stalker's dislike
+  of light still goes by the real light, so in a blackout it doesn't hold off.
+- It takes the visor over: NO SCANNER while it's on (X does nothing).
+- The game (who sees whom) always uses the real light; only the drawing
+  uses the amplified light (`viewLight`).
 
 ### Ammo types (`ammo.js`, owner 2026-11-06)
 

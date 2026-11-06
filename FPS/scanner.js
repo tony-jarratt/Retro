@@ -36,7 +36,7 @@ let scanTickTimer = 0;
 
 // X (player.js).
 function toggleScanner() {
-  if (paused || game.state !== 'playing' || !player.scanner) return;
+  if (paused || game.state !== 'playing' || !player.scanner || nightVisionOn()) return; // nightvision.js: it has the visor
   player.scanning = !player.scanning;
   sfxScanToggle(player.scanning); // sound.js
 }
@@ -61,7 +61,7 @@ function scanWalls() { return player.scannerMk2 ? 2 : 1; }
 
 // Each frame (main.js): it switches off when the level ends, and ticks while on.
 function updateScanner(dt) {
-  if (game.state !== 'playing') player.scanning = false;
+  if (game.state !== 'playing' || nightVisionOn()) player.scanning = false; // nightvision.js: it takes the visor over
   if (!player.scanning) return;
   scanTickTimer -= dt;
   if (scanTickTimer <= 0) { scanTickTimer = SCAN_TICK; sfxScanTick(); }

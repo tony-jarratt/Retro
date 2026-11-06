@@ -358,10 +358,26 @@ function makePlanSign(kind) {
 
 // A BREAKER box on the wall (power.js): a grey steel box with a big lever,
 // DOWN with a red lamp while the power's off, UP with a green one once it's
-// thrown. A yellow-and-black band says what it is from across a dark room.
+// thrown. A yellow-and-black band says what it is from across a dark room,
+// and above it a red NEON sign, EMERGENCY BREAKER, glows always: on the
+// emergency circuit, it's the brightest thing in a blackout (power.js lights
+// the wall round it too).
+const NEON_RED = [255, 55, 40];
 function makeBreaker(on) {
   const box = [118, 122, 128];
+  const neon = (text, top, x, y) => {
+    const left = Math.floor((TEX_SIZE - textWidth(text, 1)) / 2);
+    const gx = x - left, gy = y - top;
+    if (gy < 0 || gy >= 5 || gx < 0 || gx >= textWidth(text, 1) || gx % 4 === 3) return false;
+    return FONT[text[Math.floor(gx / 4)]][gy][gx % 4] === '#';
+  };
+  const lit = (x, y) => neon('EMERGENCY', 2, x, y) || neon('BREAKER', 8, x, y);
   return makeTexture(box, (x, y) => {
+    if (y < 14) {
+      if (x < 11 || x > 52 || y > 13) return null;
+      if (lit(x, y)) return glowing(NEON_RED);                                       // the tube
+      return x === 11 || x === 52 || y === 0 || y === 13 ? DARK_STEEL : glowing([16, 10, 12]); // the backing: black glass, which no light brightens
+    }
     if (x < 20 || x > 43 || y < 14 || y > 50) return null;
     if (x < 21 || x > 42 || y < 15 || y > 49) return DARK_STEEL;               // its edge
     if (y >= 17 && y < 21) return hazard(x, y, false);                         // the warning band

@@ -126,7 +126,7 @@ function placeSprites(player) {
       thing, ...spot,
       fog: fogAmount(spot.forward), // a billboard is flat, so one distance for all of it
       // Likewise one light for all of it: the light map at the spot it stands on.
-      light: lightAt(thing.x, thing.y).map((v) => v * thing.shade),
+      light: viewLight(thing.x, thing.y).map((v) => v * thing.shade),
       glowLight: [g, g, g],
     });
   }

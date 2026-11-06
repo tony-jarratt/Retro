@@ -168,13 +168,20 @@ function makeNoise(x, y, radius) {
 function creatureSightRange(enemy) {
   const full = enemy.type === 'guard' ? GUARD_SIGHT : CREATURE_SIGHT; // a guard sees further (guard.js)
   if (enemy.state !== 'idle' && enemy.state !== 'search') return full;
-  return full * playerVisibility();
+  return full * darkVisibility();
 }
 
 // How visible the light makes you: DARK_SIGHT in the dark, up to 1 in full light.
 function playerVisibility() {
   const [r, g, b] = lightAt(player.x, player.y);
   return Math.min(1, Math.max(DARK_SIGHT, ((r + g + b) / 3 - 0.2) / 0.8));
+}
+
+// How well the creatures see you for SIGHT: as playerVisibility, except that
+// with the power off they have night vision, as you do (nightvision.js).
+// (A stalker's dislike of light still goes by the real light: stalker.js.)
+function darkVisibility() {
+  return nightVisionOn() ? 1 : playerVisibility();
 }
 
 // Called by updateWalker when a melee creature is in reach and sees you.

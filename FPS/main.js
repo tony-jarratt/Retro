@@ -174,6 +174,7 @@ function frame(now) {
     hits = castRays(player);
     if (player.scanning) renderScanView(frameImage, hits, player); // scanner.js: the vector view
     else renderView(frameImage, hits, player);
+    applyNightVision(frameImage.data); // nightvision.js: green, with the power off
     drawHud(frameImage.data); // flat on top of the 3D view, same buffer
   }
   // Last of all, so it covers the HUD too: the full CRT look if you've asked

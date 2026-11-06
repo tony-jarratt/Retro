@@ -277,6 +277,7 @@ function updateLighting() {
   addAcidLights(lightGrid);     // globs in flight and pools of acid (acid.js)
   addSporeLights(lightGrid);    // spore clouds' glowing motes (spores.js)
   addBurnLights(lightGrid);     // creatures on fire (ammo.js)
+  addBreakerLights(lightGrid);  // the breaker's neon sign in a blackout (power.js)
 
   dilateIntoWalls(lightGrid);
 }

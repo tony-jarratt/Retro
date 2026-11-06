@@ -97,7 +97,7 @@ function larvaeHear(x, y, radius) {
 function larvaSees(l) {
   const dx = player.x - l.x, dy = player.y - l.y;
   const dist = Math.hypot(dx, dy);
-  if (dist > LARVA_SIGHT * playerVisibility()) return false; // creatures.js: it needs light
+  if (dist > LARVA_SIGHT * darkVisibility()) return false; // creatures.js: it needs light
   return clearLine(l.x, l.y, player.x, player.y) && !steamBlocksSight(l.x, l.y, player.x, player.y);
 }
 
