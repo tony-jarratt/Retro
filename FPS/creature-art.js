@@ -610,8 +610,140 @@ const ASH_TEXTURE = makeTexture([40, 36, 32], (x, y) => {
   return brighten([46, 42, 38], 0.6 + 0.6 * noise(x >> 1, y, 154));
 });
 
+// THE BROOD MOTHER (brood.js): what the breeding programme was for. A small
+// head and torso with clawed forelimbs, on top of an enormous translucent
+// BELLY, lit green from within, with curled young moving inside it. She
+// fills her whole square, so she reads as far bigger than anything else.
+// She's rooted in a fleshy nest. Poses: stand, and 'swell' (front only:
+// she always faces you once she's awake), the belly stretched and blazing,
+// splitting along the bottom. The belly is her weak spot: BROOD_BELLY is
+// its ellipse in the front pictures, for combat.js's double-damage test.
+const BROOD_SKIN = [190, 170, 168];
+const BROOD_DARK = [96, 76, 80];
+const BELLY_GLOW = [120, 220, 90];
+const BROOD_BELLY = { cx: 32, cy: 43, rx: 22, ry: 15 };
+
+// Inside the belly: the green light, brightest at the middle, with the dark
+// curled shapes of young in it (they shift between frames: `seed`).
+function bellyTexel(x, y, dx, r, swell, seed) {
+  // A wet highlight up and to the left: it's taut and shiny.
+  if (Math.hypot(dx + 9, y + 0.5 - 35) < 2.2 && !swell) return glowing([220, 255, 200]);
+  // Veins wandering over the skin.
+  if (r > 0.25 && Math.abs(Math.sin(dx * 0.35 + 3 * noise(x >> 3, y >> 3, 174)) * 6 - (y - 43)) < 0.55) return brighten(VEIN, 0.6);
+  // The young: curled shapes of different sizes, each turned its own way.
+  for (let k = 0; k < 4; k++) {
+    const yx = -13 + k * 8.5 + 3 * noise(k, seed, 160), yy = 40 + 7 * noise(k, seed, 161) - (k % 2) * 3;
+    const size = 2.5 + 1.8 * noise(k, seed, 175);
+    const d = Math.hypot(dx - yx, y + 0.5 - yy);
+    const a = Math.atan2(y + 0.5 - yy, dx - yx) + 6.3 * noise(k, seed, 176);
+    if (Math.abs(d - size) < 1.0 && Math.sin(a) > -0.5) return glowing(brighten(BELLY_GLOW, 0.22)); // the curled body
+    if (d < size * 0.45 && Math.sin(a + 1) > 0.3) return glowing(brighten(BELLY_GLOW, 0.28));     // its head, tucked in
+  }
+  if (r > 0.88) return skin(BROOD_SKIN, x, y, 0.75, 162); // the stretched rim of skin
+  if (swell && y > 52 && Math.abs(dx + 4 * Math.sin(y)) < 1.2) return glowing([230, 255, 200]); // splitting
+  return glowing(brighten(BELLY_GLOW, (swell ? 0.95 : 0.6) - 0.35 * r + 0.08 * noise(x >> 1, y >> 1, 163 + seed)));
+}
+
+function broodFrontShape(pose) {
+  const swell = pose === 'swell';
+  const b = swell ? { ...BROOD_BELLY, rx: BROOD_BELLY.rx + 3, ry: BROOD_BELLY.ry + 2 } : BROOD_BELLY;
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    // Forelimbs, braced on the floor either side of the belly.
+    for (const side of [-1, 1]) {
+      const pts = [[side * 7, 21], [side * 21, 25], [side * 28, 58]];
+      for (let n = 0; n < 2; n++) {
+        const w = n === 0 ? 3.6 : 3.0; // thick, heavy limbs: they carry all that weight
+        const d = segmentDistance(dx, y, pts[n][0], pts[n][1], pts[n + 1][0], pts[n + 1][1]);
+        if (d < w) return skin(BROOD_SKIN, x, y, 1.05 - 0.45 * d / w, 164);
+      }
+      for (const k of [-1, 1]) if (segmentDistance(dx, y, side * 28, 58, side * 28 + k * 3, 62) < 0.8) return CLAW;
+    }
+    const belly = inEllipse(dx, y, b.cx - 32, b.cy, b.rx, b.ry);
+    if (belly !== null) return bellyTexel(x, y, dx, belly, swell, swell ? 1 : 0);
+    const torso = inEllipse(dx, y, 0, 23, 11, 9);
+    if (torso !== null) return skin(BROOD_SKIN, x, y, 1.15 - 0.45 * torso, 165);
+    const head = inEllipse(dx, y, 0, 12, 5, 4.5);
+    if (head !== null) {
+      if (y >= 10 && y < 12 && [-3, -1, 1, 3].some((ex) => Math.abs(dx - ex) < 0.7)) return glowing(CREATURE_EYE); // four eyes
+      if (y >= 14 && y < 16 && Math.abs(dx) < 2.5) return swell ? MAW : brighten(BROOD_DARK, 0.8);
+      return skin(BROOD_SKIN, x, y, 1.1 - 0.4 * head, 166);
+    }
+    if (y >= 56 && Math.abs(dx) < 30 - (63 - y) * 1.5) return skin(BROOD_DARK, x, y, 0.9, 167); // the nest she's rooted in
+    return null;
+  };
+}
+
+// Behind her: a hunched back with a ridge of spines and clusters of eggs.
+function broodBackShape() {
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    for (const [ex, ey] of [[-12, 34], [13, 38], [-6, 46], [8, 28]]) {
+      const e = Math.hypot(dx - ex, y + 0.5 - ey);
+      if (e < 3.5) return glowing(brighten(BELLY_GLOW, 0.5 - 0.1 * e)); // eggs on her back
+    }
+    const back = inEllipse(dx, y, 0, 40, 24, 20);
+    if (back !== null) {
+      if (Math.abs(dx) < 1.5 && y < 40 && y % 4 < 2) return brighten(CLAW, 0.75); // spines
+      return skin(BROOD_SKIN, x, y, 1.1 - 0.5 * back, 168);
+    }
+    const head = inEllipse(dx, y, 0, 18, 5, 4.5);
+    if (head !== null) return skin(BROOD_SKIN, x, y, 0.95 - 0.4 * head, 169);
+    if (y >= 56 && Math.abs(dx) < 30 - (63 - y) * 1.5) return skin(BROOD_DARK, x, y, 0.9, 167);
+    return null;
+  };
+}
+
+// Side on, facing right: the belly hangs forward, the torso rears over it.
+function broodSideShape() {
+  return (x, y) => {
+    const dx = x + 0.5 - 32;
+    if (segmentDistance(dx, y, 6, 22, 16, 30) < 2.2 || segmentDistance(dx, y, 16, 30, 22, 58) < 1.8) return skin(BROOD_SKIN, x, y, 1, 164);
+    const head = inEllipse(dx, y, 8, 14, 5, 4);
+    if (head !== null) {
+      if (dx >= 10 && dx < 12.5 && y >= 12 && y < 14) return glowing(CREATURE_EYE);
+      return skin(BROOD_SKIN, x, y, 1.1 - 0.4 * head, 166);
+    }
+    const belly = inEllipse(dx, y, 4, 44, 20, 14);
+    if (belly !== null) return bellyTexel(x, y, dx - 4, belly, false, 2);
+    const back = inEllipse(dx, y, -10, 38, 14, 18);
+    if (back !== null) return skin(BROOD_SKIN, x, y, 1.1 - 0.5 * back, 168);
+    const torso = inEllipse(dx, y, 2, 24, 7, 8);
+    if (torso !== null) return skin(BROOD_SKIN, x, y, 1.1 - 0.45 * torso, 165);
+    if (y >= 56 && Math.abs(dx) < 30 - (63 - y) * 1.5) return skin(BROOD_DARK, x, y, 0.9, 167);
+    return null;
+  };
+}
+
+function makeBroodFrames() {
+  const bake = (shape) => makeTexture(BROOD_SKIN, shape);
+  const side = bake(broodSideShape());
+  return {
+    front: { stand: bake(broodFrontShape('stand')), swell: bake(broodFrontShape('swell')) },
+    back:  { stand: bake(broodBackShape()) },
+    right: { stand: side },
+    left:  { stand: bake(mirroredShape(broodSideShape(), true)) },
+  };
+}
+
+// Dead: the belly burst and slumped flat, dark now, the limbs splayed.
+function makeBroodCorpse() {
+  return makeTexture(BROOD_SKIN, (x, y) => {
+    const dx = x + 0.5 - 32;
+    for (const side of [-1, 1]) if (segmentDistance(dx, y, side * 10, 52, side * 29, 60) < 2) return skin(BROOD_SKIN, x, y, 0.7, 170);
+    const heap = inEllipse(dx, y, 0, 57, 24, 7);
+    if (heap !== null) {
+      if (heap < 0.6 && noise(x >> 1, y, 171) < 0.5) return brighten(BELLY_GLOW, 0.25); // what's left inside, gone dark
+      return skin(BROOD_SKIN, x, y, 0.8 - 0.3 * heap, 172);
+    }
+    if (y >= 61 && Math.abs(dx) < 30) return brighten(ICHOR, 0.7 + 0.3 * noise(x, y, 173));
+    return null;
+  });
+}
+
 ROBOT_FRAMES.lurcher = makeLurcherFrames();
 ROBOT_FRAMES.spitter = makeSpitterFrames();
+ROBOT_FRAMES.brood = makeBroodFrames();
 ROBOT_FRAMES.stalker = STALKER_FRAMES[3]; // fully seen: the default (the debug map, the load check)
 // What each type leaves behind (enemies.js). Robots leave the robot wreck.
-const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse(), spitter: makeSpitterCorpse(), stalker: makeStalkerCorpse() };
+const CORPSE_TEXTURES = { lurcher: makeLurcherCorpse(), spitter: makeSpitterCorpse(), stalker: makeStalkerCorpse(), brood: makeBroodCorpse() };

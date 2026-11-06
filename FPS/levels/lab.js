@@ -1,6 +1,6 @@
 // LEVEL 4: GENETICS, sublevel 3, 24 cells wide and 16 tall. The second lab
-// level: the lurchers again, and now the spitters, the larvae and their pods,
-// and the BREEDING CHAMBER. It has the
+// level: the lurchers again, and now the spitters, the stalkers, the larvae
+// and their pods, the BROOD MOTHER, and the BREEDING CHAMBER. It has the
 // lab's own look (stained white tiles, bench cabinets, cold fluorescents,
 // slime), its own objective, the BREEDING CHAMBER, and its own enemies: the
 // lab's CREATURES (creatures.js), which hear you rather than watch for you,
@@ -88,6 +88,10 @@ LEVELS.push({
     // hall's dark end, past the tanks; one between the lower lab's lights.
     { type: 'stalker', x: 22.5, y: 8.5,  angle: Math.PI },
     { type: 'stalker', x: 16.5, y: 14.5, angle: Math.PI },
+    // THE BROOD MOTHER (brood.js), rooted in her nest at the lower lab's far
+    // end. Once she's awake she births larvae every few seconds until she
+    // dies: her belly takes double. Burn the chamber while she pours them out.
+    { type: 'brood',   x: 21.5, y: 13.5, angle: Math.PI },
     { type: 'spitter', x: 19.5, y: 13.5, angle: Math.PI },
   ],
 
@@ -124,6 +128,10 @@ LEVELS.push({
   // Signs, and a trail of slime from the tanks down to the chamber. (More
   // slime and damp are scattered by the rules in decals.js.)
   decals: [
+    // The brood mother's nest: slime all round her.
+    { surface: 'floor', type: 'slime', x: 20, y: 13 },
+    { surface: 'floor', type: 'slime', x: 21, y: 12 },
+    { surface: 'floor', type: 'slime', x: 22, y: 14 },
     // Facing you as you start.
     { surface: 'wall', type: 'genetics',  x: 10, y: 2, face: 'W' },
     { surface: 'wall', type: 'biohazard', x: 10, y: 4, face: 'W' },

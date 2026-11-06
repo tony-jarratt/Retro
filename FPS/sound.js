@@ -420,6 +420,27 @@ function sfxStalkerSlash(enemy) {
   noiseBurst(out, 'highpass', 4000, 2500, 0.22, 0.4);
   noiseBurst(out, 'bandpass', 2500, 900, 0.12, 0.35, 0.22);
 }
+// The brood mother. Waking: a deep, slow groan. Labour: a wet groan that
+// rises as her belly swells. Birth: a heavy wet split and splatter.
+function sfxBroodWake(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 55, 45, 1.4, 0.18);
+  noiseBurst(out, 'lowpass', 400, 120, 1.2, 0.3);
+}
+function sfxBroodLabour(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  tone(out, 'sawtooth', 60, 140, 1.2, 0.16);
+  tone(out, 'sawtooth', 63, 146, 1.2, 0.1);
+  noiseBurst(out, 'bandpass', 300, 900, 1.2, 0.25);
+}
+function sfxBroodBirth(enemy) {
+  const out = placeAt(enemy.x, enemy.y);
+  if (!out) return;
+  noiseBurst(out, 'lowpass', 1800, 150, 0.5, 0.8);
+  drumHit(out, 'sine', 90, 40, 0.06, 0.3, 0.6);
+}
 function sfxCreatureHit(enemy) {
   const out = placeAt(enemy.x, enemy.y);
   if (!out) return;
@@ -893,6 +914,9 @@ function watchTheGame() {
       if (e.state === 'windup') sfxLurcherRear(e);
       if (e.state === 'lunge') sfxLurcherSwipe(e);
       if (e.state === 'slash') sfxStalkerSlash(e);
+      if (e.state === 'labour') sfxBroodLabour(e);
+      if (e.state === 'awake' && was.state === 'labour') sfxBroodBirth(e);
+      if (e.state === 'awake' && was.state === 'idle') sfxBroodWake(e);
     }
   }
   // A pickup that was in the list last frame and isn't now has been collected.

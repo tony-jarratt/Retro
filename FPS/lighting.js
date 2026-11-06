@@ -232,6 +232,7 @@ function updateLighting() {
   addSecurityLights(lightGrid); // cameras' red spots (security.js)
   addCoreLights(lightGrid);     // the core's pulsing heart (core.js)
   addRepairLights(lightGrid);   // repair bays' lamps and welding (repair.js)
+  addBroodLights(lightGrid);    // the brood mother's glowing belly (brood.js)
   addAcidLights(lightGrid);     // globs in flight and pools of acid (acid.js)
   addSporeLights(lightGrid);    // spore clouds' glowing motes (spores.js)
 

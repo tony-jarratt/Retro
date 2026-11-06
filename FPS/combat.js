@@ -68,9 +68,10 @@ function shotTarget(angle) {
     const texY = thing.aimRow !== null ? thing.aimRow : Math.floor((SCREEN_H / 2 - spot.top) / spot.size * TEX_SIZE);
     if (texX < 0 || texX >= TEX_SIZE || texY < 0 || texY >= TEX_SIZE) continue; // the shot misses its square
     if (isTransparent(thing.tex, texX, texY)) continue; // over its square, but on a see-through bit
-    if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward };
+    if (!best || spot.forward < best.forward) best = { thing, forward: spot.forward, texX, texY };
   }
-  if (best) return best.thing;
+  // Which texel it hit goes along too (brood.js tests for her belly).
+  if (best) return { ...best.thing, texX: best.texX, texY: best.texY };
   if (glass) return { panel: glass.panel }; // nothing nearer: the window takes it
   if (ray.cell === CORE_CELL) return { core: true };
   if (ray.cell === REPAIR_CELL) return { bay: bayAt(ray.cellX, ray.cellY) }; // repair.js
@@ -126,7 +127,8 @@ function shotHits(target) {
   if (target.enemy && target.enemy.state === 'dead') finishOff(target.enemy); // infected.js: a downed suit, for good
   if (target.enemy && target.enemy.state !== 'dead') {
     // A shot into a robot's back can count for more (the heavy's exposed vents).
-    const hits = isFacingAway(target.enemy) ? ENEMY_TYPES[target.enemy.type].backHits : 1;
+    const hits = target.enemy.type === 'brood' ? (broodBellyHit(target.enemy, target.texX, target.texY) ? 2 : 1) // brood.js: the belly
+      : isFacingAway(target.enemy) ? ENEMY_TYPES[target.enemy.type].backHits : 1;
     damageEnemy(target.enemy, hits);
   }
   if (target.camera) shootCamera(target.camera); // security.js

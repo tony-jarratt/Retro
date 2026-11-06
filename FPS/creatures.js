@@ -159,6 +159,7 @@ function makeNoise(x, y, radius) {
     if (Math.hypot(e.x - x, e.y - y) <= reach) alertEnemy(e, x, y);
   }
   larvaeHear(x, y, radius); // larvae.js: waiting larvae, and the pods
+  broodHears(x, y, radius); // brood.js: the brood mother wakes
 }
 
 // How far this creature can see you right now. Unaware (idle, or searching

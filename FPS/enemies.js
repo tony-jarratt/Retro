@@ -43,6 +43,8 @@ const BEACON_ALERT_RATE = 5;                 // ...and fast once it has: it's ca
 //   spitter  frail, keeps its distance and lobs acid where you're standing
 //            (acid.js), leaving a burning pool. Its glands are on its back:
 //            hits there count double. Get close, and it backs off.
+//   brood    the brood mother: rooted, tough, no attack of her own; she
+//            BIRTHS larvae while awake, and her belly takes double (brood.js)
 //   stalker  fast and frail, nearly invisible in the dark; slashes and runs,
 //            and holds off from you while you're lit up (stalker.js)
 //
@@ -90,6 +92,7 @@ const ENEMY_TYPES = {
   lurcher: { speed: 1.3, health: 5, aimRange: 1.6, weapon: 'melee',              damage: 30, creature: true, feeds: true },
   spitter: { speed: 1.0, health: 3, aimRange: 6,   weapon: 'lob',    charge: 1.3, damage: 15, backHits: 2, creature: true, retreat: 2.5 },
   stalker: { speed: 2.5, health: 3, aimRange: 1.0, weapon: 'slash',              damage: 12, creature: true },
+  brood:   { speed: 0,   health: 20, aimRange: 0,  weapon: 'brood', mobile: false, creature: true },
   suit:    { speed: 0.9, health: 3, aimRange: 0.8, weapon: 'grab',             damage: 4,  creature: true, rises: true },
   bloomer: { speed: 0,   health: 2, aimRange: 2.2, weapon: 'spores', charge: 0.9, mobile: false, creature: true },
 };
@@ -245,6 +248,7 @@ function alertEnemy(enemy, x, y) {
 // (updateEnemy). An offline turret has been shut down and doesn't react.
 function turnTowardsPlayer(enemy) {
   if (enemy.state === 'dead' || enemy.state === 'offline') return;
+  if (enemy.type === 'brood') return; // she turns herself, slowly (brood.js)
   if (ATTACK_STATES.includes(enemy.state)) return; // a creature mid-attack is already facing you, and won't be put off
   if (enemy.state === 'retreat' || enemy.state === 'repair') return; // fleeing to a bay, or docked: it shows you its back (repair.js)
   if (['hungry', 'feed', 'slash', 'flee', 'lurk'].includes(enemy.state)) return; // going to eat or eating (feeding.js); a stalker's own moves (stalker.js)
@@ -443,6 +447,7 @@ function updateEnemy(enemy, dt) {
   const type = ENEMY_TYPES[enemy.type];
   if (type.mobile) updateWalker(enemy, dt);
   else if (type.weapon === 'spores') updateBloomer(enemy, dt); // infected.js
+  else if (type.weapon === 'brood') updateBrood(enemy, dt);    // brood.js
   else updateTurret(enemy, dt);
 
   // Charging only happens while aiming. Leaving 'aim' (you duck out of sight,
@@ -478,7 +483,7 @@ function enemyTexture(enemy, viewer) {
     : enemy.type === 'stalker' ? STALKER_FRAMES[stalkerVisibility(enemy)] // stalker.js: seen only as well as it's lit
     : ROBOT_FRAMES[enemy.type];
   // A creature's attack faces you throughout, so it's only ever seen from the front.
-  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open', slash: 'slash' }[enemy.state];
+  const attackPose = { windup: 'rear', lunge: 'lunge', recover: 'stand', grab: 'grab', stagger: 'stand', rising: 'rise', swell: 'swell', spent: 'open', slash: 'slash', labour: 'swell' }[enemy.state];
   if (attackPose) return frames.front[attackPose];
   if (enemy.state === 'aim') {
     // It always faces you while aiming, so only the front is ever needed.

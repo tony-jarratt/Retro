@@ -356,6 +356,17 @@ cameras, tripwires or terminals (owner, 2026-11-05).
   the one further from you swings round to your side (a quarter turn from
   its partner, 1.5 cells out) instead of following. Storage: the cold store
   and the service passage are pairs; Genetics: the lower lab's two.
+- **The brood mother** (`brood.js`, art in `creature-art.js`; owner
+  2026-11-06: LAB ONLY, the only spawner; a non-lab level with one is a
+  load error). Rooted in her nest, turns slowly to face you, no attack of
+  her own: her brood is her weapon. Asleep until a noise, sight of you or a
+  hit wakes her; then every 6 s her belly SWELLS (1.2 s: stretched, blazing
+  green, lighting the room, a rising groan) and splits, spilling 3 larvae,
+  already swarming. At most 10 of hers alive at once. 20 hits; rounds on her
+  BELLY while she faces you count double (the gun can't aim up or down, so
+  in practice: from the front, near her middle; her limbs count single).
+  Blasts hurt her. Her body is food for 6 hits (feeding.js) unless burnt.
+  One in Genetics, at the lower lab's far end (21.5, 13.5).
 - **Creatures drop nothing** (owner: it makes sense for robots, not
   creatures). The lab's ammo comes in big supply crates (`ammocrate`, +20),
   and the automatic module lies in the larvae's nest. They can't open doors
@@ -449,10 +460,9 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 
 ## 9. Open ideas
 
-- **Next (agreed 2026-11-06): spawn events**, both kinds: scripted, telegraphed ambushes (a trigger
-     such as a room or the lift key; a hatch flashes and a klaxon sounds,
-     then enemies drop in), and spawners you must kill (an industrial
-     **fabricator** building robots; a lab **brood mother** birthing young).
+- Spawn events beyond the brood mother (telegraphed scripted ambushes, an
+  industrial fabricator) were proposed and NOT taken up (owner, 2026-11-06:
+  spawning should feel like a lab-only thing).
 - Ammo types (the gun's coil colour is reserved for this).
 - Rebalancing the sound mix (relative volumes).
 
