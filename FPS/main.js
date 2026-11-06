@@ -94,6 +94,12 @@ setupInput(screenCanvas, {
   loadAmmo,    // ammo.js: keys 1-3
   toggleScanner, // scanner.js: X
   // Play-testing: K gives you the scanner without finding it, and switches it on.
+  // Play-testing: I makes you invulnerable (and again, not): hits still flash, but cost nothing.
+  toggleInvulnerable: () => {
+    if (!PLAYTEST) return;
+    player.invulnerable = !player.invulnerable;
+    if (player.invulnerable) player.armour = player.maxArmour;
+  },
   cheatScanner: () => {
     if (!PLAYTEST) return;
     player.scanner = true;

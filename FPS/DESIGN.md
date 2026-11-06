@@ -701,7 +701,7 @@ fire (hold to spin up) · 1 2 3 load standard / incendiary / piercing · X scann
 Enter carry on (title, briefing, LEVEL COMPLETE, finale) · P pause (shows
 the controls; R and Enter aren't listed, the screens that use them say so;
 the page itself has no help text) · with `?playtest` only: M map, V visor,
-C CRT, K give the scanner (and switch it on), L level chooser.
+C CRT, K give the scanner (and switch it on), I invulnerable (on/off), L level chooser.
 
 ---
 

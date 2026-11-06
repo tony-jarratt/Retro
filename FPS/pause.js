@@ -25,7 +25,7 @@ const CONTROLS = [
   ['X', 'SCANNER ON / OFF  ONCE FOUND'],
   ['CLICK VIEW', 'CAPTURE MOUSE'],
   ['ESC', 'FREE MOUSE'],
-  ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT'], ['K', 'GIVE SCANNER']] : []),
+  ...(PLAYTEST ? [['M', 'MAP'], ['V', 'VISOR'], ['C', 'CRT'], ['K', 'GIVE SCANNER'], ['I', 'INVULNERABLE']] : []),
   ['N', 'SOUND'],
   ['U', 'MUSIC'],
   ...(PLAYTEST ? [['L', 'LEVEL CHOOSER']] : []),

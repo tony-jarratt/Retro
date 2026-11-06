@@ -228,6 +228,7 @@ function robotFires(enemy, dist) {
 // breached suit is fatal.
 function damagePlayer(amount) {
   if (game.state !== 'playing') return;
+  if (player.invulnerable) { game.hurtFlash = PLAYER_HURT_FLASH; return; } // play-testing (I): you see it land, it costs nothing
   if (player.armour === 0) { killPlayer(); return; }
   game.hurtFlash = PLAYER_HURT_FLASH;
   sfxSuitHit(); // sound.js
@@ -238,7 +239,7 @@ function damagePlayer(amount) {
 // Dead, whatever your armour: a breached suit taking any hit, or standing
 // on top of the demolition charge as it goes off (charge.js).
 function killPlayer() {
-  if (game.state !== 'playing') return;
+  if (game.state !== 'playing' || player.invulnerable) return; // play-testing (I)
   game.hurtFlash = PLAYER_HURT_FLASH;
   sfxSuitHit(); // sound.js
   game.state = 'dead';

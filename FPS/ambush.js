@@ -256,7 +256,7 @@ function updateLatch(dt) {
   if (latched.drain >= 1) {
     const n = Math.floor(latched.drain);
     latched.drain -= n;
-    if (player.armour > 0) {
+    if (player.armour > 0 && !player.invulnerable) { // play-testing (I): no drain
       player.armour = Math.max(0, player.armour - n);
       if (player.armour === 0) showSecurityMessage('SUIT BREACH'); // security.js, as combat.js does
     }
