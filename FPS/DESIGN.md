@@ -651,6 +651,8 @@ chamber or mother plant). Still to build: a per-level enemy roster and ambience 
 - Spawn events beyond the brood mother (telegraphed scripted ambushes, an
   industrial fabricator) were proposed and NOT taken up (owner, 2026-11-06:
   spawning should feel like a lab-only thing).
+- 8 view angles for enemies instead of 4: PARKED (owner, 2026-11-06: the 4
+  work fine; no change for the sake of it).
 - A configurable visor (owner, later): the readouts are separate pieces
   (`VISOR_SHOWS_AMMO` in ammo.js is the first such switch).
 - Rebalancing the sound mix (relative volumes).
