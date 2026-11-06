@@ -17,7 +17,7 @@
 // the lift, as every evacuation plan shows it.
 
 const PLAN_RANGE = 1.3;     // cells from the sign's face: standing in front of it
-const PLAN_FACING = 1.2;    // radians either side of looking straight at it
+const PLAN_FACING = 0.6;    // radians (about 35 degrees) either side of looking straight at it: you have to look at it
 const PLAN_MAX_CELL = 5;    // screen pixels per map cell, at most
 const PLAN_DECAL = { industrial: 'planScreen', lab: 'planWhiteboard', hq: 'planEvacuation' };
 
