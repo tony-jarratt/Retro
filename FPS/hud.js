@@ -347,8 +347,7 @@ function drawHud(pixels) {
       drawTextCentred(pixels, securityMessage, 50, ok ? HUD_GREEN : HUD_WARN, 2);
     }
     // Standing at a floor plan, you see it (plans.js), over any message.
-    const plan = planInView();
-    if (plan) drawPlan(pixels, plan);
+    if (planInView()) drawPlan(pixels);
     // While any alarm is going, a red ALARM blinks at the top of the screen.
     if (Object.values(alarms).some((t) => t > 0) && Math.floor(animTime * 3) % 2 === 0) {
       drawTextCentred(pixels, 'ALARM', 1, HUD_WARN, 1); // on the visor's top rim

@@ -78,8 +78,10 @@ the industrial sector's **security terminals** (green on black; a level with
 none has a wall monitor), the lab's **whiteboard** (blue marker, skips and
 all), the HQ's **fire evacuation plan** (red band, printed). A level lists its
 signs in `plans` ({x, y, face}, like a wall decal). **Rooms only**: walls and
-doorways, no items, props or enemies (owner: details TBD). The one mark is
-YOU ARE HERE, where the plan hangs.
+doorways, no items, props or enemies (owner: details TBD). Two marks:
+YOU ARE HERE, a triangle where you stand pointing the way you face (snapped
+to 8 directions, so it reads at this resolution), and the EXIT: the lift's
+cells in green (bright on the screen) with EXIT beside them, room side.
 
 ### Ammo types (`ammo.js`, owner 2026-11-06)
 
